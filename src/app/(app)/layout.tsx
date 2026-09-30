@@ -1,0 +1,37 @@
+import { cookies } from "next/headers"
+
+import { ShellAplicacion } from "@/components/layout/shell-aplicacion"
+import { obtenerUsuarioShell } from "@/lib/auth/dal"
+
+/** La escribe el SidebarProvider de shadcn al colapsar o expandir. */
+const COOKIE_BARRA_LATERAL = "sidebar_state"
+
+function preferenciaBarraLateral(valor: string | undefined): boolean | null {
+  if (valor === "true") return true
+  if (valor === "false") return false
+  return null
+}
+
+/**
+ * AppShell de las secciones privadas. No es la compuerta de seguridad (los
+ * layouts no se vuelven a ejecutar al navegar): cada página y cada Server
+ * Action autoriza con el DAL. Sin usuario al día no hay shell que pintar:
+ * `obtenerUsuarioShell` redirige al ingreso o al paso pendiente.
+ */
+export default async function LayoutAplicacion({ children }: LayoutProps<"/">) {
+  const [usuario, almacenCookies] = await Promise.all([
+    obtenerUsuarioShell(),
+    cookies(),
+  ])
+
+  return (
+    <ShellAplicacion
+      usuario={usuario}
+      barraLateralAbierta={preferenciaBarraLateral(
+        almacenCookies.get(COOKIE_BARRA_LATERAL)?.value
+      )}
+    >
+      {children}
+    </ShellAplicacion>
+  )
+}

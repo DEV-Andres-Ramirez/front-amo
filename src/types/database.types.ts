@@ -1,0 +1,2467 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHIVO GENERADO — no editar a mano.
+// Origen: Supabase generate_typescript_types (proyecto zygfqfvqwfvhbirmjojp, esquema public),
+// última migración aplicada: 20260930222842_negocio_actores.
+// Regenerar con `pnpm db:types` (scripts/db/generar-tipos.ts; requiere `supabase login`).
+// ─────────────────────────────────────────────────────────────────────────────
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
+  public: {
+    Tables: {
+      accesos: {
+        Row: {
+          aal: string | null
+          ciudad: string | null
+          created_at: string
+          departamento_codigo: string | null
+          dispositivo: string | null
+          email_hash: string | null
+          es_demo: boolean
+          es_sospechoso: boolean
+          evento: Database["public"]["Enums"]["acceso_evento"]
+          id: number
+          ip: unknown
+          lat: number | null
+          lon: number | null
+          motivo_sospecha: string | null
+          municipio_codigo: string | null
+          navegador: string | null
+          pais_iso2: string | null
+          session_id: string | null
+          sistema_operativo: string | null
+          user_agent: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          aal?: string | null
+          ciudad?: string | null
+          created_at?: string
+          departamento_codigo?: string | null
+          dispositivo?: string | null
+          email_hash?: string | null
+          es_demo?: boolean
+          es_sospechoso?: boolean
+          evento: Database["public"]["Enums"]["acceso_evento"]
+          id?: never
+          ip?: unknown
+          lat?: number | null
+          lon?: number | null
+          motivo_sospecha?: string | null
+          municipio_codigo?: string | null
+          navegador?: string | null
+          pais_iso2?: string | null
+          session_id?: string | null
+          sistema_operativo?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          aal?: string | null
+          ciudad?: string | null
+          created_at?: string
+          departamento_codigo?: string | null
+          dispositivo?: string | null
+          email_hash?: string | null
+          es_demo?: boolean
+          es_sospechoso?: boolean
+          evento?: Database["public"]["Enums"]["acceso_evento"]
+          id?: never
+          ip?: unknown
+          lat?: number | null
+          lon?: number | null
+          motivo_sospecha?: string | null
+          municipio_codigo?: string | null
+          navegador?: string | null
+          pais_iso2?: string | null
+          session_id?: string | null
+          sistema_operativo?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accesos_departamento_codigo_fkey"
+            columns: ["departamento_codigo"]
+            isOneToOne: false
+            referencedRelation: "departamentos"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "accesos_municipio_codigo_fkey"
+            columns: ["municipio_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "accesos_pais_iso2_fkey"
+            columns: ["pais_iso2"]
+            isOneToOne: false
+            referencedRelation: "paises"
+            referencedColumns: ["iso2"]
+          },
+          {
+            foreignKeyName: "accesos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aceptaciones_terminos: {
+        Row: {
+          aceptada_at: string
+          email_sha256: string
+          id: number
+          ip: unknown
+          perfil_id: string
+          termino_version_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          aceptada_at?: string
+          email_sha256: string
+          id?: never
+          ip?: unknown
+          perfil_id: string
+          termino_version_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          aceptada_at?: string
+          email_sha256?: string
+          id?: never
+          ip?: unknown
+          perfil_id?: string
+          termino_version_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aceptaciones_terminos_termino_version_id_fkey"
+            columns: ["termino_version_id"]
+            isOneToOne: false
+            referencedRelation: "terminos_versiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anunciantes: {
+        Row: {
+          ciudad_extranjera: string | null
+          created_at: string
+          datos_facturacion: Json
+          deleted_at: string | null
+          digito_verificacion: string | null
+          es_demo: boolean
+          estado_verificacion: Database["public"]["Enums"]["anunciante_estado"]
+          id: string
+          identificacion_extranjera: string | null
+          logo_path: string | null
+          motivo_estado: string | null
+          municipio_codigo: string | null
+          nit: string | null
+          nombre_comercial: string
+          nombre_normalizado: string | null
+          pais_iso2: string
+          razon_social: string
+          rechazado_at: string | null
+          sector_id: string
+          suspendido_at: string | null
+          updated_at: string
+          verificado_at: string | null
+          verificado_por: string | null
+        }
+        Insert: {
+          ciudad_extranjera?: string | null
+          created_at?: string
+          datos_facturacion?: Json
+          deleted_at?: string | null
+          digito_verificacion?: string | null
+          es_demo?: boolean
+          estado_verificacion?: Database["public"]["Enums"]["anunciante_estado"]
+          id?: string
+          identificacion_extranjera?: string | null
+          logo_path?: string | null
+          motivo_estado?: string | null
+          municipio_codigo?: string | null
+          nit?: string | null
+          nombre_comercial: string
+          nombre_normalizado?: string | null
+          pais_iso2?: string
+          razon_social: string
+          rechazado_at?: string | null
+          sector_id: string
+          suspendido_at?: string | null
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Update: {
+          ciudad_extranjera?: string | null
+          created_at?: string
+          datos_facturacion?: Json
+          deleted_at?: string | null
+          digito_verificacion?: string | null
+          es_demo?: boolean
+          estado_verificacion?: Database["public"]["Enums"]["anunciante_estado"]
+          id?: string
+          identificacion_extranjera?: string | null
+          logo_path?: string | null
+          motivo_estado?: string | null
+          municipio_codigo?: string | null
+          nit?: string | null
+          nombre_comercial?: string
+          nombre_normalizado?: string | null
+          pais_iso2?: string
+          razon_social?: string
+          rechazado_at?: string | null
+          sector_id?: string
+          suspendido_at?: string | null
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anunciantes_municipio_codigo_fkey"
+            columns: ["municipio_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "anunciantes_pais_iso2_fkey"
+            columns: ["pais_iso2"]
+            isOneToOne: false
+            referencedRelation: "paises"
+            referencedColumns: ["iso2"]
+          },
+          {
+            foreignKeyName: "anunciantes_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anunciantes_verificado_por_fkey"
+            columns: ["verificado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anunciantes_privado: {
+        Row: {
+          anunciante_id: string
+          contacto_celular: string | null
+          contacto_email: string | null
+          contacto_nombre: string | null
+          created_at: string
+          direccion: string | null
+          updated_at: string
+        }
+        Insert: {
+          anunciante_id: string
+          contacto_celular?: string | null
+          contacto_email?: string | null
+          contacto_nombre?: string | null
+          created_at?: string
+          direccion?: string | null
+          updated_at?: string
+        }
+        Update: {
+          anunciante_id?: string
+          contacto_celular?: string | null
+          contacto_email?: string | null
+          contacto_nombre?: string | null
+          created_at?: string
+          direccion?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anunciantes_privado_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: true
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bitacora: {
+        Row: {
+          accion: string
+          actor_email: string | null
+          actor_id: string | null
+          actor_rol: string | null
+          cambios: Json | null
+          ciudad: string | null
+          created_at: string
+          entidad: string
+          entidad_id: string | null
+          es_demo: boolean
+          estado_anterior: string | null
+          estado_nuevo: string | null
+          id: number
+          ip: unknown
+          metadatos: Json
+          motivo: string | null
+          origen: Database["public"]["Enums"]["bitacora_origen"]
+          pais_iso2: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          accion: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_rol?: string | null
+          cambios?: Json | null
+          ciudad?: string | null
+          created_at?: string
+          entidad: string
+          entidad_id?: string | null
+          es_demo?: boolean
+          estado_anterior?: string | null
+          estado_nuevo?: string | null
+          id?: never
+          ip?: unknown
+          metadatos?: Json
+          motivo?: string | null
+          origen: Database["public"]["Enums"]["bitacora_origen"]
+          pais_iso2?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          accion?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_rol?: string | null
+          cambios?: Json | null
+          ciudad?: string | null
+          created_at?: string
+          entidad?: string
+          entidad_id?: string | null
+          es_demo?: boolean
+          estado_anterior?: string | null
+          estado_nuevo?: string | null
+          id?: never
+          ip?: unknown
+          metadatos?: Json
+          motivo?: string | null
+          origen?: Database["public"]["Enums"]["bitacora_origen"]
+          pais_iso2?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitacora_pais_iso2_fkey"
+            columns: ["pais_iso2"]
+            isOneToOne: false
+            referencedRelation: "paises"
+            referencedColumns: ["iso2"]
+          },
+        ]
+      }
+      categorias: {
+        Row: {
+          activo: boolean
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+          nombre_normalizado: string | null
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          nombre_normalizado?: string | null
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          nombre_normalizado?: string | null
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracion: {
+        Row: {
+          actualizado_por: string | null
+          clave: string
+          created_at: string
+          descripcion: string
+          es_publica: boolean
+          maximo: number | null
+          minimo: number | null
+          modulo: string
+          opciones: string[] | null
+          pendiente_validacion: boolean
+          tipo: Database["public"]["Enums"]["config_tipo"]
+          unidad: string | null
+          updated_at: string
+          valor: Json
+        }
+        Insert: {
+          actualizado_por?: string | null
+          clave: string
+          created_at?: string
+          descripcion: string
+          es_publica?: boolean
+          maximo?: number | null
+          minimo?: number | null
+          modulo: string
+          opciones?: string[] | null
+          pendiente_validacion?: boolean
+          tipo: Database["public"]["Enums"]["config_tipo"]
+          unidad?: string | null
+          updated_at?: string
+          valor: Json
+        }
+        Update: {
+          actualizado_por?: string | null
+          clave?: string
+          created_at?: string
+          descripcion?: string
+          es_publica?: boolean
+          maximo?: number | null
+          minimo?: number | null
+          modulo?: string
+          opciones?: string[] | null
+          pendiente_validacion?: boolean
+          tipo?: Database["public"]["Enums"]["config_tipo"]
+          unidad?: string | null
+          updated_at?: string
+          valor?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracion_actualizado_por_fkey"
+            columns: ["actualizado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cuentas_sociales: {
+        Row: {
+          alcance_mediano: number | null
+          created_at: string
+          deleted_at: string | null
+          fecha_ultima_verificacion: string | null
+          franja_id: string | null
+          handle: string
+          id: string
+          indice_calidad: number | null
+          medio_id: string
+          metodo_verificacion:
+            | Database["public"]["Enums"]["metodo_verificacion"]
+            | null
+          multiplicador_calculado_at: string | null
+          multiplicador_calidad: number
+          multiplicador_proximo: number | null
+          multiplicador_proximo_desde: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          publicaciones_verificadas_count: number
+          seguidores_verificados: number | null
+          tarifa_referencia: number | null
+          updated_at: string
+          url: string
+          verificada: boolean
+        }
+        Insert: {
+          alcance_mediano?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          fecha_ultima_verificacion?: string | null
+          franja_id?: string | null
+          handle: string
+          id?: string
+          indice_calidad?: number | null
+          medio_id: string
+          metodo_verificacion?:
+            | Database["public"]["Enums"]["metodo_verificacion"]
+            | null
+          multiplicador_calculado_at?: string | null
+          multiplicador_calidad?: number
+          multiplicador_proximo?: number | null
+          multiplicador_proximo_desde?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          publicaciones_verificadas_count?: number
+          seguidores_verificados?: number | null
+          tarifa_referencia?: number | null
+          updated_at?: string
+          url: string
+          verificada?: boolean
+        }
+        Update: {
+          alcance_mediano?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          fecha_ultima_verificacion?: string | null
+          franja_id?: string | null
+          handle?: string
+          id?: string
+          indice_calidad?: number | null
+          medio_id?: string
+          metodo_verificacion?:
+            | Database["public"]["Enums"]["metodo_verificacion"]
+            | null
+          multiplicador_calculado_at?: string | null
+          multiplicador_calidad?: number
+          multiplicador_proximo?: number | null
+          multiplicador_proximo_desde?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          publicaciones_verificadas_count?: number
+          seguidores_verificados?: number | null
+          tarifa_referencia?: number | null
+          updated_at?: string
+          url?: string
+          verificada?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuentas_sociales_franja_id_fkey"
+            columns: ["franja_id"]
+            isOneToOne: false
+            referencedRelation: "franjas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuentas_sociales_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departamentos: {
+        Row: {
+          activo: boolean
+          alias: string[]
+          bbox: number[] | null
+          capital_codigo: string | null
+          codigo: string
+          iso_3166_2: string
+          lat: number | null
+          lon: number | null
+          nombre: string
+          nombre_corto: string
+          nombre_normalizado: string
+          poblacion: number | null
+          region: string
+        }
+        Insert: {
+          activo?: boolean
+          alias?: string[]
+          bbox?: number[] | null
+          capital_codigo?: string | null
+          codigo: string
+          iso_3166_2: string
+          lat?: number | null
+          lon?: number | null
+          nombre: string
+          nombre_corto: string
+          nombre_normalizado: string
+          poblacion?: number | null
+          region: string
+        }
+        Update: {
+          activo?: boolean
+          alias?: string[]
+          bbox?: number[] | null
+          capital_codigo?: string | null
+          codigo?: string
+          iso_3166_2?: string
+          lat?: number | null
+          lon?: number | null
+          nombre?: string
+          nombre_corto?: string
+          nombre_normalizado?: string
+          poblacion?: number | null
+          region?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departamentos_capital_codigo_fkey"
+            columns: ["capital_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+        ]
+      }
+      documentos_anunciante: {
+        Row: {
+          anunciante_id: string
+          archivo_path: string
+          created_at: string
+          estado_validacion: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento: string | null
+          id: string
+          observaciones: string | null
+          subido_por: string | null
+          tipo: Database["public"]["Enums"]["documento_anunciante_tipo"]
+          updated_at: string
+          validado_at: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          anunciante_id: string
+          archivo_path: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          observaciones?: string | null
+          subido_por?: string | null
+          tipo: Database["public"]["Enums"]["documento_anunciante_tipo"]
+          updated_at?: string
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          anunciante_id?: string
+          archivo_path?: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          observaciones?: string | null
+          subido_por?: string | null
+          tipo?: Database["public"]["Enums"]["documento_anunciante_tipo"]
+          updated_at?: string
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_anunciante_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_anunciante_subido_por_fkey"
+            columns: ["subido_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_anunciante_validado_por_fkey"
+            columns: ["validado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentos_medio: {
+        Row: {
+          archivo_path: string
+          created_at: string
+          estado_validacion: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento: string | null
+          id: string
+          medio_id: string
+          observaciones: string | null
+          subido_por: string | null
+          tipo: Database["public"]["Enums"]["documento_medio_tipo"]
+          updated_at: string
+          validado_at: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          archivo_path: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          medio_id: string
+          observaciones?: string | null
+          subido_por?: string | null
+          tipo: Database["public"]["Enums"]["documento_medio_tipo"]
+          updated_at?: string
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          archivo_path?: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["documento_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          medio_id?: string
+          observaciones?: string | null
+          subido_por?: string | null
+          tipo?: Database["public"]["Enums"]["documento_medio_tipo"]
+          updated_at?: string
+          validado_at?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_medio_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_medio_subido_por_fkey"
+            columns: ["subido_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_medio_validado_por_fkey"
+            columns: ["validado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formatos: {
+        Row: {
+          activo: boolean
+          clave: string
+          created_at: string
+          id: string
+          nombre: string
+          orden: number
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          requisitos: Json
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          clave: string
+          created_at?: string
+          id?: string
+          nombre: string
+          orden?: number
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          requisitos?: Json
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          clave?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          requisitos?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      franjas: {
+        Row: {
+          activa: boolean
+          clave: string
+          created_at: string
+          id: string
+          nombre: string
+          orden: number
+          seguidores_max: number | null
+          seguidores_min: number
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          clave: string
+          created_at?: string
+          id?: string
+          nombre: string
+          orden: number
+          seguidores_max?: number | null
+          seguidores_min: number
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          clave?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          seguidores_max?: number | null
+          seguidores_min?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      medio_audiencia_paises: {
+        Row: {
+          actualizado_at: string
+          fuente: Database["public"]["Enums"]["audiencia_fuente"]
+          medio_id: string
+          pais_iso2: string
+          porcentaje: number
+        }
+        Insert: {
+          actualizado_at?: string
+          fuente?: Database["public"]["Enums"]["audiencia_fuente"]
+          medio_id: string
+          pais_iso2: string
+          porcentaje: number
+        }
+        Update: {
+          actualizado_at?: string
+          fuente?: Database["public"]["Enums"]["audiencia_fuente"]
+          medio_id?: string
+          pais_iso2?: string
+          porcentaje?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medio_audiencia_paises_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medio_audiencia_paises_pais_iso2_fkey"
+            columns: ["pais_iso2"]
+            isOneToOne: false
+            referencedRelation: "paises"
+            referencedColumns: ["iso2"]
+          },
+        ]
+      }
+      medio_categorias: {
+        Row: {
+          categoria_id: string
+          created_at: string
+          medio_id: string
+        }
+        Insert: {
+          categoria_id: string
+          created_at?: string
+          medio_id: string
+        }
+        Update: {
+          categoria_id?: string
+          created_at?: string
+          medio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medio_categorias_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medio_categorias_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medio_pertinencia_geografica: {
+        Row: {
+          clasificado_at: string
+          clasificado_por: string | null
+          medio_id: string
+          multiplicador: number
+          municipio_codigo: string
+          notas: string | null
+        }
+        Insert: {
+          clasificado_at?: string
+          clasificado_por?: string | null
+          medio_id: string
+          multiplicador?: number
+          municipio_codigo: string
+          notas?: string | null
+        }
+        Update: {
+          clasificado_at?: string
+          clasificado_por?: string | null
+          medio_id?: string
+          multiplicador?: number
+          municipio_codigo?: string
+          notas?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medio_pertinencia_geografica_clasificado_por_fkey"
+            columns: ["clasificado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medio_pertinencia_geografica_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medio_pertinencia_geografica_municipio_codigo_fkey"
+            columns: ["municipio_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+        ]
+      }
+      medios: {
+        Row: {
+          calificacion_promedio: number | null
+          created_at: string
+          deleted_at: string | null
+          departamento_codigo: string | null
+          descripcion_audiencia: string | null
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["medio_estado"]
+          id: string
+          lat: number | null
+          lon: number | null
+          motivo_estado: string | null
+          municipio_codigo: string
+          n_cumplimiento: number
+          nivel_verificacion: number
+          nombre: string
+          nombre_normalizado: string | null
+          publicaciones_verificadas: number
+          rechazado_at: string | null
+          suspendido_at: string | null
+          tasa_cumplimiento: number | null
+          tipo: Database["public"]["Enums"]["medio_tipo"]
+          updated_at: string
+          verificado_at: string | null
+          verificado_por: string | null
+        }
+        Insert: {
+          calificacion_promedio?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          departamento_codigo?: string | null
+          descripcion_audiencia?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["medio_estado"]
+          id?: string
+          lat?: number | null
+          lon?: number | null
+          motivo_estado?: string | null
+          municipio_codigo: string
+          n_cumplimiento?: number
+          nivel_verificacion?: number
+          nombre: string
+          nombre_normalizado?: string | null
+          publicaciones_verificadas?: number
+          rechazado_at?: string | null
+          suspendido_at?: string | null
+          tasa_cumplimiento?: number | null
+          tipo: Database["public"]["Enums"]["medio_tipo"]
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Update: {
+          calificacion_promedio?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          departamento_codigo?: string | null
+          descripcion_audiencia?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["medio_estado"]
+          id?: string
+          lat?: number | null
+          lon?: number | null
+          motivo_estado?: string | null
+          municipio_codigo?: string
+          n_cumplimiento?: number
+          nivel_verificacion?: number
+          nombre?: string
+          nombre_normalizado?: string | null
+          publicaciones_verificadas?: number
+          rechazado_at?: string | null
+          suspendido_at?: string | null
+          tasa_cumplimiento?: number | null
+          tipo?: Database["public"]["Enums"]["medio_tipo"]
+          updated_at?: string
+          verificado_at?: string | null
+          verificado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medios_departamento_codigo_fkey"
+            columns: ["departamento_codigo"]
+            isOneToOne: false
+            referencedRelation: "departamentos"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "medios_municipio_codigo_fkey"
+            columns: ["municipio_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "medios_verificado_por_fkey"
+            columns: ["verificado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medios_privado: {
+        Row: {
+          celular: string | null
+          created_at: string
+          datos_pago_cifrados: string | null
+          datos_pago_resumen: string | null
+          direccion: string | null
+          email_contacto: string | null
+          es_declarante: boolean
+          medio_id: string
+          metodo_pago: Database["public"]["Enums"]["metodo_pago"] | null
+          numero_documento_cifrado: string | null
+          numero_documento_hash: string | null
+          numero_documento_resumen: string | null
+          obligado_facturar: boolean
+          responsable_iva: boolean
+          tipo_documento:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          titular_nombre: string | null
+          updated_at: string
+        }
+        Insert: {
+          celular?: string | null
+          created_at?: string
+          datos_pago_cifrados?: string | null
+          datos_pago_resumen?: string | null
+          direccion?: string | null
+          email_contacto?: string | null
+          es_declarante?: boolean
+          medio_id: string
+          metodo_pago?: Database["public"]["Enums"]["metodo_pago"] | null
+          numero_documento_cifrado?: string | null
+          numero_documento_hash?: string | null
+          numero_documento_resumen?: string | null
+          obligado_facturar?: boolean
+          responsable_iva?: boolean
+          tipo_documento?:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          titular_nombre?: string | null
+          updated_at?: string
+        }
+        Update: {
+          celular?: string | null
+          created_at?: string
+          datos_pago_cifrados?: string | null
+          datos_pago_resumen?: string | null
+          direccion?: string | null
+          email_contacto?: string | null
+          es_declarante?: boolean
+          medio_id?: string
+          metodo_pago?: Database["public"]["Enums"]["metodo_pago"] | null
+          numero_documento_cifrado?: string | null
+          numero_documento_hash?: string | null
+          numero_documento_resumen?: string | null
+          obligado_facturar?: boolean
+          responsable_iva?: boolean
+          tipo_documento?:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          titular_nombre?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medios_privado_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: true
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      municipios: {
+        Row: {
+          activo: boolean
+          bbox: number[] | null
+          codigo: string
+          codigo_geometria: string
+          departamento_codigo: string
+          es_capital: boolean
+          lat: number | null
+          lon: number | null
+          nombre: string
+          nombre_normalizado: string
+          tipo: string
+        }
+        Insert: {
+          activo?: boolean
+          bbox?: number[] | null
+          codigo: string
+          codigo_geometria: string
+          departamento_codigo: string
+          es_capital?: boolean
+          lat?: number | null
+          lon?: number | null
+          nombre: string
+          nombre_normalizado: string
+          tipo: string
+        }
+        Update: {
+          activo?: boolean
+          bbox?: number[] | null
+          codigo?: string
+          codigo_geometria?: string
+          departamento_codigo?: string
+          es_capital?: boolean
+          lat?: number | null
+          lon?: number | null
+          nombre?: string
+          nombre_normalizado?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "municipios_codigo_geometria_fkey"
+            columns: ["codigo_geometria"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "municipios_departamento_codigo_fkey"
+            columns: ["departamento_codigo"]
+            isOneToOne: false
+            referencedRelation: "departamentos"
+            referencedColumns: ["codigo"]
+          },
+        ]
+      }
+      niveles_verificacion: {
+        Row: {
+          created_at: string
+          documentos_requeridos: Database["public"]["Enums"]["documento_medio_tipo"][]
+          nivel: number
+          nombre: string
+          pendiente_validacion: boolean
+          porcentaje_alerta: number
+          porcentaje_bloqueo: number
+          requisitos: string[]
+          tope_anual: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          documentos_requeridos: Database["public"]["Enums"]["documento_medio_tipo"][]
+          nivel: number
+          nombre: string
+          pendiente_validacion?: boolean
+          porcentaje_alerta?: number
+          porcentaje_bloqueo?: number
+          requisitos: string[]
+          tope_anual?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          documentos_requeridos?: Database["public"]["Enums"]["documento_medio_tipo"][]
+          nivel?: number
+          nombre?: string
+          pendiente_validacion?: boolean
+          porcentaje_alerta?: number
+          porcentaje_bloqueo?: number
+          requisitos?: string[]
+          tope_anual?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      paises: {
+        Row: {
+          alias: string[]
+          con_geometria: boolean
+          continente: string
+          iso2: string
+          iso3: string
+          lat: number | null
+          lon: number | null
+          nombre: string
+          nombre_normalizado: string
+          numerico: string | null
+          subregion: string | null
+        }
+        Insert: {
+          alias?: string[]
+          con_geometria?: boolean
+          continente: string
+          iso2: string
+          iso3: string
+          lat?: number | null
+          lon?: number | null
+          nombre: string
+          nombre_normalizado: string
+          numerico?: string | null
+          subregion?: string | null
+        }
+        Update: {
+          alias?: string[]
+          con_geometria?: boolean
+          continente?: string
+          iso2?: string
+          iso3?: string
+          lat?: number | null
+          lon?: number | null
+          nombre?: string
+          nombre_normalizado?: string
+          numerico?: string | null
+          subregion?: string | null
+        }
+        Relationships: []
+      }
+      parametros_tributarios: {
+        Row: {
+          anio: number
+          created_at: string
+          pendiente_validacion: boolean
+          smlmv: number
+          umbral_seg_social_smlmv: number | null
+          updated_at: string
+          uvt: number
+        }
+        Insert: {
+          anio: number
+          created_at?: string
+          pendiente_validacion?: boolean
+          smlmv: number
+          umbral_seg_social_smlmv?: number | null
+          updated_at?: string
+          uvt: number
+        }
+        Update: {
+          anio?: number
+          created_at?: string
+          pendiente_validacion?: boolean
+          smlmv?: number
+          umbral_seg_social_smlmv?: number | null
+          updated_at?: string
+          uvt?: number
+        }
+        Relationships: []
+      }
+      perfiles: {
+        Row: {
+          activado_at: string | null
+          anunciante_id: string | null
+          avatar_path: string | null
+          celular: string | null
+          created_at: string
+          debe_cambiar_password: boolean
+          deleted_at: string | null
+          desactivado_at: string | null
+          email: string
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["perfil_estado"]
+          id: string
+          invitado_por: string | null
+          medio_id: string | null
+          motivo_estado: string | null
+          nombre: string | null
+          preferencias: Json
+          rol_id: string | null
+          suspendido_at: string | null
+          ultimo_acceso_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          activado_at?: string | null
+          anunciante_id?: string | null
+          avatar_path?: string | null
+          celular?: string | null
+          created_at?: string
+          debe_cambiar_password?: boolean
+          deleted_at?: string | null
+          desactivado_at?: string | null
+          email: string
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["perfil_estado"]
+          id: string
+          invitado_por?: string | null
+          medio_id?: string | null
+          motivo_estado?: string | null
+          nombre?: string | null
+          preferencias?: Json
+          rol_id?: string | null
+          suspendido_at?: string | null
+          ultimo_acceso_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activado_at?: string | null
+          anunciante_id?: string | null
+          avatar_path?: string | null
+          celular?: string | null
+          created_at?: string
+          debe_cambiar_password?: boolean
+          deleted_at?: string | null
+          desactivado_at?: string | null
+          email?: string
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["perfil_estado"]
+          id?: string
+          invitado_por?: string | null
+          medio_id?: string | null
+          motivo_estado?: string | null
+          nombre?: string | null
+          preferencias?: Json
+          rol_id?: string | null
+          suspendido_at?: string | null
+          ultimo_acceso_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfiles_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "perfiles_invitado_por_fkey"
+            columns: ["invitado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "perfiles_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "perfiles_rol_id_fkey"
+            columns: ["rol_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      perfiles_privado: {
+        Row: {
+          created_at: string
+          direccion: string | null
+          fecha_nacimiento: string | null
+          notas_internas: string | null
+          numero_documento_cifrado: string | null
+          numero_documento_hash: string | null
+          numero_documento_resumen: string | null
+          perfil_id: string
+          tipo_documento:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          notas_internas?: string | null
+          numero_documento_cifrado?: string | null
+          numero_documento_hash?: string | null
+          numero_documento_resumen?: string | null
+          perfil_id: string
+          tipo_documento?:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          notas_internas?: string | null
+          numero_documento_cifrado?: string | null
+          numero_documento_hash?: string | null
+          numero_documento_resumen?: string | null
+          perfil_id?: string
+          tipo_documento?:
+            | Database["public"]["Enums"]["documento_identidad_tipo"]
+            | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfiles_privado_perfil_id_fkey"
+            columns: ["perfil_id"]
+            isOneToOne: true
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permisos: {
+        Row: {
+          clave: string
+          descripcion: string
+          es_sensible: boolean
+          modulo: string
+          orden: number
+        }
+        Insert: {
+          clave: string
+          descripcion: string
+          es_sensible?: boolean
+          modulo: string
+          orden?: number
+        }
+        Update: {
+          clave?: string
+          descripcion?: string
+          es_sensible?: boolean
+          modulo?: string
+          orden?: number
+        }
+        Relationships: []
+      }
+      plantillas_notificacion: {
+        Row: {
+          activa: boolean
+          asunto: string | null
+          canal: Database["public"]["Enums"]["notificacion_canal"]
+          clave: string
+          created_at: string
+          cuerpo: string
+          nombre: string
+          updated_at: string
+          variables: string[]
+        }
+        Insert: {
+          activa?: boolean
+          asunto?: string | null
+          canal: Database["public"]["Enums"]["notificacion_canal"]
+          clave: string
+          created_at?: string
+          cuerpo: string
+          nombre: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Update: {
+          activa?: boolean
+          asunto?: string | null
+          canal?: Database["public"]["Enums"]["notificacion_canal"]
+          clave?: string
+          created_at?: string
+          cuerpo?: string
+          nombre?: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Relationships: []
+      }
+      resoluciones_dian: {
+        Row: {
+          activa: boolean
+          consecutivo_actual: number
+          created_at: string
+          fecha_resolucion: string
+          id: string
+          numero_resolucion: string
+          prefijo: string
+          rango_desde: number
+          rango_hasta: number
+          tipo: Database["public"]["Enums"]["documento_electronico_tipo"]
+          updated_at: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          activa?: boolean
+          consecutivo_actual: number
+          created_at?: string
+          fecha_resolucion: string
+          id?: string
+          numero_resolucion: string
+          prefijo: string
+          rango_desde: number
+          rango_hasta: number
+          tipo: Database["public"]["Enums"]["documento_electronico_tipo"]
+          updated_at?: string
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          activa?: boolean
+          consecutivo_actual?: number
+          created_at?: string
+          fecha_resolucion?: string
+          id?: string
+          numero_resolucion?: string
+          prefijo?: string
+          rango_desde?: number
+          rango_hasta?: number
+          tipo?: Database["public"]["Enums"]["documento_electronico_tipo"]
+          updated_at?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: []
+      }
+      reteica_municipal: {
+        Row: {
+          base_minima_uvt: number
+          created_at: string
+          id: string
+          municipio_codigo: string
+          pendiente_validacion: boolean
+          tarifa_por_mil: number
+          updated_at: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          base_minima_uvt?: number
+          created_at?: string
+          id?: string
+          municipio_codigo: string
+          pendiente_validacion?: boolean
+          tarifa_por_mil: number
+          updated_at?: string
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          base_minima_uvt?: number
+          created_at?: string
+          id?: string
+          municipio_codigo?: string
+          pendiente_validacion?: boolean
+          tarifa_por_mil?: number
+          updated_at?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reteica_municipal_municipio_codigo_fkey"
+            columns: ["municipio_codigo"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["codigo"]
+          },
+        ]
+      }
+      retenciones_config: {
+        Row: {
+          aplica_declarante: boolean
+          base_minima_uvt: number
+          concepto: string
+          created_at: string
+          id: string
+          pendiente_validacion: boolean
+          tarifa: number
+          tipo: Database["public"]["Enums"]["retencion_tipo"]
+          updated_at: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          aplica_declarante: boolean
+          base_minima_uvt?: number
+          concepto: string
+          created_at?: string
+          id?: string
+          pendiente_validacion?: boolean
+          tarifa: number
+          tipo: Database["public"]["Enums"]["retencion_tipo"]
+          updated_at?: string
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          aplica_declarante?: boolean
+          base_minima_uvt?: number
+          concepto?: string
+          created_at?: string
+          id?: string
+          pendiente_validacion?: boolean
+          tarifa?: number
+          tipo?: Database["public"]["Enums"]["retencion_tipo"]
+          updated_at?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: []
+      }
+      rol_permisos: {
+        Row: {
+          created_at: string
+          otorgado_por: string | null
+          permiso_clave: string
+          rol_id: string
+        }
+        Insert: {
+          created_at?: string
+          otorgado_por?: string | null
+          permiso_clave: string
+          rol_id: string
+        }
+        Update: {
+          created_at?: string
+          otorgado_por?: string | null
+          permiso_clave?: string
+          rol_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rol_permisos_otorgado_por_fkey"
+            columns: ["otorgado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rol_permisos_permiso_clave_fkey"
+            columns: ["permiso_clave"]
+            isOneToOne: false
+            referencedRelation: "permisos"
+            referencedColumns: ["clave"]
+          },
+          {
+            foreignKeyName: "rol_permisos_rol_id_fkey"
+            columns: ["rol_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          clave: string
+          color: string
+          created_at: string
+          descripcion: string | null
+          es_sistema: boolean
+          id: string
+          nombre: string
+          requiere_mfa: boolean
+          tipo: Database["public"]["Enums"]["rol_tipo"]
+          updated_at: string
+        }
+        Insert: {
+          clave: string
+          color?: string
+          created_at?: string
+          descripcion?: string | null
+          es_sistema?: boolean
+          id?: string
+          nombre: string
+          requiere_mfa?: boolean
+          tipo: Database["public"]["Enums"]["rol_tipo"]
+          updated_at?: string
+        }
+        Update: {
+          clave?: string
+          color?: string
+          created_at?: string
+          descripcion?: string | null
+          es_sistema?: boolean
+          id?: string
+          nombre?: string
+          requiere_mfa?: boolean
+          tipo?: Database["public"]["Enums"]["rol_tipo"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sectores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          deleted_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+          nombre_normalizado: string | null
+          orden: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          nombre_normalizado?: string | null
+          orden?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          nombre_normalizado?: string | null
+          orden?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tarifas: {
+        Row: {
+          creada_por: string | null
+          created_at: string
+          formato_id: string
+          franja_id: string
+          id: string
+          pendiente_validacion: boolean
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          valor_base: number
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          creada_por?: string | null
+          created_at?: string
+          formato_id: string
+          franja_id: string
+          id?: string
+          pendiente_validacion?: boolean
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          valor_base: number
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          creada_por?: string | null
+          created_at?: string
+          formato_id?: string
+          franja_id?: string
+          id?: string
+          pendiente_validacion?: boolean
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          valor_base?: number
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarifas_formato_plataforma_fkey"
+            columns: ["formato_id", "plataforma"]
+            isOneToOne: false
+            referencedRelation: "formatos"
+            referencedColumns: ["id", "plataforma"]
+          },
+          {
+            foreignKeyName: "tarifas_franja_id_fkey"
+            columns: ["franja_id"]
+            isOneToOne: false
+            referencedRelation: "franjas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminos_versiones: {
+        Row: {
+          contenido_md: string
+          creada_por: string | null
+          created_at: string
+          hash_sha256: string | null
+          id: string
+          publicada: boolean
+          tipo: Database["public"]["Enums"]["terminos_tipo"]
+          updated_at: string
+          version: string
+          vigente_desde: string | null
+        }
+        Insert: {
+          contenido_md: string
+          creada_por?: string | null
+          created_at?: string
+          hash_sha256?: string | null
+          id?: string
+          publicada?: boolean
+          tipo: Database["public"]["Enums"]["terminos_tipo"]
+          updated_at?: string
+          version: string
+          vigente_desde?: string | null
+        }
+        Update: {
+          contenido_md?: string
+          creada_por?: string | null
+          created_at?: string
+          hash_sha256?: string | null
+          id?: string
+          publicada?: boolean
+          tipo?: Database["public"]["Enums"]["terminos_tipo"]
+          updated_at?: string
+          version?: string
+          vigente_desde?: string | null
+        }
+        Relationships: []
+      }
+      verificaciones_cuenta: {
+        Row: {
+          captura_path: string | null
+          codigo_expira_at: string | null
+          codigo_hash: string | null
+          created_at: string
+          cuenta_social_id: string
+          estado_validacion: Database["public"]["Enums"]["validacion_estado"]
+          id: string
+          medio_id: string
+          metodo: Database["public"]["Enums"]["metodo_verificacion"]
+          observaciones: string | null
+          seguidores_reportados: number
+          seguidores_verificados: number | null
+          updated_at: string
+          validada_at: string | null
+          validada_por: string | null
+        }
+        Insert: {
+          captura_path?: string | null
+          codigo_expira_at?: string | null
+          codigo_hash?: string | null
+          created_at?: string
+          cuenta_social_id: string
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          id?: string
+          medio_id: string
+          metodo: Database["public"]["Enums"]["metodo_verificacion"]
+          observaciones?: string | null
+          seguidores_reportados: number
+          seguidores_verificados?: number | null
+          updated_at?: string
+          validada_at?: string | null
+          validada_por?: string | null
+        }
+        Update: {
+          captura_path?: string | null
+          codigo_expira_at?: string | null
+          codigo_hash?: string | null
+          created_at?: string
+          cuenta_social_id?: string
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          id?: string
+          medio_id?: string
+          metodo?: Database["public"]["Enums"]["metodo_verificacion"]
+          observaciones?: string | null
+          seguidores_reportados?: number
+          seguidores_verificados?: number | null
+          updated_at?: string
+          validada_at?: string | null
+          validada_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verificaciones_cuenta_cuenta_social_id_fkey"
+            columns: ["cuenta_social_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_sociales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verificaciones_cuenta_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verificaciones_cuenta_validada_por_fkey"
+            columns: ["validada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      activar_perfil_srv: { Args: { p_usuario_id: string }; Returns: undefined }
+      anunciantes_publico: {
+        Args: { p_ids?: string[] }
+        Returns: {
+          id: string
+          logo_path: string
+          nombre_comercial: string
+          sector_id: string
+        }[]
+      }
+      autorizar_gestion_usuario_srv: {
+        Args: {
+          p_accion: string
+          p_actor_id: string
+          p_objetivo: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
+      cancelar_tarifa_programada: {
+        Args: { p_tarifa_id: string }
+        Returns: undefined
+      }
+      cerrar_sesiones_usuario_srv: {
+        Args: {
+          p_actor_id: string
+          p_excepto_session?: string
+          p_motivo?: string
+          p_session_id: string
+          p_usuario_id: string
+        }
+        Returns: number
+      }
+      editar_privado_srv: {
+        Args: {
+          p_actor_id: string
+          p_cambios: Json
+          p_id: string
+          p_session_id: string
+          p_tabla: string
+        }
+        Returns: undefined
+      }
+      eliminar_usuario_srv: {
+        Args: {
+          p_actor_id: string
+          p_motivo?: string
+          p_session_id: string
+          p_usuario_id: string
+        }
+        Returns: undefined
+      }
+      listar_usuarios: {
+        Args: {
+          p_busqueda?: string
+          p_descendente?: boolean
+          p_desplazamiento?: number
+          p_estados?: Database["public"]["Enums"]["perfil_estado"][]
+          p_limite?: number
+          p_mfa?: boolean
+          p_orden?: string
+          p_roles?: string[]
+          p_tipos?: Database["public"]["Enums"]["rol_tipo"][]
+        }
+        Returns: {
+          avatar_path: string
+          created_at: string
+          email: string
+          estado: Database["public"]["Enums"]["perfil_estado"]
+          id: string
+          invitado_at: string
+          mfa_activo: boolean
+          nombre: string
+          rol_clave: string
+          rol_color: string
+          rol_id: string
+          rol_nombre: string
+          rol_tipo: Database["public"]["Enums"]["rol_tipo"]
+          total: number
+          ultimo_acceso_at: string
+        }[]
+      }
+      login_bloqueado_srv: {
+        Args: { p_email: string; p_ip: unknown }
+        Returns: {
+          bloqueado: boolean
+          reintentar_en_s: number
+        }[]
+      }
+      medios_publico: {
+        Args: { p_ids?: string[] }
+        Returns: {
+          cuentas: Json
+          departamento_codigo: string
+          id: string
+          municipio_codigo: string
+          n_cumplimiento: number
+          nivel_verificacion: number
+          nombre: string
+          publicaciones_verificadas: number
+          tasa_cumplimiento: number
+          tipo: Database["public"]["Enums"]["medio_tipo"]
+        }[]
+      }
+      mi_actividad: {
+        Args: { p_antes_id?: number; p_limite?: number }
+        Returns: {
+          accion: string
+          ciudad: string
+          created_at: string
+          entidad: string
+          entidad_id: string
+          id: number
+          ip: unknown
+          pais_iso2: string
+          user_agent: string
+        }[]
+      }
+      miembros_organizacion: {
+        Args: never
+        Returns: {
+          avatar_path: string
+          email: string
+          estado: Database["public"]["Enums"]["perfil_estado"]
+          id: string
+          nombre: string
+          rol_clave: string
+          ultimo_acceso_at: string
+        }[]
+      }
+      programar_tarifa: {
+        Args: {
+          p_desde: string
+          p_formato_id: string
+          p_franja_id: string
+          p_valor: number
+        }
+        Returns: string
+      }
+      registrar_acceso_srv: {
+        Args: {
+          p_aal: string
+          p_ciudad: string
+          p_dispositivo: string
+          p_email: string
+          p_evento: Database["public"]["Enums"]["acceso_evento"]
+          p_ip: unknown
+          p_lat: number
+          p_lon: number
+          p_navegador: string
+          p_pais: string
+          p_region: string
+          p_session_id: string
+          p_so: string
+          p_ua: string
+          p_usuario_id: string
+        }
+        Returns: {
+          es_sospechoso: boolean
+          id: number
+          motivo: string
+        }[]
+      }
+      registrar_evento_srv: {
+        Args: {
+          p_accion: string
+          p_actor_id: string
+          p_ciudad: string
+          p_entidad: string
+          p_entidad_id: string
+          p_ip: unknown
+          p_metadatos: Json
+          p_motivo?: string
+          p_pais: string
+          p_ua: string
+        }
+        Returns: number
+      }
+      registrar_intento_login_srv: {
+        Args: { p_email: string; p_exito: boolean; p_ip: unknown }
+        Returns: undefined
+      }
+      resumen_usuarios: {
+        Args: never
+        Returns: {
+          activos: number
+          activos_con_mfa: number
+          desactivados: number
+          invitados: number
+          suspendidos: number
+          total: number
+        }[]
+      }
+      revelar_privado_srv: {
+        Args: {
+          p_actor_id: string
+          p_campos: string[]
+          p_id: string
+          p_session_id: string
+          p_tabla: string
+        }
+        Returns: Json
+      }
+      roles_asignables: {
+        Args: never
+        Returns: {
+          clave: string
+          color: string
+          descripcion: string
+          id: string
+          nombre: string
+          requiere_mfa: boolean
+          tipo: Database["public"]["Enums"]["rol_tipo"]
+        }[]
+      }
+      seguridad_usuario: {
+        Args: { p_usuario_id: string }
+        Returns: {
+          bloqueado_hasta: string
+          email_confirmado_at: string
+          invitado_at: string
+          mfa_activado_at: string
+          mfa_factores: number
+          mfa_ultimo_uso_at: string
+          sesiones_activas: number
+          ultimo_ingreso_at: string
+        }[]
+      }
+      sesiones_usuario: {
+        Args: { p_usuario_id: string }
+        Returns: {
+          aal: string
+          creada_at: string
+          id: string
+          ip: unknown
+          refrescada_at: string
+          ultima_actividad_at: string
+          user_agent: string
+        }[]
+      }
+      suspender_usuario_srv: {
+        Args: {
+          p_actor_id: string
+          p_motivo: string
+          p_session_id: string
+          p_usuario_id: string
+        }
+        Returns: undefined
+      }
+      tocar_sesion_srv: {
+        Args: { p_session_id: string; p_usuario_id: string }
+        Returns: string
+      }
+      transicionar_srv: {
+        Args: {
+          p_actor_id: string
+          p_datos?: Json
+          p_entidad: string
+          p_hacia: string
+          p_id: string
+          p_motivo?: string
+          p_session_id: string
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      acceso_evento:
+        | "LOGIN_EXITOSO"
+        | "LOGIN_FALLIDO"
+        | "LOGIN_BLOQUEADO"
+        | "MFA_EXITOSO"
+        | "MFA_FALLIDO"
+        | "CIERRE_SESION"
+        | "SESION_EXPIRADA"
+        | "SESION_REVOCADA"
+        | "USUARIO_SUSPENDIDO"
+        | "RECUPERACION_SOLICITADA"
+        | "CONTRASENA_CAMBIADA"
+      anunciante_estado: "PENDIENTE" | "VERIFICADO" | "RECHAZADO" | "SUSPENDIDO"
+      audiencia_fuente: "DECLARADA" | "VERIFICADA_MANUAL" | "API"
+      auditoria_tratamiento: "OMITIR" | "HASH" | "ENMASCARAR"
+      bitacora_origen: "APP" | "DB" | "API_DIRECTA" | "DEMO"
+      config_tipo:
+        | "ENTERO"
+        | "DECIMAL"
+        | "PORCENTAJE"
+        | "BOOLEANO"
+        | "TEXTO"
+        | "LISTA_TEXTO"
+        | "MAPA_DECIMAL"
+      documento_anunciante_tipo:
+        | "RUT"
+        | "CAMARA_COMERCIO"
+        | "CERT_BANCARIA"
+        | "OTRO"
+      documento_electronico_tipo: "FACTURA_VENTA" | "DOCUMENTO_SOPORTE"
+      documento_estado: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "VENCIDO"
+      documento_identidad_tipo: "CC" | "CE" | "PPT" | "PASAPORTE" | "NIT"
+      documento_medio_tipo:
+        | "CEDULA_FRENTE"
+        | "CEDULA_REVERSO"
+        | "PRUEBA_VIDA"
+        | "RUT"
+        | "RUT_SOCIEDAD"
+        | "CAMARA_COMERCIO"
+        | "CERT_BANCARIA"
+        | "CERT_BILLETERA"
+        | "SEG_SOCIAL"
+      medio_estado: "PENDIENTE" | "VERIFICADO" | "RECHAZADO" | "SUSPENDIDO"
+      medio_tipo:
+        | "PAGINA_NOTICIAS"
+        | "CREADOR"
+        | "EMISORA"
+        | "PERIODICO"
+        | "CANAL_TV"
+        | "COMUNITARIO"
+        | "OTRO"
+      metodo_pago: "BANCARIO" | "BILLETERA"
+      metodo_verificacion: "MANUAL" | "CODIGO_HISTORIA" | "API"
+      notificacion_canal: "APP" | "EMAIL" | "WHATSAPP" | "PUSH"
+      perfil_estado: "INVITADO" | "ACTIVO" | "SUSPENDIDO" | "DESACTIVADO"
+      plataforma: "FACEBOOK" | "INSTAGRAM" | "TIKTOK"
+      retencion_tipo: "RETEFUENTE" | "RETEICA" | "RETEIVA"
+      rol_tipo: "ADMIN" | "ANUNCIANTE" | "MEDIO"
+      terminos_tipo:
+        | "TERMINOS_MEDIO"
+        | "TERMINOS_ANUNCIANTE"
+        | "POLITICA_DATOS"
+        | "CONDICIONES_COMERCIALES"
+      validacion_estado: "PENDIENTE" | "APROBADA" | "RECHAZADA"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      acceso_evento: [
+        "LOGIN_EXITOSO",
+        "LOGIN_FALLIDO",
+        "LOGIN_BLOQUEADO",
+        "MFA_EXITOSO",
+        "MFA_FALLIDO",
+        "CIERRE_SESION",
+        "SESION_EXPIRADA",
+        "SESION_REVOCADA",
+        "USUARIO_SUSPENDIDO",
+        "RECUPERACION_SOLICITADA",
+        "CONTRASENA_CAMBIADA",
+      ],
+      anunciante_estado: ["PENDIENTE", "VERIFICADO", "RECHAZADO", "SUSPENDIDO"],
+      audiencia_fuente: ["DECLARADA", "VERIFICADA_MANUAL", "API"],
+      auditoria_tratamiento: ["OMITIR", "HASH", "ENMASCARAR"],
+      bitacora_origen: ["APP", "DB", "API_DIRECTA", "DEMO"],
+      config_tipo: [
+        "ENTERO",
+        "DECIMAL",
+        "PORCENTAJE",
+        "BOOLEANO",
+        "TEXTO",
+        "LISTA_TEXTO",
+        "MAPA_DECIMAL",
+      ],
+      documento_anunciante_tipo: [
+        "RUT",
+        "CAMARA_COMERCIO",
+        "CERT_BANCARIA",
+        "OTRO",
+      ],
+      documento_electronico_tipo: ["FACTURA_VENTA", "DOCUMENTO_SOPORTE"],
+      documento_estado: ["PENDIENTE", "APROBADO", "RECHAZADO", "VENCIDO"],
+      documento_identidad_tipo: ["CC", "CE", "PPT", "PASAPORTE", "NIT"],
+      documento_medio_tipo: [
+        "CEDULA_FRENTE",
+        "CEDULA_REVERSO",
+        "PRUEBA_VIDA",
+        "RUT",
+        "RUT_SOCIEDAD",
+        "CAMARA_COMERCIO",
+        "CERT_BANCARIA",
+        "CERT_BILLETERA",
+        "SEG_SOCIAL",
+      ],
+      medio_estado: ["PENDIENTE", "VERIFICADO", "RECHAZADO", "SUSPENDIDO"],
+      medio_tipo: [
+        "PAGINA_NOTICIAS",
+        "CREADOR",
+        "EMISORA",
+        "PERIODICO",
+        "CANAL_TV",
+        "COMUNITARIO",
+        "OTRO",
+      ],
+      metodo_pago: ["BANCARIO", "BILLETERA"],
+      metodo_verificacion: ["MANUAL", "CODIGO_HISTORIA", "API"],
+      notificacion_canal: ["APP", "EMAIL", "WHATSAPP", "PUSH"],
+      perfil_estado: ["INVITADO", "ACTIVO", "SUSPENDIDO", "DESACTIVADO"],
+      plataforma: ["FACEBOOK", "INSTAGRAM", "TIKTOK"],
+      retencion_tipo: ["RETEFUENTE", "RETEICA", "RETEIVA"],
+      rol_tipo: ["ADMIN", "ANUNCIANTE", "MEDIO"],
+      terminos_tipo: [
+        "TERMINOS_MEDIO",
+        "TERMINOS_ANUNCIANTE",
+        "POLITICA_DATOS",
+        "CONDICIONES_COMERCIALES",
+      ],
+      validacion_estado: ["PENDIENTE", "APROBADA", "RECHAZADA"],
+    },
+  },
+} as const
