@@ -515,7 +515,9 @@ export function ExploradorGeo({
             <BarraCompacta {...propsBarra} className="w-full max-w-xl" />
             <CoachmarkMapa habilitado={mapaListo && mapaUsable} tactil={!punteroFino} />
           </div>
+          {/* Bajo la hoja de detalle: oculto también para el tabulador (`inert`). */}
           <div
+            inert={datosDetalle !== null}
             className={cn(
               "flex items-end justify-between gap-2 transition-opacity duration-200",
               datosDetalle && "pointer-events-none opacity-0"
