@@ -62,8 +62,10 @@ describe("proveedor simulado (AMO_GEO_MOCK)", () => {
   })
 
   it("solo trae puntos para el mapa de calor en métricas con coordenadas reales", async () => {
-    expect((await proveedor.mapa(BASE)).puntos?.length).toBeGreaterThan(0)
-    expect((await proveedor.mapa({ ...BASE, metrica: "gmv" })).puntos).toBeNull()
+    const calor = await proveedor.puntos(BASE)
+    expect(calor.puntos.length).toBeGreaterThan(0)
+    expect(calor.total).toBe(calor.muestra)
+    expect((await proveedor.puntos({ ...BASE, metrica: "gmv" })).puntos).toEqual([])
   })
 
   it("las tasas con muestra insuficiente vuelven sin valor pero con n", async () => {
@@ -73,17 +75,34 @@ describe("proveedor simulado (AMO_GEO_MOCK)", () => {
     expect(insuficientes.every((f) => (f.n ?? 0) < 20)).toBe(true)
   })
 
-  it("el detalle trae KPI por métrica, serie diaria y top", async () => {
+  it("el detalle trae KPI por métrica, serie semanal, subzonas y medios", async () => {
     const detalle = await proveedor.detalle({
       ...BASE,
       zona: "05",
       metricasKpi: metricasDelNivel("nacional"),
+      conMedios: true,
     })
     expect(detalle.kpis.map((k) => k.metrica)).toEqual(
       metricasDelNivel("nacional")
     )
-    expect(detalle.serie?.granularidad).toBe("dia")
-    expect(detalle.serie?.valores).toHaveLength(30)
+    expect(detalle.serie?.granularidad).toBe("semana")
+    expect(detalle.serie?.puntos).toHaveLength(5)
+    expect(detalle.sinSerie).toBeNull()
     expect(detalle.top?.filas.length).toBeLessThanOrEqual(5)
+    expect(detalle.medios?.filas).toHaveLength(5)
+  })
+
+  it("la audiencia es una foto actual: sin evolución", async () => {
+    const detalle = await proveedor.detalle({
+      ...BASE,
+      nivel: "internacional",
+      metrica: "audiencia",
+      zona: "US",
+      metricasKpi: ["audiencia"],
+      conMedios: false,
+    })
+    expect(detalle.serie).toBeNull()
+    expect(detalle.sinSerie).toBe("foto-actual")
+    expect(detalle.medios).toBeNull()
   })
 })

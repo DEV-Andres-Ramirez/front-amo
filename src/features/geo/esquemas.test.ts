@@ -39,6 +39,19 @@ describe("parámetros de GET /api/geo/metricas", () => {
     }
   })
 
+  it("el modo calor solo existe para métricas con puntos reales", () => {
+    expect(leer({ vista: "puntos", nivel: "nacional", metrica: "accesos", ...PERIODO })).toMatchObject({
+      ok: true,
+      datos: { vista: "puntos", consulta: { metrica: "accesos" } },
+    })
+    expect(leer({ vista: "puntos", nivel: "nacional", metrica: "gmv", ...PERIODO }).ok).toBe(false)
+  })
+
+  it("el detalle no incluye los medios destacados por omisión (lo decide la ruta)", () => {
+    const resultado = leer({ vista: "detalle", nivel: "nacional", metrica: "gmv", zona: "05", ...PERIODO })
+    expect(resultado.ok && resultado.datos.vista === "detalle" && resultado.datos.consulta.conMedios).toBe(false)
+  })
+
   it.each([
     ["métrica fuera de la matriz", { nivel: "internacional", metrica: "gmv" }],
     ["nivel desconocido", { nivel: "galaxia", metrica: "medios" }],

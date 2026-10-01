@@ -7,13 +7,37 @@ import {
   METRICAS_GEO,
   metricaPermitida,
   metricasDelNivel,
+  NIVEL_RPC,
   NIVELES_GEO,
   resolverMetrica,
 } from "./metricas"
 
 const SIN_ACCESOS = METRICAS_GEO.filter((metrica) => metrica !== "accesos")
 
+/**
+ * Matriz de `private.geo_validar` (migración 20261001042322_analitica_geo):
+ * la UI no puede ofrecer una métrica que la RPC rechace.
+ */
+const MATRIZ_RPC = {
+  pais: ["accesos", "audiencia", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
+  departamento: ["accesos", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
+  municipio: ["accesos", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
+} as const
+
 describe("catálogo de métricas del mapa", () => {
+  it("todas las métricas de cada nivel existen en la matriz de geo_metricas", () => {
+    for (const nivel of NIVELES_GEO) {
+      const admitidas: readonly string[] = MATRIZ_RPC[NIVEL_RPC[nivel]]
+      for (const metrica of metricasDelNivel(nivel)) {
+        expect(admitidas, `${nivel} × ${metrica}`).toContain(metrica)
+      }
+    }
+  })
+
+  it("Colombia ofrece todas las métricas de la RPC salvo la audiencia (solo por país)", () => {
+    expect([...metricasDelNivel("nacional")].sort()).toEqual([...MATRIZ_RPC.departamento].sort())
+  })
+
   it("cada nivel ofrece las métricas de la matriz (§5.9)", () => {
     expect(metricasDelNivel("internacional")).toEqual([
       "anunciantes",

@@ -100,7 +100,8 @@ begin
                                                                        r := r || jsonb_build_object('a2_admin_tarifas_vigentes_27', v_n = 27);
   select count(*) into v_n from public.niveles_verificacion;          r := r || jsonb_build_object('a2_admin_niveles_3', v_n = 3);
   select count(*) into v_n from public.parametros_tributarios;        r := r || jsonb_build_object('a2_admin_parametros_2', v_n = 2);
-  select count(*) into v_n from public.plantillas_notificacion;       r := r || jsonb_build_object('a2_admin_plantillas_20', v_n = 20);
+  -- 20 de configuracion_semillas + seguridad.alerta_pais_inusual (notificaciones, M8).
+  select count(*) into v_n from public.plantillas_notificacion;       r := r || jsonb_build_object('a2_admin_plantillas_21', v_n = 21);
   select count(*) into v_n from public.configuracion;                 r := r || jsonb_build_object('a2_admin_configuracion_53', v_n = 53);
   select count(*) into v_n from public.terminos_versiones where tipo = 'POLITICA_DATOS';
                                                                        r := r || jsonb_build_object('a2_admin_ve_borradores', v_n = 2);

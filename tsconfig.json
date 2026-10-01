@@ -42,7 +42,11 @@
     ".next-auditoria/types/**/*.ts",
     ".next-auditoria/dev/types/**/*.ts",
     ".next-graficos/types/**/*.ts",
-    ".next-graficos/dev/types/**/*.ts"
+    ".next-graficos/dev/types/**/*.ts",
+    ".next-inicio/types/**/*.ts",
+    ".next-inicio/dev/types/**/*.ts",
+    ".next-geo-datos/types/**/*.ts",
+    ".next-geo-datos/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

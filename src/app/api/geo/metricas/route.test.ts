@@ -23,7 +23,7 @@ vi.mock("@/lib/auth/dal", () => ({
   ) => permisos.some((permiso) => usuario.permisos.includes(permiso)),
 }))
 vi.mock("@/features/geo/proveedor-servidor", () => ({
-  obtenerProveedorGeo: () => proveedor.actual,
+  obtenerProveedorGeo: async () => proveedor.actual,
 }))
 
 const { GET } = await import("./route")
@@ -105,16 +105,46 @@ describe("GET /api/geo/metricas", () => {
     expect(metricas).not.toContain("accesos")
   })
 
+  it("los medios destacados del detalle exigen `reportes.ver`", async () => {
+    conPermisos("analitica.mapa")
+    const sinReportes = await (await pedir(`${MAPA}&vista=detalle&zona=05`)).json()
+    expect(sinReportes.medios).toBeNull()
+
+    conPermisos("analitica.mapa", "reportes.ver")
+    const conReportes = await (await pedir(`${MAPA}&vista=detalle&zona=05`)).json()
+    expect(conReportes.medios.filas.length).toBeGreaterThan(0)
+  })
+
+  it("los puntos del modo calor se piden aparte y respetan el permiso de la métrica", async () => {
+    const PUNTOS = "vista=puntos&nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30"
+    conPermisos("analitica.mapa")
+    expect((await pedir(PUNTOS)).status).toBe(403)
+
+    conPermisos("analitica.mapa", "accesos.ver")
+    const respuesta = await pedir(PUNTOS)
+    expect(respuesta.status).toBe(200)
+    const cuerpo = await respuesta.json()
+    expect(cuerpo.puntos.length).toBeGreaterThan(0)
+    expect(cuerpo).toMatchObject({ consulta: { metrica: "accesos" }, origen: "simulado" })
+
+    const sinPuntos = await pedir(PUNTOS.replace("accesos", "gmv"))
+    expect(sinPuntos.status).toBe(400)
+  })
+
+  it("el mapa ya no arrastra los puntos (el coroplético no espera coordenadas)", async () => {
+    conPermisos("analitica.mapa", "accesos.ver")
+    const cuerpo = await (
+      await pedir("nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30")
+    ).json()
+    expect(cuerpo).not.toHaveProperty("puntos")
+  })
+
   it("sin la RPC en la BD responde 503 con un mensaje claro", async () => {
     conPermisos("analitica.mapa")
-    proveedor.actual = {
-      mapa: async () => {
-        throw new ErrorDatosGeo("no-disponible", "Falta la función geo_metricas.")
-      },
-      detalle: async () => {
-        throw new ErrorDatosGeo("no-disponible", "Falta la función geo_metricas.")
-      },
+    const noDisponible = async (): Promise<never> => {
+      throw new ErrorDatosGeo("no-disponible", "Falta la función geo_metricas.")
     }
+    proveedor.actual = { mapa: noDisponible, puntos: noDisponible, detalle: noDisponible }
     const respuesta = await pedir(MAPA)
     expect(respuesta.status).toBe(503)
     expect(respuesta.headers.get("cache-control")).toBe("no-store")
@@ -124,14 +154,10 @@ describe("GET /api/geo/metricas", () => {
   it("un fallo inesperado es 500 sin filtrar detalles", async () => {
     conPermisos("analitica.mapa")
     const error = vi.spyOn(console, "error").mockImplementation(() => {})
-    proveedor.actual = {
-      mapa: async () => {
-        throw new Error("conexión perdida con detalles internos")
-      },
-      detalle: async () => {
-        throw new Error("x")
-      },
+    const falla = async (): Promise<never> => {
+      throw new Error("conexión perdida con detalles internos")
     }
+    proveedor.actual = { mapa: falla, puntos: falla, detalle: falla }
     const respuesta = await pedir(MAPA)
     expect(respuesta.status).toBe(500)
     expect(JSON.stringify(await respuesta.json())).not.toMatch(/internos/)

@@ -1,6 +1,8 @@
 import { cookies } from "next/headers"
 
 import { ShellAplicacion } from "@/components/layout/shell-aplicacion"
+import { ProveedorPreferencias } from "@/features/cuenta/components/proveedor-preferencias"
+import { preferenciasPropias } from "@/features/cuenta/queries"
 import { obtenerUsuarioShell } from "@/lib/auth/dal"
 
 /** La escribe el SidebarProvider de shadcn al colapsar o expandir. */
@@ -23,15 +25,20 @@ export default async function LayoutAplicacion({ children }: LayoutProps<"/">) {
     obtenerUsuarioShell(),
     cookies(),
   ])
+  // Movimiento reducido, densidad y formato de cifras de la cuenta valen en
+  // toda la app, no solo en /cuenta/preferencias.
+  const preferencias = await preferenciasPropias(usuario.id)
 
   return (
-    <ShellAplicacion
-      usuario={usuario}
-      barraLateralAbierta={preferenciaBarraLateral(
-        almacenCookies.get(COOKIE_BARRA_LATERAL)?.value
-      )}
-    >
-      {children}
-    </ShellAplicacion>
+    <ProveedorPreferencias inicial={preferencias}>
+      <ShellAplicacion
+        usuario={usuario}
+        barraLateralAbierta={preferenciaBarraLateral(
+          almacenCookies.get(COOKIE_BARRA_LATERAL)?.value
+        )}
+      >
+        {children}
+      </ShellAplicacion>
+    </ProveedorPreferencias>
   )
 }

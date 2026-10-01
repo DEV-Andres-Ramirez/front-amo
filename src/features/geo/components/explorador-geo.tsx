@@ -40,7 +40,11 @@ import {
 } from "../consultas-cliente"
 import { departamentoPorCodigo } from "../departamentos"
 import { claveAmbito, encuadreDelNivel, urlGeometria } from "../encuadre"
-import { formatearPeriodo, formatearValorGeo } from "../formato"
+import {
+  describirPuntosCalor,
+  formatearPeriodo,
+  formatearValorGeo,
+} from "../formato"
 import {
   DEFINICIONES_METRICAS,
   type MetricaGeo,
@@ -68,11 +72,11 @@ import { CoachmarkMapa } from "./coachmark-mapa"
 import { ContenidoTooltip } from "./contenido-tooltip"
 import { ControlesZoom, type OpcionesVista } from "./controles-mapa"
 import type { DatosDetalle } from "./detalle-zona"
-import { type FocoLeyenda, LeyendaMapa } from "./leyenda-mapa"
+import { type CalorLeyenda, type FocoLeyenda, LeyendaMapa } from "./leyenda-mapa"
 import { CLASE_LIENZO, CLASE_PANEL } from "./lienzo"
 import { HojaDetalle, PanelDetalleLateral } from "./panel-detalle"
 import { PanelRanking } from "./panel-ranking"
-import { useDatosExplorador } from "./use-datos-explorador"
+import { type CalorExplorador, useDatosExplorador } from "./use-datos-explorador"
 import {
   disposicionPara,
   useFocoTrasCambioDeNivel,
@@ -117,6 +121,24 @@ function margenDelMapa(amplia: boolean, conDetalle: boolean, alto: number): Marg
   return conDetalle
     ? { ...MARGEN_COMPACTO, bottom: Math.round(alto * FRACCION_HOJA_DETALLE) }
     : MARGEN_COMPACTO
+}
+
+/** Estado del modo calor para la leyenda; `null` si el modo no está activo. */
+function calorDeLeyenda(calor: CalorExplorador): CalorLeyenda | null {
+  if (!calor.activo || !calor.disponible) return null
+  const { respuesta } = calor
+  const estado: CalorLeyenda["estado"] = calor.error
+    ? "error"
+    : !respuesta || (calor.cargando && respuesta.puntos.length === 0)
+      ? "cargando"
+      : respuesta.puntos.length === 0
+        ? "vacio"
+        : "listo"
+  return {
+    estado,
+    nota: respuesta ? describirPuntosCalor(respuesta) : null,
+    onReintentar: calor.reintentar,
+  }
 }
 
 function nombreDelAmbito(estado: EstadoNivel): string {
@@ -274,7 +296,9 @@ export function ExploradorGeo({
       ),
     [estado, amplia, ancho]
   )
-  const puntos = explorador.calor ? (respuesta?.puntos ?? null) : null
+  const puntos = datos.calor.respuesta?.puntos ?? null
+  const calorVisible = datos.calor.activo && !!puntos?.length
+  const calorLeyenda = calorDeLeyenda(datos.calor)
   const margen = margenDelMapa(amplia, seleccionado !== null, alto)
   const enfoque = seleccionado ? datos.centroZona(seleccionado) : null
   const tipoZona = TIPO_ZONA[estado.nivel]
@@ -323,7 +347,7 @@ export function ExploradorGeo({
     admitePor100k: explorador.admitePor100k,
     por100k: explorador.por100k,
     onPor100k: explorador.cambiarPor100k,
-    admiteCalor: explorador.admiteCalor && !!respuesta?.puntos?.length,
+    admiteCalor: datos.calor.disponible,
     calor: explorador.calor,
     onCalor: explorador.cambiarCalor,
     pantallaCompleta: pantalla.activa,
@@ -401,7 +425,7 @@ export function ExploradorGeo({
   const sinDatos = vista !== null && vista.ranking.conDatos === 0 && !datos.cargando
   const errorDatos = datos.error
   const leyenda =
-    vista && metricaVista && (vista.ranking.conDatos > 0 || explorador.calor) ? (
+    vista && metricaVista && (vista.ranking.conDatos > 0 || calorLeyenda) ? (
       <LeyendaMapa
         escala={vista.escala}
         tema={tema}
@@ -414,7 +438,7 @@ export function ExploradorGeo({
         fijado={enAmbito(fijadoLeyenda, claveLeyenda)}
         onFoco={(valor) => setFocoLeyenda({ ambito: claveLeyenda, valor })}
         onFijar={(valor) => setFijadoLeyenda({ ambito: claveLeyenda, valor })}
-        calor={explorador.calor && !!puntos?.length}
+        calor={calorLeyenda}
         compacta={!amplia}
       />
     ) : null
@@ -577,7 +601,7 @@ export function ExploradorGeo({
           circulos={datos.circulos?.circulos}
           radios={datos.circulos?.radios}
           puntos={puntos}
-          calor={explorador.calor && !!puntos?.length}
+          calor={calorVisible}
           rayarSinDatos={rayarSinDatos}
           seleccionado={seleccionado}
           enfoque={enfoque}

@@ -25,8 +25,13 @@ describe("elección del proveedor de datos geográficos", () => {
     ).toBe(false)
   })
 
+  it("sin la variable, el proveedor es el de la base de datos", async () => {
+    const proveedor = await obtenerProveedorGeo({ NODE_ENV: "test" })
+    expect(Object.keys(proveedor).sort()).toEqual(["detalle", "mapa", "puntos"])
+  })
+
   it("el simulado responde con origen «simulado»", async () => {
-    const proveedor = obtenerProveedorGeo({ AMO_GEO_MOCK: "1", NODE_ENV: "test" })
+    const proveedor = await obtenerProveedorGeo({ AMO_GEO_MOCK: "1", NODE_ENV: "test" })
     const respuesta = await proveedor.mapa({
       nivel: "nacional",
       metrica: "medios",

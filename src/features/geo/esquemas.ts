@@ -14,6 +14,7 @@ import {
 
 import { DIAS_MAXIMOS_RANGO } from "./estado-url"
 import {
+  admiteCalor,
   DEFINICIONES_METRICAS,
   METRICAS_GEO,
   metricaDisponibleEn,
@@ -44,7 +45,7 @@ const ZONA_VALIDA: Readonly<
 
 export const esquemaParametrosGeo = z
   .object({
-    vista: z.enum(["mapa", "detalle"]).default("mapa"),
+    vista: z.enum(["mapa", "puntos", "detalle"]).default("mapa"),
     nivel: z.enum(NIVELES_GEO),
     metrica: z.enum(METRICAS_GEO),
     desde: dia,
@@ -81,6 +82,14 @@ export const esquemaParametrosGeo = z
       })
     }
 
+    if (p.vista === "puntos" && !admiteCalor(p.metrica)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["metrica"],
+        message: `«${DEFINICIONES_METRICAS[p.metrica].titulo}» no tiene puntos reales para el mapa de calor.`,
+      })
+    }
+
     const departamento = p.nivel === "departamental" ? (p.depto ?? null) : null
     if (
       p.nivel === "departamental" &&
@@ -105,7 +114,7 @@ export const esquemaParametrosGeo = z
   })
 
 export type ParametrosGeo =
-  | { readonly vista: "mapa"; readonly consulta: ConsultaMapaGeo }
+  | { readonly vista: "mapa" | "puntos"; readonly consulta: ConsultaMapaGeo }
   | { readonly vista: "detalle"; readonly consulta: ConsultaDetalleGeo }
 
 /** Valida y normaliza los parámetros de la URL de la API. */
@@ -137,8 +146,10 @@ export function leerParametrosGeo(
               ...consulta,
               zona: p.zona ?? "",
               metricasKpi: metricasDelNivel(p.nivel),
+              // La ruta lo activa según los permisos del usuario.
+              conMedios: false,
             },
           }
-        : { vista: "mapa", consulta },
+        : { vista: p.vista, consulta },
   }
 }

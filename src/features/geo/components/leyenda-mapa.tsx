@@ -1,5 +1,6 @@
 "use client"
 
+import { LoaderCircle, RotateCcw } from "lucide-react"
 import type { CSSProperties } from "react"
 
 import type { EscalaCoropletica, TemaMapa } from "@/lib/geo/escalas"
@@ -11,6 +12,14 @@ import { CLASE_PANEL } from "./lienzo"
 
 /** Clase de la leyenda en foco: índice de clase o "sin datos". */
 export type FocoLeyenda = number | "sin-datos" | null
+
+/** Estado del modo calor que explica la leyenda. */
+export interface CalorLeyenda {
+  readonly estado: "cargando" | "listo" | "vacio" | "error"
+  /** Qué se ve y con qué precisión (solo con puntos). */
+  readonly nota: string | null
+  readonly onReintentar: () => void
+}
 
 interface LeyendaMapaProps {
   escala: EscalaCoropletica
@@ -25,7 +34,8 @@ interface LeyendaMapaProps {
   fijado: FocoLeyenda
   onFoco: (foco: FocoLeyenda) => void
   onFijar: (foco: FocoLeyenda) => void
-  calor: boolean
+  /** Con el modo calor activo, la leyenda explica la densidad. */
+  calor: CalorLeyenda | null
   compacta?: boolean
   className?: string
 }
@@ -65,24 +75,13 @@ export function LeyendaMapa({
 
   if (calor) {
     return (
-      <div className={cn(CLASE_PANEL, "flex flex-col gap-2 p-3", className)}>
-        <p className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-          Densidad · {definicion.tituloCorto}
-        </p>
-        <div
-          aria-hidden
-          className={cn(
-            "h-2 w-52 rounded-full",
-            tema === "oscuro"
-              ? "bg-[linear-gradient(90deg,#3F2A76,#7549DE,#A788F6,#DCD0FD,#FFFFFF)]"
-              : "bg-[linear-gradient(90deg,#EDE7FE,#C3AEFB,#8C66EE,#6238BF,#261848)]"
-          )}
-        />
-        <div className="flex justify-between text-[0.6875rem] text-muted-foreground">
-          <span>Menos</span>
-          <span>Más</span>
-        </div>
-      </div>
+      <LeyendaCalor
+        calor={calor}
+        tema={tema}
+        titulo={definicion.tituloCorto}
+        compacta={compacta}
+        className={className}
+      />
     )
   }
 
@@ -176,4 +175,77 @@ export function LeyendaMapa({
       </div>
     </div>
   )
+}
+
+const DEGRADADO_CALOR: Readonly<Record<TemaMapa, string>> = {
+  oscuro: "bg-[linear-gradient(90deg,#3F2A76,#7549DE,#A788F6,#DCD0FD,#FFFFFF)]",
+  claro: "bg-[linear-gradient(90deg,#EDE7FE,#C3AEFB,#8C66EE,#6238BF,#261848)]",
+}
+
+/** Leyenda del modo calor: rampa de densidad, precisión y estado de la carga. */
+function LeyendaCalor({
+  calor,
+  tema,
+  titulo,
+  compacta,
+  className,
+}: {
+  calor: CalorLeyenda
+  tema: TemaMapa
+  titulo: string
+  compacta: boolean
+  className?: string
+}) {
+  const conPuntos = calor.estado === "listo"
+  return (
+    <div
+      className={cn(
+        CLASE_PANEL,
+        "flex flex-col gap-2 p-3",
+        compacta ? "max-w-[15rem]" : "max-w-[17rem]",
+        className
+      )}
+    >
+      <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+        Densidad · {titulo}
+        {calor.estado === "cargando" ? (
+          <LoaderCircle aria-hidden className="size-3 animate-spin text-primary" />
+        ) : null}
+      </p>
+      <div
+        aria-hidden
+        className={cn(
+          "h-2 w-full rounded-full transition-opacity duration-300",
+          compacta ? "min-w-40" : "min-w-52",
+          DEGRADADO_CALOR[tema],
+          !conPuntos && "opacity-35"
+        )}
+      />
+      {conPuntos ? (
+        <div className="flex justify-between text-[0.6875rem] text-muted-foreground">
+          <span>Menos</span>
+          <span>Más</span>
+        </div>
+      ) : null}
+      <p role="status" className="text-[0.6875rem] leading-snug text-muted-foreground">
+        {MENSAJE_CALOR[calor.estado] ?? calor.nota}
+      </p>
+      {calor.estado === "error" ? (
+        <button
+          type="button"
+          onClick={calor.onReintentar}
+          className="flex w-fit items-center gap-1.5 rounded-md text-[0.6875rem] font-medium text-primary outline-none hover:underline focus-visible:anillo-foco"
+        >
+          <RotateCcw aria-hidden className="size-3" />
+          Reintentar
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+const MENSAJE_CALOR: Partial<Record<CalorLeyenda["estado"], string>> = {
+  cargando: "Leyendo las ubicaciones del periodo…",
+  vacio: "Ningún registro del periodo trae coordenadas: se muestra el mapa por zonas.",
+  error: "No pudimos leer las ubicaciones. El mapa por zonas sigue disponible.",
 }

@@ -1,35 +1,23 @@
-import { LayoutDashboard } from "lucide-react"
 import type { Metadata } from "next"
 
-import { EstadoVacio } from "@/components/feedback/estado-vacio"
-import { ContenedorPagina } from "@/components/layout/contenedor-pagina"
-import { EncabezadoPagina } from "@/components/layout/encabezado-pagina"
+import { PanelInicio } from "@/features/dashboard/components/panel-inicio"
+import { cargarValoresPeriodo } from "@/features/dashboard/periodo"
 import { requerirPermiso } from "@/lib/auth/dal"
 
 export const metadata: Metadata = { title: "Inicio" }
 
-/** Marcador provisional: la fase de paneles reemplaza esta página. */
-export default async function PaginaInicio() {
+/**
+ * Inicio: el panel que corresponde al tipo de rol (interno, anunciante o
+ * medio), con el periodo en la URL (`?periodo=` o `desde`/`hasta`).
+ */
+export default async function PaginaInicio({
+  searchParams,
+}: PageProps<"/inicio">) {
   const usuario = await requerirPermiso([
     "inicio.admin",
     "inicio.anunciante",
     "inicio.medio",
   ])
-
-  const primerNombre = usuario.nombre.split(" ")[0]
-
-  return (
-    <ContenedorPagina>
-      <EncabezadoPagina
-        titulo={`Hola, ${primerNombre}`}
-        descripcion="Este es tu punto de partida en AMO."
-      />
-      <EstadoVacio
-        icono={LayoutDashboard}
-        titulo="Tu panel está en preparación"
-        descripcion="Pronto verás aquí los indicadores, alertas y actividad reciente de tu operación."
-        className="flex-none py-16"
-      />
-    </ContenedorPagina>
-  )
+  const valores = await cargarValoresPeriodo(searchParams)
+  return <PanelInicio usuario={usuario} valores={valores} />
 }

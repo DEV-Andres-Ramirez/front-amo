@@ -17,8 +17,6 @@ interface ShellAplicacionProps {
   usuario: UsuarioSesion
   /** Cookie `sidebar_state` leída en el layout; `null` si nunca se eligió. */
   barraLateralAbierta: boolean | null
-  /** Notificaciones sin leer (placeholder hasta el módulo de notificaciones). */
-  noLeidas?: number
   children: ReactNode
 }
 
@@ -29,7 +27,6 @@ interface ShellAplicacionProps {
 export function ShellAplicacion({
   usuario,
   barraLateralAbierta,
-  noLeidas = 0,
   children,
 }: ShellAplicacionProps) {
   const [abierta, setAbierta] = useEstadoBarraLateral(barraLateralAbierta)
@@ -54,7 +51,7 @@ export function ShellAplicacion({
          * y el salto al contenido llega directo a la página.
          */}
         <div className="relative flex min-w-0 flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-border/60 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2">
-          <BarraSuperior noLeidas={noLeidas} />
+          <BarraSuperior />
           <main
             id={ID_CONTENIDO}
             tabIndex={-1}

@@ -2,7 +2,10 @@
  * Contrato de datos del explorador geográfico, compartido por el Route
  * Handler, los proveedores (Supabase y simulado) y el cliente.
  */
+import type { ZonaMundo } from "@/components/maps/mapa-mundi"
+
 import type { MetricaGeo, NivelGeo } from "./metricas"
+import type { GranularidadSerie } from "./serie"
 
 export interface ConsultaMapaGeo {
   readonly nivel: NivelGeo
@@ -19,6 +22,8 @@ export interface ConsultaDetalleGeo extends ConsultaMapaGeo {
   readonly zona: string
   /** Métricas de las tarjetas del detalle (las del nivel que el usuario puede ver). */
   readonly metricasKpi: readonly MetricaGeo[]
+  /** Incluir los medios destacados de la zona (requiere `reportes.ver`). */
+  readonly conMedios: boolean
 }
 
 /** Una fila de `geo_metricas` (docs/modelo-datos.md §5.9) en camelCase. */
@@ -34,7 +39,7 @@ export interface FilaMetricaGeo {
   readonly valorPor100k: number | null
 }
 
-/** Punto real para el mapa de calor: [longitud, latitud, peso]. */
+/** Celda del mapa de calor (coordenadas reales agregadas): [longitud, latitud, peso]. */
 export type PuntoGeo = readonly [lon: number, lat: number, peso: number]
 
 /** Zona sin polígono en el GeoJSON (microestados, islas): se dibuja como círculo. */
@@ -48,10 +53,26 @@ export type OrigenDatosGeo = "base-de-datos" | "simulado"
 export interface RespuestaMapaGeo {
   readonly consulta: ConsultaMapaGeo
   readonly filas: readonly FilaMetricaGeo[]
-  /** Solo para métricas con coordenadas reales (accesos, medios); `null` si no aplica o no hay. */
-  readonly puntos: readonly PuntoGeo[] | null
   /** Zonas con fila pero sin polígono propio (solo países). */
   readonly sinPoligono: readonly CentroZona[]
+  readonly origen: OrigenDatosGeo
+}
+
+/**
+ * Modo calor (`?vista=puntos`), solo para métricas con coordenadas reales
+ * (accesos, medios). Se pide aparte y solo al activarlo: el mapa coroplético
+ * no espera la lectura de coordenadas.
+ */
+export interface RespuestaPuntosGeo {
+  readonly consulta: ConsultaMapaGeo
+  /** Celdas agregadas (nunca coordenadas individuales). */
+  readonly puntos: readonly PuntoGeo[]
+  /** Registros con coordenadas en el periodo. */
+  readonly total: number
+  /** Registros leídos; menor que `total` si la lectura se muestreó. */
+  readonly muestra: number
+  /** Lado de la celda de agregación, en grados. */
+  readonly pasoGrados: number
   readonly origen: OrigenDatosGeo
 }
 
@@ -61,23 +82,42 @@ export interface KpiZona {
   readonly n: number | null
 }
 
-export interface SerieZona {
-  /** Primer día del primer periodo ('YYYY-MM-DD'). */
-  readonly inicio: string
-  readonly granularidad: "dia" | "semana"
-  readonly valores: readonly number[]
+export interface PuntoSerieZona {
+  /** Días inclusivos de la cubeta ('YYYY-MM-DD'). */
+  readonly desde: string
+  readonly hasta: string
+  /** `null`: muestra insuficiente (tasas con n < mínimo). */
+  readonly valor: number | null
+  /** La cubeta no cubre su semana o su mes completos. */
+  readonly parcial: boolean
 }
+
+export interface SerieZona {
+  readonly granularidad: GranularidadSerie
+  readonly puntos: readonly PuntoSerieZona[]
+}
+
+/** Por qué el detalle no trae evolución. */
+export type MotivoSinSerie =
+  /** La métrica es una foto actual sin dimensión temporal (audiencia). */
+  | "foto-actual"
+  /** Ninguna cubeta tiene valor (sin movimiento o muestra insuficiente). */
+  | "sin-datos"
+  /** La consulta falló; el resto del detalle sí llegó. */
+  | "fallo"
 
 export interface FilaTopZona {
   readonly codigo: string | null
   readonly nombre: string
   readonly valor: number | null
-  /** Contexto corto (municipio de un medio, plataforma…). */
+  /** Contexto corto (municipio de un medio, tasa de cumplimiento…). */
   readonly detalle: string | null
 }
 
 export interface TopZona {
   readonly titulo: string
+  /** Aclaración del criterio ("con entrega en el periodo"). */
+  readonly descripcion?: string
   readonly metrica: MetricaGeo
   readonly filas: readonly FilaTopZona[]
 }
@@ -85,18 +125,25 @@ export interface TopZona {
 export interface RespuestaDetalleGeo {
   readonly consulta: ConsultaDetalleGeo
   readonly kpis: readonly KpiZona[]
-  /** Evolución de la métrica en el periodo; `null` si la fuente aún no la ofrece. */
+  /** Evolución de la métrica en el periodo. */
   readonly serie: SerieZona | null
+  /** Motivo cuando `serie` es `null`. */
+  readonly sinSerie: MotivoSinSerie | null
+  /** Subzonas con mayor valor (departamentos de Colombia, municipios de un departamento). */
   readonly top: TopZona | null
+  /** Medios con más asignaciones en la zona (solo con `reportes.ver`). */
+  readonly medios: TopZona | null
   readonly origen: OrigenDatosGeo
 }
 
 /**
  * Fuente de datos del explorador. Dos implementaciones: Supabase (RPC
- * `geo_metricas`, producción) y simulada (determinista, desarrollo y pruebas).
+ * `geo_metricas` y lecturas con la RLS del usuario, producción) y simulada
+ * (determinista, solo desarrollo y pruebas).
  */
 export interface ProveedorMetricasGeo {
   mapa(consulta: ConsultaMapaGeo): Promise<RespuestaMapaGeo>
+  puntos(consulta: ConsultaMapaGeo): Promise<RespuestaPuntosGeo>
   detalle(consulta: ConsultaDetalleGeo): Promise<RespuestaDetalleGeo>
 }
 
@@ -125,4 +172,15 @@ export interface ErrorApiGeo {
     /** Sugerencia para desarrollo (nunca en producción). */
     readonly pista?: string
   }
+}
+
+/** Ingresos exitosos del periodo por ubicación (mapa de la página de Accesos). */
+export interface IngresosPorUbicacion {
+  readonly paises: readonly ZonaMundo[]
+  /** Por código DANE; los departamentos sin ingresos valen 0. */
+  readonly departamentos: Readonly<Record<string, number>>
+  /** Ingresos exitosos con país conocido. */
+  readonly total: number
+  /** Cifras estimadas a partir de una muestra (solo por la vía de la tabla). */
+  readonly estimado: boolean
 }

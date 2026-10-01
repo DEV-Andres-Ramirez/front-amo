@@ -1,10 +1,10 @@
 "use client"
 
-import { ArrowRight, Info, X } from "lucide-react"
+import { ArrowRight, ChartNoAxesColumn, Info, X } from "lucide-react"
 
 import { EstadoError } from "@/components/feedback/estado-error"
 import { Esqueleto } from "@/components/feedback/esqueletos"
-import { Sparkline } from "@/components/maps/sparkline"
+import { BarrasSerie } from "@/components/maps/barras-serie"
 import {
   type FormatoNumero,
   NumeroAnimado,
@@ -14,14 +14,25 @@ import { cn } from "@/lib/utils"
 
 import type { FilaRanking } from "../agregacion"
 import { departamentoPorCodigo } from "../departamentos"
-import { formatearParticipacion, formatearValorGeo, unidadGeo } from "../formato"
+import {
+  etiquetaCubeta,
+  formatearParticipacion,
+  formatearValorGeo,
+  TITULO_SERIE,
+  unidadGeo,
+} from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 import {
   DEPARTAMENTOS_SIN_DESCENSO,
   type EstadoNivel,
   TIPO_ZONA,
 } from "../niveles"
-import type { RespuestaDetalleGeo } from "../tipos"
+import type {
+  MotivoSinSerie,
+  RespuestaDetalleGeo,
+  SerieZona,
+  TopZona,
+} from "../tipos"
 import { ICONOS_METRICA } from "./iconos-metrica"
 
 export interface DatosDetalle {
@@ -136,6 +147,27 @@ function ValorPrincipal({
   )
 }
 
+const SIN_SERIE: Readonly<Record<MotivoSinSerie, string>> = {
+  "foto-actual":
+    "Es una foto de las audiencias declaradas hoy: no cambia con el periodo.",
+  "sin-datos": "Sin movimiento en esta zona durante el periodo.",
+  fallo: "No pudimos calcular la evolución. El resto del detalle está al día.",
+}
+
+/** Nota de la serie: periodos incompletos y cubetas sin muestra suficiente. */
+function notaSerie(serie: SerieZona): string | null {
+  const notas: string[] = []
+  if (serie.puntos.some((punto) => punto.parcial)) {
+    notas.push("Las barras tenues cubren periodos incompletos")
+  }
+  if (serie.puntos.some((punto) => punto.valor === null)) {
+    notas.push("la línea punteada indica muestra insuficiente")
+  }
+  if (notas.length === 0) return null
+  const texto = notas.join("; ")
+  return `${texto.charAt(0).toUpperCase()}${texto.slice(1)}.`
+}
+
 function Serie({
   detalle,
   metrica,
@@ -143,33 +175,29 @@ function Serie({
   detalle: RespuestaDetalleGeo
   metrica: MetricaGeo
 }) {
-  const serie = detalle.serie
-  if (!serie || serie.valores.length < 2) {
+  const { serie, sinSerie } = detalle
+  if (!serie) {
     return (
-      <p className="flex items-center gap-2 rounded-xl bg-foreground/4 px-3 py-2.5 text-xs text-muted-foreground">
-        <Info aria-hidden className="size-3.5 shrink-0" />
-        La evolución por zona estará disponible cuando la base de datos la calcule.
+      <p className="flex items-start gap-2 rounded-xl bg-foreground/4 px-3 py-2.5 text-xs text-muted-foreground">
+        <ChartNoAxesColumn aria-hidden className="mt-px size-3.5 shrink-0" />
+        {SIN_SERIE[sinSerie ?? "sin-datos"]}
       </p>
     )
   }
-  const minimo = Math.min(...serie.valores)
-  const maximo = Math.max(...serie.valores)
-  const periodo = serie.granularidad === "dia" ? "diaria" : "semanal"
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between text-xs text-muted-foreground">
-        <span>Evolución {periodo}</span>
-        <span className="cifras">
-          {formatearValorGeo(minimo, metrica, { compacto: true })} –{" "}
-          {formatearValorGeo(maximo, metrica, { compacto: true })}
-        </span>
-      </div>
-      <Sparkline
-        valores={serie.valores}
-        etiqueta={`Evolución ${periodo}: mínimo ${formatearValorGeo(minimo, metrica)}, máximo ${formatearValorGeo(maximo, metrica)}`}
-        className="h-12"
-      />
-    </div>
+    <BarrasSerie
+      titulo={TITULO_SERIE[serie.granularidad]}
+      barras={serie.puntos.map((punto) => ({
+        valor: punto.valor,
+        parcial: punto.parcial,
+        etiqueta: etiquetaCubeta(punto, serie.granularidad),
+        texto:
+          punto.valor === null
+            ? "Muestra insuficiente"
+            : formatearValorGeo(punto.valor, metrica, { compacto: true }),
+      }))}
+      nota={notaSerie(serie)}
+    />
   )
 }
 
@@ -217,25 +245,36 @@ function Kpis({
   )
 }
 
-function Top({ detalle }: { detalle: RespuestaDetalleGeo }) {
-  const top = detalle.top
+function Destacados({ top }: { top: TopZona | null }) {
   if (!top || top.filas.length === 0) return null
   const maximo = Math.max(...top.filas.map((f) => f.valor ?? 0), 0)
   return (
     <section aria-label={top.titulo} className="flex flex-col gap-2">
-      <h3 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-        {top.titulo}
-      </h3>
+      <div className="flex flex-col gap-0.5">
+        <h3 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+          {top.titulo}
+        </h3>
+        {top.descripcion ? (
+          <p className="text-[0.6875rem] text-muted-foreground">{top.descripcion}</p>
+        ) : null}
+      </div>
       <ol className="flex flex-col gap-2">
         {top.filas.map((fila, indice) => (
           <li key={`${fila.codigo ?? fila.nombre}-${indice}`} className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className="flex min-w-0 items-baseline gap-1.5">
                 <span className="cifras text-muted-foreground">{indice + 1}.</span>
-                <span className="truncate font-medium">{fila.nombre}</span>
+                <span className="truncate font-medium" title={fila.nombre}>
+                  {fila.nombre}
+                </span>
               </span>
               <span className="cifras shrink-0 text-muted-foreground">
                 {formatearValorGeo(fila.valor, top.metrica, { compacto: true })}
+                {fila.detalle ? (
+                  <span className="ml-1.5 text-[0.6875rem] text-muted-foreground/80">
+                    · {fila.detalle}
+                  </span>
+                ) : null}
               </span>
             </div>
             <span aria-hidden className="h-1 overflow-hidden rounded-full bg-foreground/6">
@@ -349,7 +388,8 @@ export function CuerpoDetalle({
             metrica={datos.metrica}
             onCambiarMetrica={onCambiarMetrica}
           />
-          <Top detalle={datos.detalle} />
+          <Destacados top={datos.detalle.top} />
+          <Destacados top={datos.detalle.medios} />
         </div>
       ) : (
         <EsqueletoDetalle />

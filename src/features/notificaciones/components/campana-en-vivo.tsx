@@ -28,14 +28,7 @@ function etiquetaAccesible(noLeidas: number): string {
 /**
  * Campana del AppShell conectada a la fuente de datos: conteo de no leídas
  * con sondeo de 60 s (React Query) y panel con las últimas notificaciones.
- *
- * Integración (coordinador), en `components/layout/barra-superior.tsx`:
- * reemplazar `<CampanaNotificaciones noLeidas={noLeidas} />` por
- * `<CampanaNotificacionesEnVivo />` (misma apariencia y tamaño). Si se
- * prefiere conservar el componente del layout, basta con leer el conteo con
- * `useConteoNoLeidas()` y poner `<PanelNotificaciones activo onCerrar />`
- * dentro de su `<PopoverContent className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 p-0">`.
- * Mostrarla solo con el permiso `notificaciones.ver` (todos los roles lo tienen).
+ * Se monta en `components/layout/barra-superior.tsx`.
  */
 export function CampanaNotificacionesEnVivo() {
   const [abierto, setAbierto] = useState(false)

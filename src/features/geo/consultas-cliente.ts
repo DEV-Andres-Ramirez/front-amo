@@ -17,9 +17,17 @@ import type {
   ErrorApiGeo,
   RespuestaDetalleGeo,
   RespuestaMapaGeo,
+  RespuestaPuntosGeo,
 } from "./tipos"
 
 const RUTA_API = "/api/geo/metricas"
+
+/**
+ * La analítica cambia despacio (cron diario, cargas de métricas): cinco
+ * minutos sin volver a pedir al ir y venir entre niveles, métricas y zonas.
+ * El caché del navegador (`max-age=60`) cubre además las recargas.
+ */
+const VIGENCIA_DATOS_MS = 5 * 60_000
 
 /** Error de la API con el estado HTTP y el mensaje listo para la interfaz. */
 export class ErrorConsultaGeo extends Error {
@@ -34,9 +42,14 @@ export class ErrorConsultaGeo extends Error {
   }
 }
 
+export type SolicitudGeo =
+  | { readonly vista: "mapa" }
+  | { readonly vista: "puntos" }
+  | { readonly vista: "detalle"; readonly zona: string }
+
 export function parametrosConsulta(
   consulta: ConsultaMapaGeo,
-  zona?: string
+  solicitud: SolicitudGeo = { vista: "mapa" }
 ): URLSearchParams {
   const parametros = new URLSearchParams({
     nivel: consulta.nivel,
@@ -45,10 +58,8 @@ export function parametrosConsulta(
     hasta: consulta.hasta,
   })
   if (consulta.departamento) parametros.set("depto", consulta.departamento)
-  if (zona) {
-    parametros.set("vista", "detalle")
-    parametros.set("zona", zona)
-  }
+  if (solicitud.vista !== "mapa") parametros.set("vista", solicitud.vista)
+  if (solicitud.vista === "detalle") parametros.set("zona", solicitud.zona)
   return parametros
 }
 
@@ -98,6 +109,8 @@ export const clavesGeo = {
   todo: ["geo"] as const,
   mapa: (c: ConsultaMapaGeo) =>
     ["geo", "mapa", c.nivel, c.metrica, c.desde, c.hasta, c.departamento] as const,
+  puntos: (c: ConsultaMapaGeo) =>
+    ["geo", "puntos", c.nivel, c.metrica, c.desde, c.hasta, c.departamento] as const,
   detalle: (c: ConsultaMapaGeo, zona: string) =>
     [
       "geo",
@@ -138,6 +151,36 @@ export function useMetricasMapa(consulta: ConsultaMapaGeo | null) {
       previo && consulta && mismoAmbito(previo.consulta, consulta)
         ? previo
         : undefined,
+    staleTime: VIGENCIA_DATOS_MS,
+    retry: reintentar,
+  })
+}
+
+/**
+ * Puntos del modo calor: solo se piden con el modo activo, aparte del
+ * coroplético (que no espera la lectura de coordenadas).
+ */
+export function usePuntosMapa(consulta: ConsultaMapaGeo | null, activo: boolean) {
+  return useQuery({
+    queryKey: consulta ? clavesGeo.puntos(consulta) : ["geo", "puntos"],
+    queryFn:
+      consulta && activo
+        ? ({ signal }) =>
+            pedir<RespuestaPuntosGeo>(
+              parametrosConsulta(consulta, { vista: "puntos" }),
+              signal
+            )
+        : skipToken,
+    // Al cambiar el periodo se conservan los puntos anteriores; con otra
+    // métrica u otro ámbito, no (serían otros datos).
+    placeholderData: (previo) =>
+      previo &&
+      consulta &&
+      previo.consulta.metrica === consulta.metrica &&
+      mismoAmbito(previo.consulta, consulta)
+        ? previo
+        : undefined,
+    staleTime: VIGENCIA_DATOS_MS,
     retry: reintentar,
   })
 }
@@ -153,12 +196,13 @@ export function useDetalleZona(
       consulta && zona
         ? ({ signal }) =>
             pedir<RespuestaDetalleGeo>(
-              parametrosConsulta(consulta, zona),
+              parametrosConsulta(consulta, { vista: "detalle", zona }),
               signal
             )
         : skipToken,
     placeholderData: (previo) =>
       previo && previo.consulta.zona === zona ? previo : undefined,
+    staleTime: VIGENCIA_DATOS_MS,
     retry: reintentar,
   })
 }
@@ -230,6 +274,6 @@ export function precargarMetricasMapa(
     queryKey: clavesGeo.mapa(consulta),
     queryFn: ({ signal }) =>
       pedir<RespuestaMapaGeo>(parametrosConsulta(consulta), signal),
-    staleTime: 60_000,
+    staleTime: VIGENCIA_DATOS_MS,
   })
 }

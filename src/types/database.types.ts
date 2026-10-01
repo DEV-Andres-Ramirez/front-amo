@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHIVO GENERADO — no editar a mano.
 // Origen: Supabase generate_typescript_types (proyecto zygfqfvqwfvhbirmjojp, esquema public),
-// última migración aplicada: 20261001002838_negocio_transacciones_politicas.
+// última migración aplicada: 20261001053648_roles_permisos_aplicables.
 // Regenerar con `pnpm db:types` (scripts/db/generar-tipos.ts; requiere `supabase login`).
 // ─────────────────────────────────────────────────────────────────────────────
 export type Json =
@@ -2380,6 +2380,68 @@ export type Database = {
         }
         Relationships: []
       }
+      notificaciones: {
+        Row: {
+          canal: Database["public"]["Enums"]["notificacion_canal"]
+          created_at: string
+          entidad: string | null
+          entidad_id: string | null
+          enviada_email_at: string | null
+          es_demo: boolean
+          id: number
+          leida: boolean
+          leida_at: string | null
+          mensaje: string
+          prioridad: number
+          tipo: string
+          titulo: string
+          url: string | null
+          usuario_id: string
+        }
+        Insert: {
+          canal?: Database["public"]["Enums"]["notificacion_canal"]
+          created_at?: string
+          entidad?: string | null
+          entidad_id?: string | null
+          enviada_email_at?: string | null
+          es_demo?: boolean
+          id?: never
+          leida?: boolean
+          leida_at?: string | null
+          mensaje: string
+          prioridad?: number
+          tipo: string
+          titulo: string
+          url?: string | null
+          usuario_id: string
+        }
+        Update: {
+          canal?: Database["public"]["Enums"]["notificacion_canal"]
+          created_at?: string
+          entidad?: string | null
+          entidad_id?: string | null
+          enviada_email_at?: string | null
+          es_demo?: boolean
+          id?: never
+          leida?: boolean
+          leida_at?: string | null
+          mensaje?: string
+          prioridad?: number
+          tipo?: string
+          titulo?: string
+          url?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificaciones_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oferta_cupos: {
         Row: {
           created_at: string
@@ -3502,6 +3564,14 @@ export type Database = {
         Returns: string
       }
       activar_perfil_srv: { Args: { p_usuario_id: string }; Returns: undefined }
+      actividad_heatmap: {
+        Args: { p_desde: string; p_fuente?: string; p_hasta: string }
+        Returns: {
+          cantidad: number
+          dia_semana: number
+          hora: number
+        }[]
+      }
       anunciantes_publico: {
         Args: { p_ids?: string[] }
         Returns: {
@@ -3554,6 +3624,30 @@ export type Database = {
           tarifa_id: string
         }[]
       }
+      desempeno_anunciante: {
+        Args: {
+          p_campana_id?: string
+          p_desde: string
+          p_dimension: string
+          p_hasta: string
+        }
+        Returns: {
+          alcance: number
+          asignaciones: number
+          clave: string
+          clics: number
+          costo_por_alcance: number
+          costo_por_interaccion: number
+          cpm_efectivo: number
+          engagement: number
+          gmv: number
+          impresiones: number
+          interacciones: number
+          n: number
+          nombre: string
+          reproducciones: number
+        }[]
+      }
       editar_privado_srv: {
         Args: {
           p_actor_id: string
@@ -3572,6 +3666,16 @@ export type Database = {
           p_usuario_id: string
         }
         Returns: undefined
+      }
+      embudo_asignaciones: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          cantidad: number
+          etapa: string
+          orden: number
+          porcentaje_anterior: number
+          porcentaje_inicio: number
+        }[]
       }
       emitir_documento_soporte_srv: {
         Args: {
@@ -3613,6 +3717,69 @@ export type Database = {
         }
         Returns: string
       }
+      geo_metricas: {
+        Args: {
+          p_departamento?: string
+          p_desde: string
+          p_hasta: string
+          p_metrica: string
+          p_nivel: string
+        }
+        Returns: {
+          codigo: string
+          codigo_geometria: string
+          n: number
+          nombre: string
+          poblacion: number
+          valor: number
+          valor_por_100k: number
+        }[]
+      }
+      kpis_admin: {
+        Args: {
+          p_desde: string
+          p_desde_ant?: string
+          p_hasta: string
+          p_hasta_ant?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["kpi_fila"][]
+        SetofOptions: {
+          from: "*"
+          to: "kpi_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      kpis_anunciante: {
+        Args: {
+          p_desde: string
+          p_desde_ant?: string
+          p_hasta: string
+          p_hasta_ant?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["kpi_fila"][]
+        SetofOptions: {
+          from: "*"
+          to: "kpi_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      kpis_medio: {
+        Args: {
+          p_desde: string
+          p_desde_ant?: string
+          p_hasta: string
+          p_hasta_ant?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["kpi_fila"][]
+        SetofOptions: {
+          from: "*"
+          to: "kpi_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       listar_usuarios: {
         Args: {
           p_busqueda?: string
@@ -3650,6 +3817,22 @@ export type Database = {
           reintentar_en_s: number
         }[]
       }
+      marcar_notificaciones_leidas: {
+        Args: { p_ids?: number[]; p_leida?: boolean }
+        Returns: number
+      }
+      medios_en_riesgo: {
+        Args: { p_limite?: number }
+        Returns: {
+          asignaciones_abiertas: number
+          departamento: string
+          gmv_90d: number
+          medio_id: string
+          nombre: string
+          ultima_aceptacion_at: string
+          ultima_actividad_at: string
+        }[]
+      }
       medios_publico: {
         Args: { p_ids?: string[] }
         Returns: {
@@ -3663,6 +3846,34 @@ export type Database = {
           publicaciones_verificadas: number
           tasa_cumplimiento: number
           tipo: Database["public"]["Enums"]["medio_tipo"]
+        }[]
+      }
+      metricas_accesos: {
+        Args: {
+          p_desde: string
+          p_desde_ant?: string
+          p_hasta: string
+          p_hasta_ant?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["kpi_fila"][]
+        SetofOptions: {
+          from: "*"
+          to: "kpi_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      mezcla_plataformas: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          alcance: number
+          asignaciones: number
+          cpm_efectivo: number
+          formato_clave: string
+          formato_nombre: string
+          gmv: number
+          participacion_gmv: number
+          plataforma: Database["public"]["Enums"]["plataforma"]
         }[]
       }
       mi_actividad: {
@@ -3744,6 +3955,27 @@ export type Database = {
           verificada_at: string
         }[]
       }
+      mis_notificaciones: {
+        Args: {
+          p_antes_id?: number
+          p_limite?: number
+          p_solo_no_leidas?: boolean
+        }
+        Returns: {
+          created_at: string
+          entidad: string
+          entidad_id: string
+          id: number
+          leida: boolean
+          leida_at: string
+          mensaje: string
+          prioridad: number
+          tipo: string
+          titulo: string
+          url: string
+        }[]
+      }
+      notificaciones_no_leidas: { Args: never; Returns: number }
       ofertas_para_medio: {
         Args: { p_oferta_id?: string }
         Returns: {
@@ -3795,6 +4027,15 @@ export type Database = {
           p_valor: number
         }
         Returns: string
+      }
+      proximas_acciones_medio: {
+        Args: { p_limite?: number }
+        Returns: {
+          accion: string
+          asignacion_id: string
+          oferta_titulo: string
+          vence_at: string
+        }[]
       }
       rechazar_oferta_srv: {
         Args: {
@@ -3898,6 +4139,126 @@ export type Database = {
         Args: { p_oferta_id: string }
         Returns: undefined
       }
+      reporte_cartera: {
+        Args: { p_corte: string }
+        Returns: {
+          anunciante: string
+          anunciante_id: string
+          facturado: number
+          facturas_vencidas: number
+          pagado: number
+          saldo: number
+          saldo_0_30: number
+          saldo_31_60: number
+          saldo_61_90: number
+          saldo_90_mas: number
+        }[]
+      }
+      reporte_cobertura_territorial: {
+        Args: { p_departamento?: string; p_desde: string; p_hasta: string }
+        Returns: {
+          alcance: number
+          asignaciones: number
+          departamento: string
+          departamento_codigo: string
+          gmv: number
+          medios: number
+          medios_activos: number
+          medios_por_100k: number
+          municipio: string
+          municipio_codigo: string
+          poblacion: number
+        }[]
+      }
+      reporte_cumplimiento_medios: {
+        Args: { p_departamento?: string; p_desde: string; p_hasta: string }
+        Returns: {
+          alertas_metricas: number
+          canceladas: number
+          comprometidas: number
+          cumplidas: number
+          departamento: string
+          en_disputa: number
+          medio: string
+          medio_id: string
+          multiplicador_promedio: number
+          municipio: string
+          nivel: number
+          tasa_cumplimiento: number
+          vencidas: number
+        }[]
+      }
+      reporte_desempeno_campanas: {
+        Args: { p_anunciante_id?: string; p_desde: string; p_hasta: string }
+        Returns: {
+          alcance: number
+          anunciante: string
+          campana: string
+          campana_id: string
+          clics: number
+          costo_por_alcance: number
+          costo_por_interaccion: number
+          cpm_efectivo: number
+          cupos: number
+          cupos_ocupados: number
+          engagement: number
+          gmv_comprometido: number
+          gmv_verificado: number
+          impresiones: number
+          interacciones: number
+          n_verificadas: number
+          ofertas: number
+          reproducciones: number
+          tasa_cumplimiento: number
+          tasa_llenado: number
+        }[]
+      }
+      reporte_finanzas: {
+        Args: { p_agrupacion: string; p_desde: string; p_hasta: string }
+        Returns: {
+          cartera: number
+          comision: number
+          facturado: number
+          gmv_comprometido: number
+          gmv_verificado: number
+          grupo: string
+          grupo_id: string
+          pagado_medios: number
+          recaudado: number
+          take_rate: number
+        }[]
+      }
+      reporte_resumen_ejecutivo: {
+        Args: {
+          p_desde: string
+          p_desde_ant?: string
+          p_hasta: string
+          p_hasta_ant?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["kpi_fila"][]
+        SetofOptions: {
+          from: "*"
+          to: "kpi_fila"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      reporte_usuarios_accesos: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          accesos_exitosos: number
+          accesos_fallidos: number
+          email: string
+          estado: Database["public"]["Enums"]["perfil_estado"]
+          mfa_activo: boolean
+          nombre: string
+          paises_distintos: number
+          rol: string
+          sospechosos: number
+          ultimo_acceso_at: string
+          usuario_id: string
+        }[]
+      }
       reservar_cupo_srv: {
         Args: {
           p_actor_id: string
@@ -3948,6 +4309,15 @@ export type Database = {
           tipo: Database["public"]["Enums"]["rol_tipo"]
         }[]
       }
+      salud_medios: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          cantidad: number
+          gmv_en_juego: number
+          porcentaje: number
+          segmento: string
+        }[]
+      }
       seguridad_usuario: {
         Args: { p_usuario_id: string }
         Returns: {
@@ -3959,6 +4329,26 @@ export type Database = {
           mfa_ultimo_uso_at: string
           sesiones_activas: number
           ultimo_ingreso_at: string
+        }[]
+      }
+      serie_ganancias_medio: {
+        Args: { p_desde: string; p_granularidad: string; p_hasta: string }
+        Returns: {
+          asignaciones: number
+          ganado: number
+          pagado: number
+          periodo: string
+        }[]
+      }
+      serie_gmv: {
+        Args: { p_desde: string; p_granularidad: string; p_hasta: string }
+        Returns: {
+          asignaciones_aceptadas: number
+          comision: number
+          gmv_comprometido: number
+          gmv_verificado: number
+          negocios: number
+          periodo: string
         }[]
       }
       sesiones_usuario: {
@@ -3985,6 +4375,24 @@ export type Database = {
       tocar_sesion_srv: {
         Args: { p_session_id: string; p_usuario_id: string }
         Returns: string
+      }
+      top_zonas: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_limite?: number
+          p_metrica: string
+          p_nivel: string
+        }
+        Returns: {
+          codigo: string
+          nombre: string
+          participacion: number
+          rank: number
+          valor: number
+          valor_anterior: number
+          variacion: number
+        }[]
       }
       transicionar_srv: {
         Args: {
@@ -4118,7 +4526,16 @@ export type Database = {
       validacion_estado: "PENDIENTE" | "APROBADA" | "RECHAZADA"
     }
     CompositeTypes: {
-      [_ in never]: never
+      kpi_fila: {
+        kpi: string | null
+        valor: number | null
+        valor_anterior: number | null
+        variacion: number | null
+        n: number | null
+        unidad: string | null
+        serie: number[] | null
+        n_anterior: number | null
+      }
     }
   }
 }

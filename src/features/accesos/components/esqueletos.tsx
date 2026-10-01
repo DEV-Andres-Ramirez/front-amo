@@ -1,5 +1,6 @@
 import { EsqueletoTablaDatos } from "@/components/data-table/esqueleto-tabla"
 import { Esqueleto, EsqueletoKpis } from "@/components/feedback/esqueletos"
+import { EsqueletoMapaIngresos } from "@/features/geo/components/esqueleto-mapa-ingresos"
 import { cn } from "@/lib/utils"
 
 /** Cinco indicadores con la misma rejilla que los reales. */
@@ -67,7 +68,7 @@ export function EsqueletoSeguridadAccesos() {
   )
 }
 
-/** Rankings de países y ciudades. */
+/** Mapa de ingresos y rankings de países y ciudades (misma rejilla que `DisposicionOrigen`). */
 export function EsqueletoOrigenAccesos() {
   return (
     <div role="status" aria-busy="true" className="flex flex-col gap-4">
@@ -76,9 +77,12 @@ export function EsqueletoOrigenAccesos() {
         <Esqueleto className="h-5 w-48" />
         <Esqueleto className="h-3.5 w-80 max-w-full" />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Tarjeta />
-        <Tarjeta />
+      <div className="grid gap-4 lg:grid-cols-5">
+        <EsqueletoMapaIngresos className="min-w-0 lg:col-span-3" />
+        <div className="grid min-w-0 gap-4 md:grid-cols-2 lg:col-span-2 lg:grid-cols-1">
+          <Tarjeta />
+          <Tarjeta />
+        </div>
       </div>
     </div>
   )

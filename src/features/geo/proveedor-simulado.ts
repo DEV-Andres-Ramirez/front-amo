@@ -22,6 +22,7 @@ import { tasaPonderada } from "./agregacion"
 import { azar, generador, puntosAlrededor } from "./azar"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "./metricas"
 import { CODIGO_COLOMBIA } from "./niveles"
+import { cubetasSerie } from "./serie"
 import { centrosSinPoligono } from "./sin-poligono"
 import type {
   ConsultaDetalleGeo,
@@ -32,6 +33,7 @@ import type {
   PuntoGeo,
   RespuestaDetalleGeo,
   RespuestaMapaGeo,
+  RespuestaPuntosGeo,
   SerieZona,
   TopZona,
 } from "./tipos"
@@ -363,8 +365,8 @@ function puntosMunicipales(consulta: ConsultaMapaGeo): PuntoGeo[] {
   )
 }
 
-function puntosSimulados(consulta: ConsultaMapaGeo): PuntoGeo[] | null {
-  if (!DEFINICIONES_METRICAS[consulta.metrica].conPuntos) return null
+function puntosSimulados(consulta: ConsultaMapaGeo): PuntoGeo[] {
+  if (!DEFINICIONES_METRICAS[consulta.metrica].conPuntos) return []
   if (consulta.nivel !== "internacional") return puntosMunicipales(consulta)
   const extranjeros = zonasDelNivel(consulta).filter(
     (zona) => zona.codigo !== CODIGO_COLOMBIA
@@ -377,43 +379,46 @@ function puntosSimulados(consulta: ConsultaMapaGeo): PuntoGeo[] | null {
 
 // ── Detalle de una zona ──────────────────────────────────────────────────────
 
-function granularidad(dias: number): SerieZona["granularidad"] {
-  return dias <= 31 ? "dia" : "semana"
-}
-
 function serieSimulada(
   consulta: ConsultaDetalleGeo,
   valor: number | null
 ): SerieZona | null {
-  if (valor === null) return null
-  const periodo = periodoDe(consulta)
-  const tipo = granularidad(periodo.dias)
-  const puntos = tipo === "dia" ? periodo.dias : Math.ceil(periodo.dias / 7)
+  const plan = cubetasSerie(consulta.desde, consulta.hasta)
+  if (valor === null || !plan || consulta.metrica === "audiencia") return null
+  const { cubetas } = plan
   const aleatorio = generador(
     `serie|${consulta.metrica}|${consulta.zona}|${consulta.desde}|${consulta.hasta}`
   )
   const definicion = DEFINICIONES_METRICAS[consulta.metrica]
 
-  let valores: number[]
+  let valores: (number | null)[]
   if (!definicion.aditiva) {
-    valores = Array.from({ length: puntos }, () =>
-      Math.min(1, Math.max(0, valor + (aleatorio() - 0.5) * 0.12))
+    // Algunas cubetas no alcanzan la muestra mínima.
+    valores = cubetas.map(() =>
+      aleatorio() < 0.15
+        ? null
+        : Math.min(1, Math.max(0, valor + (aleatorio() - 0.5) * 0.12))
     )
   } else if (definicion.foto) {
     // Stock que crece hasta el valor al cierre.
-    valores = Array.from({ length: puntos }, (_, i) =>
-      Math.round(valor * (0.86 + (0.14 * (i + 1)) / puntos + (aleatorio() - 0.5) * 0.015))
+    valores = cubetas.map((_, i) =>
+      Math.round(
+        valor *
+          (0.86 + (0.14 * (i + 1)) / cubetas.length + (aleatorio() - 0.5) * 0.015)
+      )
     )
-    valores[puntos - 1] = valor
+    valores[cubetas.length - 1] = valor
   } else {
-    // Flujo: reparto con estacionalidad semanal (fines de semana más bajos).
-    const pesos = Array.from({ length: puntos }, (_, i) => {
-      const finDeSemana = tipo === "dia" && (i % 7 === 5 || i % 7 === 6)
-      return (finDeSemana ? 0.55 : 1) * (0.6 + 0.8 * aleatorio())
-    })
+    // Flujo: las cubetas parciales reciben menos; ruido de ±40 %.
+    const pesos = cubetas.map(
+      (cubeta) => (cubeta.parcial ? 0.45 : 1) * (0.6 + 0.8 * aleatorio())
+    )
     valores = repartirEntero(Math.round(valor), pesos)
   }
-  return { inicio: consulta.desde, granularidad: tipo, valores }
+  return {
+    granularidad: plan.granularidad,
+    puntos: cubetas.map((cubeta, i) => ({ ...cubeta, valor: valores[i] })),
+  }
 }
 
 const PREFIJOS_MEDIO = [
@@ -439,29 +444,31 @@ function nombresMedios(lugar: string, semilla: string, cantidad: number): string
   return [...nombres].slice(0, cantidad)
 }
 
-function topMedios(
-  consulta: ConsultaDetalleGeo,
-  lugar: string,
-  valor: number | null,
-  detalle: string | null
-): TopZona {
-  const nombres = nombresMedios(lugar, `${consulta.nivel}|${consulta.zona}`, 5)
-  const aditiva = DEFINICIONES_METRICAS[consulta.metrica].aditiva
-  const pesos = nombres.map((_, i) => 1 / (i + 1.4))
-  const valores =
-    valor === null
-      ? nombres.map(() => null)
-      : aditiva
-        ? repartirEntero(Math.round(valor * 0.8), pesos)
-        : nombres.map((_, i) => Math.min(1, valor + 0.04 - i * 0.015))
+/** Medios con más asignaciones en la zona (como `reporte_cumplimiento_medios`). */
+function mediosSimulados(consulta: ConsultaDetalleGeo): TopZona | null {
+  const lugar =
+    consulta.nivel === "departamental"
+      ? obtenerMunicipio(consulta.zona)?.nombre
+      : consulta.nivel === "nacional"
+        ? obtenerDepartamento(consulta.zona)?.nombre
+        : consulta.zona === CODIGO_COLOMBIA
+          ? "Colombia"
+          : undefined
+  if (!consulta.conMedios || !lugar) return null
+  const semilla = `${consulta.nivel}|${consulta.zona}|${consulta.desde}|${consulta.hasta}`
+  const aleatorio = generador(`asignaciones|${semilla}`)
+  const nombres = nombresMedios(lugar, semilla, 5)
+  const total = Math.round(8 + aleatorio() * 60 * (periodoDe(consulta).dias / 30))
+  const asignaciones = repartirEntero(total, nombres.map((_, i) => 1 / (i + 1.4)))
   return {
-    titulo: `Medios destacados en ${lugar.split(",")[0]}`,
-    metrica: consulta.metrica,
+    titulo: "Medios con más asignaciones",
+    descripcion: "Asignaciones con entrega en el periodo y su cumplimiento.",
+    metrica: "asignaciones",
     filas: nombres.map((nombre, i) => ({
       codigo: null,
       nombre,
-      valor: valores[i],
-      detalle,
+      valor: asignaciones[i],
+      detalle: `${Math.round(82 + aleatorio() * 18)} % a tiempo`,
     })),
   }
 }
@@ -490,27 +497,19 @@ function titulo(prefijo: string, metrica: MetricaGeo): string {
     : `${prefijo} con mayor ${DEFINICIONES_METRICAS[metrica].tituloCorto.toLowerCase()}`
 }
 
-function topSimulado(consulta: ConsultaDetalleGeo, valor: number | null): TopZona | null {
-  switch (consulta.nivel) {
-    case "internacional": {
-      const pais = obtenerPais(consulta.zona)
-      if (consulta.zona === CODIGO_COLOMBIA && consulta.metrica !== "audiencia") {
-        return topSubzonas({ ...consulta, nivel: "nacional" }, titulo("Departamentos", consulta.metrica))
-      }
-      return consulta.metrica === "audiencia" && pais
-        ? topMedios(consulta, pais.nombre, valor, "Seguidores estimados")
-        : null
-    }
-    case "nacional":
-      return topSubzonas(
-        { ...consulta, nivel: "departamental", departamento: consulta.zona },
-        titulo("Municipios", consulta.metrica)
-      )
-    case "departamental": {
-      const municipio = obtenerMunicipio(consulta.zona)
-      return municipio ? topMedios(consulta, municipio.nombre, valor, municipio.nombre) : null
-    }
+function topSimulado(consulta: ConsultaDetalleGeo): TopZona | null {
+  if (consulta.nivel === "internacional") {
+    return consulta.zona === CODIGO_COLOMBIA && consulta.metrica !== "audiencia"
+      ? topSubzonas({ ...consulta, nivel: "nacional" }, titulo("Departamentos", consulta.metrica))
+      : null
   }
+  if (consulta.nivel === "nacional") {
+    return topSubzonas(
+      { ...consulta, nivel: "departamental", departamento: consulta.zona },
+      titulo("Municipios", consulta.metrica)
+    )
+  }
+  return null
 }
 
 function valorDeZona(consulta: ConsultaMapaGeo, zona: string) {
@@ -541,8 +540,21 @@ export function crearProveedorSimulado({
       return {
         consulta,
         filas,
-        puntos: puntosSimulados(consulta),
         sinPoligono: centrosSinPoligono(consulta.nivel, filas),
+        origen: "simulado",
+      }
+    },
+
+    async puntos(consulta): Promise<RespuestaPuntosGeo> {
+      await esperar(latenciaMs)
+      const puntos = puntosSimulados(consulta)
+      const total = Math.round(puntos.reduce((suma, [, , peso]) => suma + peso, 0))
+      return {
+        consulta,
+        puntos,
+        total,
+        muestra: total,
+        pasoGrados: 0.01,
         origen: "simulado",
       }
     },
@@ -554,11 +566,18 @@ export function crearProveedorSimulado({
         ...valorDeZona({ ...consulta, metrica }, consulta.zona),
       }))
       const actual = kpis.find((k) => k.metrica === consulta.metrica)?.valor ?? null
+      const serie = serieSimulada(consulta, actual)
       return {
         consulta,
         kpis,
-        serie: serieSimulada(consulta, actual),
-        top: topSimulado(consulta, actual),
+        serie,
+        sinSerie: serie
+          ? null
+          : consulta.metrica === "audiencia"
+            ? "foto-actual"
+            : "sin-datos",
+        top: topSimulado(consulta),
+        medios: mediosSimulados(consulta),
         origen: "simulado",
       }
     },

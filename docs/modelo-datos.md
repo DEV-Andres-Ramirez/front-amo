@@ -198,6 +198,7 @@ Las funciones lanzan `raise exception using errcode = 'P0001', message = '<CODIG
 | `AMO_CONFIG_INVALIDA` | Valor de configuración fuera de tipo/rango |
 | `AMO_METRICA_NIVEL_INVALIDO` | Combinación nivel × métrica no soportada en analítica |
 | `AMO_LOGIN_BLOQUEADO` | Limitador de login activo |
+| `AMO_PERMISO_NO_APLICABLE` | Un rol ANUNCIANTE o MEDIO personalizado no admite un permiso que no tenga su rol de sistema (ni cambia de tipo si tiene permisos no aplicables) |
 
 ---
 
@@ -1095,6 +1096,32 @@ Trigger (COULD, §9.1): `trg_notificaciones_z_realtime` AFTER INSERT → `privat
 RLS: select/update `usuario_id = (select auth.uid())`. Inserta solo `private.notificar(...)` (definer, usado por procedimientos/triggers) y `service_role`.
 GRANT authenticated `select, update (leida, leida_at)`; service_role CRUD. No auditada (volumen).
 
+**Real (M8, `20261001040539_notificaciones`):**
+- **Checks adicionales:**
+  - `tipo ~ '^[a-z_]+(\.[a-z_]+)+$'`.
+  - `url` sin `..`.
+  - `leida or leida_at is null`.
+- **Índice extra** `notificaciones_dedupe_idx (tipo, entidad_id, usuario_id, created_at desc)`, para la deduplicación de los recordatorios del cron.
+- **RLS:** restrictiva «acceso válido» más las permisivas «select propio» y «update propio».
+- **`leida_at`:** la fija la BD con `trg_notificaciones_b_lectura` (BEFORE UPDATE, `private.ahora()` al marcar y null al desmarcar). El valor que envía el cliente se ignora.
+- **RPC invoker** (EXECUTE authenticated):
+  - `notificaciones_no_leidas() returns integer`.
+  - `mis_notificaciones(p_limite int default 20, p_antes_id bigint default null, p_solo_no_leidas boolean default false)`: cursor keyset por `id desc`.
+  - `marcar_notificaciones_leidas(p_ids bigint[] default null, p_leida boolean default true) returns integer`: null = todas las propias.
+- **Triggers de notificación por transición** (`private.notificar_transicion()`, AFTER UPDATE OF estado/estado_validacion):
+  - `trg_{ofertas,asignaciones,publicaciones,metricas,verificaciones_cuenta,liquidaciones,disputas}_z_notificar`.
+  - `trg_disputas_z_notificar_alta`, AFTER INSERT.
+- **Tipos emitidos:**
+  - Ofertas: `oferta.devuelta`, `oferta.publicada` y `oferta.nueva_elegible`, esta a los medios con `oferta_visible_para`.
+  - Asignaciones: `asignacion.vencida` y `asignacion.cancelada` (a ambas partes).
+  - Validación: `evidencia.rechazada`, `metricas.rechazadas` y `cuenta.verificacion_resuelta`.
+  - Pagos: `liquidacion.pagada`.
+  - Disputas: `disputa.abierta` (a la contraparte) y `disputa.resuelta`.
+- **Alerta de seguridad:** `trg_accesos_z_alertar` (AFTER INSERT en `accesos`, si `es_sospechoso` y `PAIS_INUSUAL`).
+  - Notifica `seguridad.pais_inusual` al usuario (url `/cuenta/seguridad`).
+  - Notifica `seguridad.alerta_pais_inusual` a cada SUPERADMIN activo (url `/administracion/accesos`).
+  - Ambas con prioridad 2. La plantilla `seguridad.alerta_pais_inusual` (APP) es nueva, así que ahora hay 21 plantillas.
+
 ### 3.8 Reglas transversales de las tablas
 1. **Columnas de autoría sin FK.** Una FK `on delete set null` ejecuta un UPDATE (y `cascade`/`restrict` un DELETE o un bloqueo) sobre la tabla referenciante, que dispara sus triggers. En tablas **inmutables o append-only** eso rompe el borrado definitivo de usuarios (`auth.admin.deleteUser`) y la purga demo. Por eso estas columnas son `uuid` **sin FK** (con índice), igual que `bitacora.actor_id`: `tarifas.creada_por`, `terminos_versiones.creada_por`, `aceptaciones_terminos.perfil_id` (+ snapshot `email_sha256`), `pagos_anunciante.registrado_por`, `metricas.validada_por`, `disputas.abierta_por`, `disputa_mensajes.autor_id`, `dispersiones.generada_por`. El resto de columnas de autoría (`*_por` en tablas mutables sin trigger que lo impida) mantienen FK `on delete set null`. Test obligatorio: `deleteUser` de un usuario con aceptación de términos, tarifa creada, métrica validada y disputa abierta termina sin error.
 2. **Rutas de Storage ligadas a su fila.** Toda columna `*_path` valida que su prefijo corresponda a la propia fila (CHECK, o trigger cuando el prefijo depende de otra tabla o de `modo_carga`): `documentos_*.archivo_path`, `verificaciones_cuenta.captura_path`, `anunciantes.logo_path`, `perfiles.avatar_path`, `creativo_archivos.archivo_path` (trigger), `publicaciones.captura_path/miniatura_path` (trigger), `metricas.captura_path/miniatura_path` (trigger), `disputa_mensajes.adjunto_path`, `liquidaciones.soporte_pago_path/factura_medio_path`, `facturas.archivo_path`, `documentos_soporte.archivo_path`, `pagos_anunciante.soporte_path`, `dispersiones.archivo_path`. Así una fila no puede apuntar a un objeto ajeno para obtener su URL firmada (§8).
@@ -1692,6 +1719,16 @@ si (new.rol_id = v_super or old.rol_id = v_super) y rol cambió:
 **`private.fn_guardar_roles()`** — BEFORE UPDATE OR DELETE ON `roles`: si `old.es_sistema` y no `session_user = 'postgres'` ⇒ `AMO_ROL_SISTEMA` (inmutables: sin DELETE ni UPDATE de ninguna columna salvo `color`/`descripcion`). En INSERT/UPDATE: `new.es_sistema` solo `true` si owner. DELETE de rol personalizado solo si ningún perfil lo usa (FK restrict).
 **`private.fn_guardar_rol_permisos()`** — BEFORE INSERT OR DELETE ON `rol_permisos`: rol de sistema ⇒ solo owner (`AMO_ROL_SISTEMA`); anti-escalada: si el actor no es SUPERADMIN, `tiene_permiso_de(actor, new.permiso_clave)` o `AMO_ESCALADA_PERMISOS`; un actor no edita permisos de su propio rol (`AMO_ROL_PROPIO`).
 
+**Real (verificación integral, `20261001053648_roles_permisos_aplicables`):**
+- `private.tiene_permiso` no distingue el tipo del rol: un permiso interno (`usuarios.ver`, `campanas.ver`, `pagos.registrar`…) en un rol de anunciante o de medio le abriría datos de toda la plataforma. Por eso un rol personalizado de tipo ANUNCIANTE o MEDIO solo admite los permisos de su rol de sistema; uno ADMIN, todos. Es el criterio de `esAplicable` en `src/features/roles/reglas.ts`.
+- `private.permiso_aplicable(p_tipo rol_tipo, p_clave text) → boolean`: definer, STABLE, sin EXECUTE para la API.
+- `fn_guardar_rol_permisos`:
+  - INSERT de un permiso no aplicable en un rol personalizado externo ⇒ `AMO_PERMISO_NO_APLICABLE`, también como owner. Los roles de sistema no se validan porque definen la regla.
+  - `trg_rol_permisos_a_guardar` se dispara ahora también en UPDATE. Cambiar `rol_id` o `permiso_clave` de una fila ⇒ `AMO_NO_AUTORIZADO`, también como owner: antes ese UPDATE (posible con la secret key) no pasaba por ninguna guarda. Para reasignar se retira y se otorga. El `on delete set null` de `otorgado_por` sigue permitido.
+- `trg_roles_a_tipo_aplicable` (BEFORE UPDATE OF tipo, definer `private.fn_roles_tipo_aplicable`): un rol personalizado con permisos no aplicables al tipo nuevo no cambia de tipo (`AMO_PERMISO_NO_APLICABLE`).
+- Límite: si una migración retira un permiso del rol de sistema ANUNCIANTE o MEDIO, los roles personalizados de ese tipo lo conservan hasta que se les retire.
+- Pruebas: `supabase/tests/humo_roles_permisos_aplicables.sql` 7/7 y `rls.sql` (es06).
+
 **`private.handle_new_user()`** — AFTER INSERT ON `auth.users`, definer.
 ```sql
 insert into public.perfiles (id, email, estado, rol_id, debe_cambiar_password)
@@ -1753,6 +1790,11 @@ El mismo limitador protege otros flujos con una clave propia (`src/features/auth
 - Resuelve `departamento_codigo` = `departamentos.codigo where iso_3166_2 = 'CO-' || upper(p_region)` si `p_pais = 'CO'`; `municipio_codigo` = municipio del departamento con `nombre_normalizado = private.normalizar_texto(p_ciudad)` (o alias); redondea lat/lon a 2 decimales.
 - Sospecha: `LOGIN_EXITOSO` desde un `pais_iso2` no visto para ese usuario en los últimos 90 días de accesos exitosos y no incluido en `seguridad.paises_habituales` ⇒ `PAIS_INUSUAL` (la app notifica `seguridad.pais_inusual` a SUPERADMIN); ≥ `login_max_fallos_email` fallos previos en la ventana ⇒ `MULTIPLES_FALLOS`.
 - En `LOGIN_EXITOSO` actualiza `perfiles.ultimo_acceso_at` e inserta/actualiza `private.sesiones_actividad`.
+- **Real (`20261001040702_accesos_bloqueo_unico`, misma firma):**
+  - Un `LOGIN_BLOQUEADO` solo se registra la **primera** vez por ventana. Si ya hay uno de la misma identidad y la misma IP dentro de `seguridad.login_bloqueo_minutos`, devuelve `(id existente, false, null)` sin insertar.
+  - La identidad es `email_hash` (correo o clave del limitador); si no hay, `usuario_id`; si tampoco, solo la IP.
+  - Índice de apoyo: `accesos_bloqueos_idx (email_hash, created_at desc) where evento = 'LOGIN_BLOQUEADO'`.
+  - La notificación de `PAIS_INUSUAL` la emite la BD (`trg_accesos_z_alertar`, §3.7), no la app.
 
 Test (`supabase/tests/rls.sql` o prueba de servidor): 20 fallos desde una IP contra 20 emails distintos ⇒ `bloqueado = true` para un email nuevo desde esa IP; 5 fallos (email, IP₁) no bloquean ese email desde IP₂; nunca retorna `bloqueado` null.
 
@@ -1861,6 +1903,22 @@ return
 Los chequeos de cupo, presupuestos y topes se hacen **con las filas bloqueadas** (y el medio bloqueado por advisory lock) ⇒ con 3 cupos y 20 llamadas paralelas exactamente 3 insertan. Los CHECK de `cupos_ocupados ≤ cupos_totales` y `presupuesto_comprometido ≤ máximo` son la red de seguridad.
 
 **Prueba de carrera** (`scripts/pruebas/carrera-cupos.ts`, **sin** `modo_carga`, contra la BD real; §10.2 exige atomicidad sobre cupo, presupuesto y tope %): (1) 20 medios distintos contra 3 cupos de la misma franja ⇒ exactamente 3; (2) `presupuesto_maximo` = 2,5 precios con 10 cupos ⇒ exactamente 2; (3) tope % por medio limitante con `permite_multiples_cupos` y 5 aceptaciones paralelas del mismo medio ⇒ solo las que caben; (4) el mismo medio aceptando en paralelo en dos campañas distintas con tope anual para una sola ⇒ exactamente 1; (5) aceptar y cancelar en paralelo sobre una oferta en `CUPOS_COMPLETOS`; (6) doble envío con la misma `clave_idempotencia` ⇒ una sola asignación. Tras cada caso se verifican los invariantes: `oferta_cupos.cupos_ocupados` = conteo de asignaciones con `consume_cupo` en esa franja; `ofertas.cupos_ocupados` = Σ `oferta_cupos.cupos_ocupados`; `presupuesto_comprometido` (oferta y campaña) = Σ `monto_bruto` de asignaciones con `consume_cupo`; toda asignación con `aceptada_at` tiene su fila en `asignacion_montos`; ningún error 40P01 (deadlock).
+
+**Real (verificación integral):** `scripts/pruebas/carrera-cupos.ts` (`pnpm exec tsx --env-file=.env.local scripts/pruebas/carrera-cupos.ts`; con `--solo-limpiar` solo borra restos de corridas interrumpidas).
+- **Preparación por las vías normales, sin `modo_carga`:**
+  - Cuentas `es_demo` en `e2e.carrera-<corrida>-…@amo.test`: un operador ADMIN con TOTP enrolado (sesión aal2) para las transiciones y 20 usuarios MEDIO con sesión propia (`signInWithPassword`). Rol y organización se fijan con el SUPERADMIN como actor (`x-amo-actor`); la activación va por `activar_perfil_srv`.
+  - Un anunciante verificado y 20 medios de nivel 1 en Bogotá, con documentos aprobados, medio de pago y una cuenta de Instagram con 40 000 seguidores verificada por `transicionar_srv` (franja F1).
+  - Una campaña activa por escenario, con ofertas publicadas sin segmentación (cupos en F1 y creativo con archivo).
+- **Escenarios:**
+  - (1) ×3.
+  - Variante ×3: dos ofertas de la misma campaña compiten por su presupuesto. Se publican con presupuesto para ambas y luego la campaña baja a 3 precios (permitido mientras no quede por debajo de lo comprometido).
+  - (2), (3), (6) una vez.
+  - (5): los 3 titulares desisten con `rechazar_oferta_srv` mientras otros 10 medios aceptan.
+  - (4): el medio se lleva a menos de dos aceptaciones del umbral de bloqueo y acepta en dos campañas a la vez.
+- **Comprobaciones:** éxitos exactos, solo los rechazos esperados, cero 40P01, los invariantes de arriba, el tope % por medio, el estado de la oferta (CUPOS_COMPLETOS o PUBLICADA) y el bruto congelado (= tarifa con multiplicadores neutros). La lógica pura (`scripts/pruebas/carrera/invariantes.ts`) tiene tests Vitest.
+- **Limpieza:** en un `finally`, en orden de dependencias: asignaciones, creativos, ofertas, campañas, usuarios, cuentas, medios, anunciante y los avisos a terceros sobre esas entidades. La bitácora se conserva: es inmutable para la API y la retención la purga.
+- **Observado:** si los 3 cupos se llenan antes de la ventana, la oferta pasa a CUPOS_COMPLETOS en la misma transacción de la tercera reserva, así que los demás reciben `AMO_OFERTA_NO_DISPONIBLE`, no `AMO_SIN_CUPO`. En la variante, el rechazo es `AMO_PRESUPUESTO_CAMPANA`, o `AMO_TOPE_MEDIO` si un medio ya ganó en la otra oferta.
+- **Resultado:** ver §11.2, «Verificación integral».
 
 **`private.liberar_cupo_efecto(p_asignacion_id uuid) returns void`** — definer, sin EXECUTE para API. **Solo contadores**; precondición: el llamador (`transicionar_srv` o `vencer_asignaciones`) ya validó la transición, ya tomó los bloqueos canónicos `campanas → ofertas → oferta_cupos(franja) → asignación` y ya aplicó el cambio de estado con `aplicar_transicion`.
 ```
@@ -1986,6 +2044,31 @@ Registra un evento `bitacora` con conteos (`origen='DB'`).
 **`private.purgar_demo() returns jsonb`** — definer; solo owner con `amo.purga = 'on'` y `amo.modo_carga = 'on'`. Borra respetando las FKs (hijos antes que padres; `restrict` en `asignaciones.factura_id/liquidacion_id`, `perfiles.medio_id/anunciante_id` y `comisiones_excepcion.campana_id`):
 `disputa_mensajes → disputas → metricas → publicaciones → descargas_contenido → pagos_anunciante → documentos_soporte → asignacion_montos → asignaciones → liquidaciones → dispersiones (es_demo) → facturas → oferta_vistas → creativo_archivos → creativos → oferta_cupos → ofertas → comisiones_excepcion` (las de anunciantes o campañas demo) `→ campanas → verificaciones_cuenta → cuentas_sociales, medio_categorias, medio_audiencia_paises, medio_pertinencia_geografica, documentos_medio, documentos_anunciante, medios_privado, anunciantes_privado → update perfiles set medio_id = null, anunciante_id = null where es_demo → medios, anunciantes (es_demo) → aceptaciones_terminos` (de perfiles `es_demo`; sin FK, §3.8) `→ perfiles_privado` (de perfiles `es_demo`) `→ notificaciones, accesos, bitacora (es_demo)`. Los `auth.users` demo los borra después `scripts/demo/purgar.ts` vía admin API (cascada a `perfiles`). Los objetos de Storage demo se borran por prefijo desde el script.
 
+**Real (M8 `20261001040539_notificaciones`, M11 `20261001045506_cron`):**
+- **`private.notificar`** (misma firma; sin EXECUTE para la API, ni `service_role`):
+  - Renderiza la plantilla APP activa. Si llega `oferta_id`, completa `oferta`/`anunciante`.
+  - Una variable ausente se muestra como `—`. Recorta título y mensaje a 120 y 500.
+  - Solo notifica a perfiles `ACTIVO`, sin duplicados.
+  - Descarta una `url` que no sea interna; acota la prioridad a 0–2; hereda `es_demo` del perfil.
+  - Con `modo_carga` no hace nada. Devuelve cuántas filas insertó.
+  - Utilidades internas sin grants: `usuarios_anunciante`, `formato_fecha`, `formato_cop`, `nombre_plataforma`.
+- **Procedures:**
+  - Firmas reales: `vencer_asignaciones(p_max_lotes integer default 20, p_confirmar boolean default true)` y `actualizar_estados(…)`, con la misma forma.
+  - `p_confirmar = false` no hace `commit`, para las pruebas dentro de `begin … rollback`.
+  - Como no admiten cláusula `SET`, el advisor marca `function_search_path_mutable` (WARN aceptado). Fijan `search_path` vacío por lote con `set_config` y usan nombres calificados.
+- **Helpers internos** (sin grants):
+  - `condicion_sistema`.
+  - `cron_aplicar(entidad, id, hacia, motivo)`: bloqueos canónicos, revalidación, `aplicar_transicion` SISTEMA y `liberar_cupo_efecto` al vencer. Captura `lock_not_available` y `P0001`.
+  - `marcar_metricas_atrasadas(limite)`.
+  - `actualizar_lote(familia, limite)`. Familias: `ofertas_en_ejecucion`, `ofertas_vencidas`, `ofertas_cerradas`, `campanas_finalizadas`, `facturas_vencidas`, `documentos_vencidos` y `metricas_atrasadas`.
+- **`purgar_retencion`:**
+  - Devuelve los conteos en jsonb y los registra en la bitácora (`registrar_en_bitacora`).
+  - Restaura `amo.purga` al terminar.
+  - Purga también `private.intentos_login` y las filas huérfanas de `private.sesiones_actividad`.
+- **`purgar_demo`:**
+  - Trabaja con arreglos de uuid, sin tablas temporales.
+  - **Conserva** los anunciantes y medios demo que aún referencia un perfil **no** demo (p. ej. la organización E2E), para no violar la FK `perfiles → organización`. Los informa en `organizaciones_conservadas`.
+
 ### 5.9 RPC de analítica (M9)
 Comunes a todas: `language sql` (o plpgsql si hay validación), **`security invoker`** (salvo las del medio, §5.0), **`stable`**, `set search_path = ''`, **`set timezone = 'America/Bogota'`**, `grant execute ... to authenticated`. Parámetros `p_desde date, p_hasta date` (inclusivos) y, en toda RPC que devuelva `kpi_fila`, `p_desde_ant date default null, p_hasta_ant date default null` (periodo de comparación explícito; por defecto, el mismo número de días inmediatamente antes, §1.6). La primera instrucción valida permiso (plpgsql: `if not private.tiene_permiso('<p>') then raise AMO_NO_AUTORIZADO`) y la RLS limita las filas. Fórmulas exactas de cada KPI: `docs/kpis.md`. **n mínimo** (`docs/kpis.md` §0.4): las tasas **agregadas o comparadas** (tablero admin, desgloses, rankings, mapas, insights) devuelven `valor = null` si n < `analitica.n_minimo_tasas`; las razones de **una entidad concreta** (una campaña, un anunciante en su propio tablero, un medio) devuelven siempre `valor` y `n` (son cifras contables exactas; la UI muestra «n = 7» como nota).
 
@@ -2030,6 +2113,36 @@ Forma común de las funciones de tarjetas KPI — **`kpi_fila`**:
 | `alcance` | ✔ (solo CO) | ✔ | ✔ | Σ `alcance_norm` del último corte validado por publicación, ancla `verificada_at` |
 
 Índices de soporte (M9; se validan con `EXPLAIN ANALYZE` sobre datos demo, p95 < 300 ms; si no, rollups diarios `analitica_diaria` en migración posterior): `asignaciones (aceptada_at) include (monto_bruto, medio_id, anunciante_id, plataforma, estado)`, `asignaciones (verificada_at) include (monto_bruto, estado, medio_id, anunciante_id, plataforma) where verificada_at is not null`, (`asignacion_montos` se une por su PK), `metricas (asignacion_id, corte) include (alcance_norm, impresiones_norm, interacciones, clics_enlace, reproducciones) where estado_validacion = 'APROBADA'` (el CTE `ultimo_corte` se une primero con las asignaciones filtradas por `verificada_at`, `docs/kpis.md` §0.3), `publicaciones (anunciante_id)`, `publicaciones (medio_id)`, `metricas (anunciante_id)`, `metricas (medio_id)` (políticas sin llamada por fila), `ofertas (publicada_at) where publicada_at is not null`, `oferta_vistas (primera_vista_at, oferta_id)`, `accesos (evento, created_at) include (pais_iso2, departamento_codigo, municipio_codigo)`.
+
+**Real (M9: `20261001041651_analitica_base`, `…042017_analitica_admin`, `…042322_analitica_geo`, `…042715_analitica_roles`, `…043017_analitica_reportes`):**
+- **`kpi_fila`:** añade `n_anterior integer` al final, porque la UI exige el n mínimo en ambos periodos. Los KPI «foto» (`medios_en_riesgo`, campañas activas, saldos del medio) devuelven `serie = null`.
+- **Helpers comunes** (private, EXECUTE authenticated/service_role, lista blanca; puros o invoker, así que no amplían lo legible):
+  - `exigir_permiso(variadic text[])`: sesión válida y al menos uno de los permisos; si no, `AMO_NO_AUTORIZADO`.
+  - `rango_kpi(p_desde, p_hasta, p_desde_ant, p_hasta_ant)`: valida con `AMO_CONFIG_INVALIDA`. Los dos parámetros del periodo anterior van juntos.
+  - Cubetas: `cubeta(ts, dias)` y `cubetas(desde, hasta)`.
+  - `kpi_ensamblar(defs, agregados, cubetas, nmin)`: tipos `suma|razon|distinto|razon_distinto`, banderas `nmin`/`foto`/`sin_ant` y redondeo a 6 decimales.
+  - `desempeno_verificadas(p_ini, p_fin)`: último corte APROBADO por publicación, con prioridad D7 > H72 > H24.
+  - Cumplimiento: `cumplimiento_aplica(…)`, `cumplimiento_ok(…)` y `medios_en_riesgo_al(p_t)`.
+  - Geo: `geo_validar(nivel, metrica)` y `geo_valores(…)`.
+- **Ajustes de las RPC:**
+  - `actividad_heatmap` acepta además `p_fuente = 'bitacora'` (exige `auditoria.ver`); `publicaciones` exige `inicio.admin`.
+  - `geo_metricas` y `top_zonas` añaden las métricas `cumplimiento` (tasa §1.10 con n mínimo) y `campanas` (campañas distintas con asignaciones aceptadas) en los tres niveles. En `pais`, las métricas que se ubican por el municipio del medio solo tienen la fila CO. `municipio` sin `p_departamento` ⇒ `AMO_CONFIG_INVALIDA`.
+  - `reporte_usuarios_accesos` es **definer** (lee `auth.mfa_factors`): filtra `acceso_valido`, exige `reportes.ver` + `accesos.ver` + `usuarios.ver` y enmascara el correo salvo con `datos_sensibles.ver`.
+  - `kpis_medio`, `serie_ganancias_medio` y `proximas_acciones_medio` son **definer**, con filtro explícito `medio_id = mi_medio_id()` y `acceso_valido()` (WARN del advisor aceptado). El resto son invoker.
+- **Índices creados:**
+  - `asignaciones`:
+    - `asignaciones_aceptada_cubierta_idx`.
+    - `asignaciones_verificada_cubierta_idx` (sustituye a `asignaciones_verificada_at_idx`).
+    - `asignaciones_limite_publicacion_idx`, `asignaciones_publicada_at_idx` y `asignaciones_pagada_at_idx`.
+  - `ofertas`: `ofertas_limite_publicadas_idx` y `ofertas_llena_at_idx`.
+  - Otras tablas:
+    - `oferta_vistas_primera_vista_idx` y `accesos_evento_created_idx`.
+    - `medios_verificado_at_idx` y `publicaciones_fecha_publicacion_idx`.
+    - `facturas_fecha_emision_idx` y `pagos_anunciante_fecha_pago_idx`.
+  - `metricas_aprobadas_idx` ya existía desde M7.
+- **Pendientes:**
+  - `EXPLAIN ANALYZE` sobre datos demo (la BD aún está vacía).
+  - `detalle_zona_geo(nivel, codigo, desde, hasta)`: requisito de la Fase 4a, no implementado.
 
 ---
 
@@ -2206,6 +2319,28 @@ Políticas sobre `storage.objects` (todas `to authenticated`; **no** se ejecuta 
 
 La creación de buckets va en la migración: `insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values (...) on conflict (id) do update set ...`.
 
+**Real (M10, `20261001044423_storage`):**
+- **Buckets:** los cinco privados con los límites y MIME de la tabla. `evidencias` acepta `application/pdf` en todo el bucket, porque el MIME no se puede restringir por carpeta.
+- **Helpers de ruta** (puros, EXECUTE authenticated): `private.seg` y `seg_uuid`. `seg_uuid` es immutable sobre `storage.foldername`.
+- **Helpers de propiedad** (definer, filtrados por la identidad del JWT, EXECUTE authenticated, lista blanca):
+  - `es_mi_oferta(oferta)`.
+  - `puedo_subir_creativo(oferta, creativo)`: el creativo pertenece a la oferta; dueño con `ofertas.gestionar_propias` u `ofertas.gestionar`; y oferta en BORRADOR/DEVUELTA o creativo vigente (nueva versión).
+  - `puedo_subir_evidencia(asignacion)`.
+  - `soy_parte_disputa(disputa, solo_abierta)`.
+  - `soy_dueno_soporte(tipo, id)`.
+  - Se reutilizan `puedo_ver_asignacion` y `puedo_descargar_creativos_de` de M7.
+- **Restrictivas globales:**
+  - «storage: acceso válido» (all).
+  - «storage: ruta segura» (insert): el `name` no contiene `..` ni `//` ni empieza por `/`.
+- **`avatares`:**
+  - El insert exige exactamente `<tipo>/<id>/<archivo>`.
+  - DELETE solo para el avatar propio. Sin políticas UPDATE.
+- **`soportes`:**
+  - El insert interno exige que exista la fila (`liquidaciones`/`facturas`).
+  - `documento_soporte` y `dispersion` solo los sube el servidor.
+- **`perfiles.avatar_path`:** endurecido con `perfiles_avatar_path_seguro_chk` (null, o sin `..` y con forma `^perfil/<uuid>/[A-Za-z0-9][A-Za-z0-9._-]{0,120}$`), además del check de prefijo propio.
+- **Pruebas:** `supabase/tests/humo_storage.sql`, 55/55.
+
 ---
 
 ## 9. Realtime y cron
@@ -2227,6 +2362,14 @@ create policy "realtime: tópico propio" on realtime.messages for select to auth
 ```
 Reglas: no crear objetos en el esquema `realtime` (bloqueado) ni ejecutar `enable row level security` sobre `realtime.messages`; en el panel, «Allow public access» desactivado; cliente `supabase.realtime.setAuth()` + `channel('usuario:<uuid>', { config: { private: true } })`. Test de aislamiento: usuario A no recibe mensajes del tópico de B.
 
+**Real (M8, implementado):**
+- **Payload:** `{id, tipo, titulo, prioridad, no_leidas}`, evento `notificacion`, tópico `usuario:<uuid>`, privado.
+- **Política:** exige además `(select private.acceso_valido())`, así que una sesión revocada o vencida no se suscribe.
+- **Fallos de `realtime.send`:** solo avisan (WARNING) y no abortan el INSERT. Hoy `realtime.messages` no tiene particiones: las crea el servicio Realtime y el owner no puede crearlas (42501).
+- **Prueba de aislamiento** (`humo_notificaciones.sql` e1–e5): evalúa la `qual` almacenada de la política con `realtime.topic` fijado. Cubre tópico propio, tópico ajeno, extensión distinta de `broadcast` y sesión inválida.
+- **Pendiente:** la prueba de extremo a extremo con dos clientes.
+- **Polling:** la bandeja sigue funcionando por sondeo.
+
 ### 9.2 Cron (`pg_cron`, horarios en UTC; Bogotá = UTC−5)
 | Job | Programación (UTC) | Hora Bogotá | Llama a |
 |---|---|---|---|
@@ -2237,6 +2380,11 @@ Reglas: no crear objetos en el esquema `realtime` (bloqueado) ni ejecutar `enabl
 | `amo_recalcular_multiplicadores` | `30 8 * * 1` | lunes 03:30 | `select private.recalcular_multiplicadores();` |
 | `amo_retencion` | `0 9 * * *` | 04:00 diario | `select private.purgar_retencion();` (incluye `cron.job_run_details` > 7 días) |
 Máximo 6 jobs concurrentes (≤ 8 recomendado), cada uno < 60 s. Registro con `select cron.schedule('<nombre>', '<cron>', $$...$$);` precedido de `select cron.unschedule(jobid) from cron.job where jobname = '<nombre>';` para idempotencia.
+
+**Real (M11, `20261001045506_cron`):**
+- Los seis jobs están programados como en la tabla.
+- Primeras corridas comprobadas en `cron.job_run_details`: `amo_vencer_asignaciones` (05:00 UTC) y `amo_actualizar_estados` (05:05 UTC) terminaron `succeeded`.
+- Pruebas: `supabase/tests/humo_cron.sql`, 28/28.
 
 ---
 
@@ -2331,12 +2479,23 @@ Nombres: `supabase/migrations/<version>_<nombre>.sql`, aplicadas con MCP `apply_
 | 5 | `configuracion` (+ `configuracion_semillas`) | enums; `franjas`, `formatos`, `tarifas`, `niveles_verificacion`, `parametros_tributarios`, `retenciones_config`, `reteica_municipal`, `resoluciones_dian` (+ exclusión de rangos y trigger de consecutivo), `plantillas_notificacion`, `terminos_versiones`, `aceptaciones_terminos`; `fn_validar_configuracion` (**ya creada en M3**); `programar_tarifa`, `cancelar_tarifa_programada`; `siguiente_consecutivo`; semillas de §7 y catálogos. Aplicada como `20260930221629_configuracion` (DDL) y `20260930221740_configuracion_semillas` (datos) |
 | 6 | `negocio_actores` | enums (incluido `validacion_estado`); `anunciantes` (+`_privado`, `documentos_anunciante`), `medios` (+`_privado`), `medio_categorias`, `medio_audiencia_paises`, `medio_pertinencia_geografica`, `documentos_medio`, `cuentas_sociales`, `verificaciones_cuenta`; helpers `cuenta_vigente` (+ `anunciante_ve_medio`/`medio_ve_anunciante` provisionales); SRF `anunciantes_publico`, `medios_publico`; semilla del anunciante E2E **antes** de las FKs `perfiles → anunciantes/medios`. Aplicada como `20260930222842_negocio_actores` |
 | 7 | `negocio_transacciones` | enums; `private.transiciones_estado` (con `columna_at`/`modo_at`) + semilla completa (§4.1–§4.2) y triggers `a_validar_transicion` en todas las entidades (incluidas M3/M6); `campanas`, `ofertas`, `oferta_cupos`, `oferta_vistas`, `creativos`, `creativo_archivos`, `comisiones_excepcion`, `asignaciones`, `asignacion_montos`, `descargas_contenido`, `publicaciones`, `metricas`, `dispersiones`, `liquidaciones`, `documentos_soporte`, `facturas`, `pagos_anunciante`, `disputas`, `disputa_mensajes`; helpers de visibilidad y `consume_cupo`; SRF `ofertas_para_medio`, `mis_asignaciones_medio`; `validar_actor`, `verificar_propiedad`, `aplicar_transicion`, `fn_validar_transicion`, `transicionar_srv`, `activar_perfil_srv`; `calcular_precio`, `cotizar_oferta`, `estimar_oferta`, `reservar_cupo` (+`_srv`), `liberar_cupo_efecto`, `reconsumir_cupo`, `rechazar_oferta_srv`, `registrar_vista_oferta`, `registrar_descarga_srv`, `registrar_evidencia_srv`, `evaluar_metricas_cargadas`, `abrir_disputa_srv`, `generar_liquidacion_srv`, `emitir_factura_srv`, `emitir_documento_soporte_srv`, `registrar_pago_anunciante_srv`, `registrar_pago_liquidacion_srv`, `preparar_dispersion_srv`. Aplicada como `20260930232342_negocio_transacciones_tablas`, `20260930234051_negocio_transacciones_funciones`, `20260930234802_negocio_transacciones_transiciones`, `20260930235300_negocio_transacciones_procedimientos`, `20260930235615_negocio_transacciones_seguridad`, `20261001001638_negocio_transacciones_ajustes` y `20261001002838_negocio_transacciones_politicas` (§11.2) |
-| 8 | `notificaciones` | `notificaciones`; `private.notificar`, `private.notificar_transicion` + triggers de asignaciones/ofertas; (COULD) `fn_notificacion_realtime` + política en `realtime.messages` |
-| 9 | `analitica` | tipo `public.kpi_fila`; RPC de §5.9 (incluidas `desempeno_anunciante` y `serie_ganancias_medio`); índices de soporte; `EXPLAIN ANALYZE` documentado en el PR |
-| 10 | `storage` | buckets (§8), helpers `private.seg`/`seg_uuid`, políticas por bucket/carpeta y restrictiva global |
-| 11 | `cron` | procedures `vencer_asignaciones`, `actualizar_estados`; funciones `recalcular_multiplicadores`, `aplicar_multiplicadores_programados`, `recalcular_indicadores_medios`, `revisar_reverificacion`, `generar_recordatorios`, `purgar_retencion`, `purgar_demo`; `cron.schedule` de §9.2 |
+| 8 | `notificaciones` | `notificaciones`; `private.notificar`, `private.notificar_transicion` + triggers de asignaciones/ofertas; (COULD) `fn_notificacion_realtime` + política en `realtime.messages`. Aplicada como `20261001040539_notificaciones` (+ corrección `20261001040702_accesos_bloqueo_unico`, §5.5) |
+| 9 | `analitica` | tipo `public.kpi_fila`; RPC de §5.9 (incluidas `desempeno_anunciante` y `serie_ganancias_medio`); índices de soporte; `EXPLAIN ANALYZE` documentado en el PR. Aplicada como `20261001041651_analitica_base`, `20261001042017_analitica_admin`, `20261001042322_analitica_geo`, `20261001042715_analitica_roles` y `20261001043017_analitica_reportes` |
+| 10 | `storage` | buckets (§8), helpers `private.seg`/`seg_uuid`, políticas por bucket/carpeta y restrictiva global. Aplicada como `20261001044423_storage` |
+| 11 | `cron` | procedures `vencer_asignaciones`, `actualizar_estados`; funciones `recalcular_multiplicadores`, `aplicar_multiplicadores_programados`, `recalcular_indicadores_medios`, `revisar_reverificacion`, `generar_recordatorios`, `purgar_retencion`, `purgar_demo`; `cron.schedule` de §9.2. Aplicada como `20261001045506_cron` |
+| V | `roles_permisos_aplicables` (verificación integral) | `private.permiso_aplicable`; `fn_guardar_rol_permisos` también en UPDATE; `fn_roles_tipo_aplicable` + `trg_roles_a_tipo_aplicable` (§5.4, requisito 1 de la Fase 4a). Aplicada como `20261001053648_roles_permisos_aplicables` |
 
 Después de la 11: `get_advisors` (security + performance) → 0 ERROR; WARN aceptados y documentados: HIBP (plan free), `unused_index` (BD nueva), `extension_in_public` no debe aparecer. `generate_typescript_types` → `src/types/database.types.ts`. Pruebas: `supabase/tests/rls.sql` (matriz de §3 por rol; columnas no públicas no seleccionables por la contraparte; IDOR entre medios en todos los `*_srv`; escalada de roles —ADMIN no asigna FINANZAS ni toca a un SUPERADMIN—; `columna_at` existentes; vencimiento y cancelación **sin** `modo_carga`), carrera de cupos (§5.7), transiciones inválidas, grants de columna y de EXECUTE (§1.1), `_privado` (solo dueño; internos vía srv), headers falsificados → `API_DIRECTA`, limitador de login (spraying), `deleteUser` con actividad (§3.8).
+
+**Real (verificación integral, 2026-10-01):**
+- **`supabase/tests/rls.sql`: 123/123** (`begin … rollback`, ejecutada por MCP). Cubre:
+  - **Estructura (g01–g17):** RLS en toda tabla de `public`; la restrictiva `acceso_valido` (o las cuatro por operación) en todas; las seis excepciones de §2.3 y ninguna más; políticas solo `to authenticated`; `anon` sin tablas ni EXECUTE; `*_srv` definer y solo para service_role; EXECUTE de authenticated en `private` dentro de la lista blanca; definer con `search_path = ''`; tablas de `private` sin grants; bitácora y accesos sin escritura de service_role; restrictivas de Storage; buckets privados con límites; tópico de Realtime; `columna_at` y estados de transición existentes; toda FK con índice.
+  - **Grants de columna (c01–c08).**
+  - **Por rol:** SUPERADMIN aal2/aal1 (sa01–sa05), ADMIN aal1/aal2 y cabeceras falsificadas → `API_DIRECTA` (ad01–ad11), OPERACIONES (op01–op04), FINANZAS (fi01–fi03), anunciante A vs B (an01–an27) y medio A vs B (me01–me20). Incluye IDOR en `transicionar_srv`, `abrir_disputa_srv`, `reservar_cupo_srv`, `registrar_descarga_srv`, `registrar_evidencia_srv`, `generar_liquidacion_srv` y `revelar_privado_srv`, las tablas `_privado`, notificaciones propias y las RPC de analítica por rol.
+  - **Sin acceso (x01–x08):** cuenta suspendida, sesión revocada, expirada o inactiva, y `*_srv` a aal1.
+  - **Otros:** Storage por bucket y carpeta (st01–st05), escalada de roles (es01–es07), transiciones inválidas y escritura directa de estado (tr01–tr04), limitador por spraying (li01–li03) y borrado definitivo con actividad (du01).
+- **Carrera de cupos (§5.7):** dos corridas completas, 22/22 escenarios OK, 450 llamadas concurrentes y 0 deadlocks; detalle en §11.2.
+- **Advisors:** 0 ERROR (security y performance); WARN documentados en §11.2.
 
 ### 11.1 Registro de decisiones asumidas (requieren validación del cliente)
 | # | Decisión | Sección |
@@ -2375,10 +2534,10 @@ Después de la 11: `get_advisors` (security + performance) → 0 ERROR; WARN ace
 | D32 | N1 acepta certificado bancario **o** de billetera según el medio de pago; N3 exige además `RUT_SOCIEDAD` | §3.4 |
 | D33 | Riesgo del plan free: 50 MB máximo por archivo en Storage limita reels/videos largos en calidad original; 1 GB total obliga a capturas compartidas en la demo | §3.6, §8, §10 |
 
-### 11.2 Desviaciones de la implementación (M1–M7)
-Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores cuando difieran. Los detalles de M5, M6 y M7 están anotados como «Real» en §3.4, §3.5, §3.6, §4.1, §5.2 y §5.7.
+### 11.2 Desviaciones de la implementación (M1–M11)
+Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores cuando difieran. Los detalles de M5–M11 y de la verificación integral están anotados como «Real» en §3.4, §3.5, §3.6, §3.7, §4.1, §5.2, §5.4, §5.5, §5.7, §5.8, §5.9, §8, §9.1, §9.2 y §11.
 
-**Migraciones aplicadas:** `20260930175547_extensiones_y_esquemas`; geo en 7 archivos (`20260930175839_geo`, `…180049/180222_geo_semilla_paises_1/2`, `…180426–181414_geo_semilla_municipios_1..5`); `20260930182318_identidad_rbac`; `20260930182513_corregir_execute_interruptores`; `20260930183050_bitacora_accesos`; `20260930183850_perfiles_select_unificada`; `20260930185657_sesion_vigencia_y_activacion`; `20260930195743_usuarios_gestion`; `20260930203229_usuarios_roles_asignables`; `20260930221629_configuracion`; `20260930221740_configuracion_semillas`; `20260930222842_negocio_actores`; M7 en `20260930232342_negocio_transacciones_tablas`, `20260930234051_…_funciones`, `20260930234802_…_transiciones`, `20260930235300_…_procedimientos`, `20260930235615_…_seguridad`, `20261001001638_…_ajustes` y `20261001002838_…_politicas`. Pruebas de humo (siempre `begin … rollback`) en `supabase/tests/`: `humo_m1_m4.sql`, `auditoria_seguridad.sql`, `humo_configuracion.sql`, `humo_negocio_actores.sql` y `humo_negocio_transacciones.sql`.
+**Migraciones aplicadas:** `20260930175547_extensiones_y_esquemas`; geo en 7 archivos (`20260930175839_geo`, `…180049/180222_geo_semilla_paises_1/2`, `…180426–181414_geo_semilla_municipios_1..5`); `20260930182318_identidad_rbac`; `20260930182513_corregir_execute_interruptores`; `20260930183050_bitacora_accesos`; `20260930183850_perfiles_select_unificada`; `20260930185657_sesion_vigencia_y_activacion`; `20260930195743_usuarios_gestion`; `20260930203229_usuarios_roles_asignables`; `20260930221629_configuracion`; `20260930221740_configuracion_semillas`; `20260930222842_negocio_actores`; M7 en `20260930232342_negocio_transacciones_tablas`, `20260930234051_…_funciones`, `20260930234802_…_transiciones`, `20260930235300_…_procedimientos`, `20260930235615_…_seguridad`, `20261001001638_…_ajustes` y `20261001002838_…_politicas`; M8 en `20261001040539_notificaciones` y `20261001040702_accesos_bloqueo_unico`; M9 en `20261001041651_analitica_base`, `…042017_analitica_admin`, `…042322_analitica_geo`, `…042715_analitica_roles` y `…043017_analitica_reportes`; M10 en `20261001044423_storage`; M11 en `20261001045506_cron`; verificación integral en `20261001053648_roles_permisos_aplicables`. Pruebas de humo (siempre `begin … rollback`) en `supabase/tests/`: `humo_m1_m4.sql`, `auditoria_seguridad.sql`, `humo_configuracion.sql`, `humo_negocio_actores.sql`, `humo_negocio_transacciones.sql`, `humo_notificaciones.sql`, `humo_analitica.sql`, `humo_storage.sql`, `humo_cron.sql`, `humo_roles_permisos_aplicables.sql` y la suite `rls.sql`. Prueba de carrera contra la BD real: `scripts/pruebas/carrera-cupos.ts`.
 
 **M1–M4 e integración de usuarios:**
 1. `modo_carga()` y `purga_habilitada()` tienen EXECUTE para authenticated y service_role (§1.5): un trigger invoker solo puede llamar funciones con EXECUTE para los roles de la API.
@@ -2408,9 +2567,58 @@ Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores c
 - **Pruebas:** `humo_negocio_transacciones.sql` pasa 154/154, más 15/15 del bloque de políticas 7g.
 - **Regresión:** las pruebas anteriores ya no escriben `perfiles.estado` por UPDATE directo; su preparación (owner) fija `amo.transicion_autorizada` o `modo_carga`, y la aprobación de verificaciones va por `transicionar_srv`. Resultados: `humo_m1_m4` 71/71, `auditoria_seguridad` 35/35, `humo_configuracion` 66/66 y `humo_negocio_actores` 73/73.
 
+**M8–M11** (detalle en §3.7, §5.5, §5.8, §5.9, §8, §9.1 y §9.2 «Real»):
+- **Despliegue:** nueve migraciones.
+  - M8 en dos: notificaciones, más la corrección pendiente del bloqueo único en `accesos`.
+  - M9 en cinco, por tamaño: base, admin, geo, roles y reportes.
+  - M10 y M11 en una cada una.
+- **Contratos nuevos para la app:**
+  - `kpi_fila.n_anterior`.
+  - Fuente `bitacora` en `actividad_heatmap`.
+  - Métricas geo `cumplimiento` y `campanas`.
+  - RPC de bandeja (`notificaciones_no_leidas`, `mis_notificaciones`, `marcar_notificaciones_leidas`), con `leida_at` fijado por la BD.
+  - Alerta `PAIS_INUSUAL` emitida por la BD.
+  - Un solo `LOGIN_BLOQUEADO` por ventana, con el id repetido en los reintentos.
+  - `avatares` exige `perfil/<uuid propio>/<archivo>`.
+- **Advisors:** sin ERROR. WARN aceptados:
+  - Definer ejecutables por authenticated: las RPC del medio y `reporte_usuarios_accesos`, además de las de M3/M6/M7.
+  - `function_search_path_mutable` en los dos procedures de M11, que no admiten `SET`.
+  - OTP largo y HIBP (plan free).
+  - En performance, solo INFO de índices sin uso.
+- **Pruebas:**
+  - Nuevas: `humo_notificaciones` 34/34, `humo_analitica` 66/66, `humo_storage` 55/55 y `humo_cron` 28/28.
+  - Regresión: `humo_negocio_transacciones` 154/154 + 15/15, `humo_m1_m4` 71/71, `auditoria_seguridad` 35/35, `humo_configuracion` 66/66 y `humo_negocio_actores` 73/73.
+  - `humo_configuracion` espera ahora 21 plantillas.
+- **Tipos:** `src/types/database.types.ts` regenerado hasta `20261001045506_cron`. `pnpm typecheck` y `pnpm test` (1165) pasan sin cambios de código.
+
+**Verificación integral** (detalle en §5.4, §5.7 y §11 «Real»):
+- **Migración `20261001053648_roles_permisos_aplicables`** (requisito 1 de la Fase 4a, seguridad):
+  - Un rol ANUNCIANTE o MEDIO personalizado no admite permisos que no tenga su rol de sistema: `AMO_PERMISO_NO_APLICABLE`, nuevo en §1.7.
+  - Un permiso no se reasigna por UPDATE.
+  - Un rol con permisos no aplicables no cambia de tipo.
+  - Antes de aplicarla, ningún rol personalizado infringía la regla (la migración lo comprueba con `assert`).
+- **`rls.sql`: 123/123.** `humo_roles_permisos_aplicables.sql`: 7/7. `scripts/db/probar-guardas-postgrest.ts` (por PostgREST): 7/7.
+- **Carrera de cupos:** dos corridas, cada una con 11 escenarios y 225 llamadas concurrentes. Total 22/22 OK, 450 llamadas, 0 deadlocks, 0 errores inesperados e invariantes intactos.
+  - (1) 20 medios contra 3 cupos, ×6: siempre exactamente 3; los otros 17 reciben `AMO_OFERTA_NO_DISPONIBLE`.
+  - Dos ofertas contra el presupuesto de la campaña, ×6: siempre exactamente 3 de 40; el resto, `AMO_PRESUPUESTO_CAMPANA`, `AMO_TOPE_MEDIO` o `AMO_OFERTA_NO_DISPONIBLE`.
+  - (2) Presupuesto de 2,5 precios: 2 de 20.
+  - (3) Tope del 20 % por medio, mismo medio ×5: 2 de 5.
+  - (5) Aceptar y desistir en paralelo: 3 desistimientos + 3 reaceptaciones; nunca más de 3 cupos ocupados.
+  - (6) Misma clave de idempotencia ×5: 5 respuestas con la misma asignación.
+  - (4) Tope anual con dos campañas en paralelo: 1 de 2 (`AMO_TOPE_NIVEL`).
+  - Limpieza total verificada: 0 filas de negocio y 0 usuarios de la prueba. Quedan las filas de bitácora de la prueba, inmutables para la API.
+- **Advisors:** 0 ERROR.
+  - Security, WARN aceptados: las 15 definer ejecutables por authenticated (SRF de visibilidad, RPC del medio, `reporte_usuarios_accesos` y RPC de usuarios; filtran por `acceso_valido` y permiso), `function_search_path_mutable` de los dos procedures (Postgres no admite `SET` con `COMMIT`), y Auth: caducidad de OTP > 1 h y protección de contraseñas filtradas (HIBP).
+  - Los dos de Auth no se corrigen con migraciones: la caducidad del OTP se baja a ≤ 3600 s en Auth → Providers → Email del dashboard, y HIBP exige el plan Pro.
+  - Performance: solo INFO de índices sin uso (78; BD sin datos).
+- **Tipos:** `generate_typescript_types` da el mismo contenido (la migración solo toca `private` y triggers); se actualizó la cabecera de `src/types/database.types.ts`.
+- **App:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (1210) y `pnpm build` pasan sin cambios de código de la app.
+
 **Pendientes registrados:**
-- Endurecer `perfiles.avatar_path` contra `..` (M10).
-- Registrar en `accesos` solo el primer intento bloqueado por ventana.
-- Purgar las cuentas y la organización E2E antes de producción.
+- Purgar las cuentas y la organización E2E antes de producción. `purgar_demo` la conserva mientras un perfil no demo la referencie.
 - Desde M7, `scripts/bootstrap/provision-e2e.ts` (`asegurarPerfil` con `estado: "ACTIVO"`) y `scripts/bootstrap/superadmin.ts` fallan con `AMO_ESTADO_SOLO_VIA_TRANSICION` cuando cambian el estado: en el primer aprovisionamiento y al restaurar una cuenta suspendida. Deben fijar rol y organización sin `estado` y llamar a `activar_perfil_srv` (correo confirmado) para `INVITADO → ACTIVO`, o a `transicionar_srv` para restaurar.
-- M8 debe redefinir `private.notificar` (misma firma) y añadir `notificar_transicion`.
+- `detalle_zona_geo(nivel, codigo, desde, hasta)` (Fase 4a): no implementada.
+- Fase 4a, requisitos 2 y 3 (opcionales para la UI): `guardar_permisos_rol_srv` (guardado transaccional de la matriz de permisos) y `mis_sesiones()`, sin implementar. La app debe mapear el nuevo `AMO_PERMISO_NO_APLICABLE` en `src/features/roles/errores.ts` (hoy la UI ya filtra con `esAplicable`, así que solo llega por una petición manipulada).
+- Bajar la caducidad del OTP de correo a ≤ 1 h en el dashboard de Auth (advisor `auth_otp_long_expiry`).
+- `EXPLAIN ANALYZE` de las RPC de analítica con datos demo (p95 < 300 ms).
+- Prueba de Realtime de extremo a extremo (las particiones de `realtime.messages` las crea el servicio).

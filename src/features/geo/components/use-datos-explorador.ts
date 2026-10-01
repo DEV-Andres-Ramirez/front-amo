@@ -11,11 +11,16 @@ import {
   type CapaGeometria,
   useGeometriaNivel,
   useMetricasMapa,
+  usePuntosMapa,
 } from "../consultas-cliente"
 import { departamentoPorCodigo } from "../departamentos"
 import { urlGeometria } from "../encuadre"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
-import type { CentroZona, RespuestaMapaGeo } from "../tipos"
+import type {
+  CentroZona,
+  RespuestaMapaGeo,
+  RespuestaPuntosGeo,
+} from "../tipos"
 import type { EstadoExplorador } from "../use-estado-explorador"
 import {
   type CirculosVista,
@@ -24,6 +29,17 @@ import {
   type VistaMapa,
   type ZonaDibujable,
 } from "../vista-mapa"
+
+export interface CalorExplorador {
+  /** El usuario puede activar el modo (métrica con puntos reales y datos en el periodo). */
+  readonly disponible: boolean
+  /** El modo está activo en la URL. */
+  readonly activo: boolean
+  readonly respuesta: RespuestaPuntosGeo | undefined
+  readonly cargando: boolean
+  readonly error: Error | null
+  readonly reintentar: () => void
+}
 
 export interface DatosExplorador {
   /** Polígonos que se dibujan (los del nivel anterior mientras llega el nuevo). */
@@ -41,6 +57,7 @@ export interface DatosExplorador {
   readonly cargando: boolean
   readonly error: Error | null
   readonly reintentar: () => void
+  readonly calor: CalorExplorador
   nombreZona(codigo: string): string
   /** Punto representativo de la zona (para traerla a la vista al seleccionarla). */
   centroZona(codigo: string): Posicion | null
@@ -64,6 +81,8 @@ export function useDatosExplorador(
   const { nivel: estado, consulta, por100k } = explorador
   const geometria = useGeometriaNivel(urlGeometria(estado))
   const metricas = useMetricasMapa(consulta)
+  // En paralelo con el coroplético: un enlace con `calor=true` no espera al mapa.
+  const puntos = usePuntosMapa(consulta, explorador.calor)
   const respuesta = metricas.data
 
   const capaVigente = !!geometria.data && !geometria.isPlaceholderData
@@ -118,6 +137,16 @@ export function useDatosExplorador(
     return [(oeste + este) / 2, (sur + norte) / 2]
   }
 
+  const conDatos = (vista?.ranking.conDatos ?? 0) > 0
+  const calor: CalorExplorador = {
+    disponible: explorador.admiteCalor && (conDatos || explorador.calor),
+    activo: explorador.calor,
+    respuesta: explorador.calor ? puntos.data : undefined,
+    cargando: explorador.calor && puntos.isFetching,
+    error: explorador.calor ? puntos.error : null,
+    reintentar: () => void puntos.refetch(),
+  }
+
   return {
     capa: geometria.data,
     capaVigente,
@@ -130,6 +159,7 @@ export function useDatosExplorador(
     cargando: metricas.isFetching || (!capaVigente && !geometria.error),
     error: metricas.error,
     reintentar: () => void metricas.refetch(),
+    calor,
     nombreZona: (codigo) =>
       vista?.porCodigo.get(codigo)?.nombre ?? nombres.get(codigo) ?? codigo,
     centroZona,

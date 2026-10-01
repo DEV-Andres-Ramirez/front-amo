@@ -7,6 +7,7 @@ import type { ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cargarPeriodo, etiquetaRango } from "@/features/auditoria/periodo"
+import { MapaIngresos } from "@/features/geo/components/mapa-ingresos"
 import { tieneAlgunPermiso } from "@/lib/auth/dal"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
 import { serializarFecha } from "@/lib/fechas"
@@ -113,11 +114,10 @@ const VACIO_UBICACION = {
 /**
  * Distribución de "Origen de los ingresos".
  *
- * RANURA DEL MAPA DE ACCESOS (la construye la pista geo): cuando exista el
- * mapa de accesos (coropleta por país con `geo_metricas(nivel, 'accesos', …)`
- * y modo calor con los puntos lat/lon de `accesos`), se pasa en `mapa` y
- * ocupa la columna ancha con los rankings apilados a su derecha. Sin mapa,
- * los rankings comparten la fila y el encabezado enlaza al explorador.
+ * Ranura del mapa de accesos (`MapaIngresos`, módulo geo): planisferio por
+ * país y Colombia por departamento, en SVG; ocupa la columna ancha con los
+ * rankings apilados a su derecha. Sin mapa, los rankings comparten la fila y
+ * el encabezado enlaza al explorador.
  */
 function DisposicionOrigen({
   mapa,
@@ -222,6 +222,7 @@ export async function SeccionOrigenAccesos({
         <SinUbicacion />
       ) : (
         <DisposicionOrigen
+          mapa={<MapaIngresos rango={rango} usuario={usuario} />}
           paises={
             <RankingUbicaciones
               titulo="Países"

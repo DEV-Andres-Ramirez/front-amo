@@ -7,7 +7,8 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
-import { CampanaNotificaciones } from "./campana-notificaciones"
+import { CampanaNotificacionesEnVivo } from "@/features/notificaciones/components/campana-en-vivo"
+
 import { useShell } from "./contexto-shell"
 import { MenuUsuario } from "./menu-usuario"
 import { MigasPan } from "./migas-pan"
@@ -51,7 +52,7 @@ function BotonBusqueda() {
  * notificaciones, tema y cuenta. Tiene su propio `view-transition-name` para
  * no deslizarse con el contenido al navegar (ver globals.css).
  */
-export function BarraSuperior({ noLeidas }: { noLeidas?: number }) {
+export function BarraSuperior() {
   return (
     <header
       style={{ viewTransitionName: "amo-barra-superior" }}
@@ -68,7 +69,7 @@ export function BarraSuperior({ noLeidas }: { noLeidas?: number }) {
       <MigasPan className="flex-1" />
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <BotonBusqueda />
-        <CampanaNotificaciones noLeidas={noLeidas} />
+        <CampanaNotificacionesEnVivo />
         <SelectorTema />
         <MenuUsuario />
       </div>
