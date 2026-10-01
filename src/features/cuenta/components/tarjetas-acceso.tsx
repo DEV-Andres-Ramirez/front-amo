@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import type { SeguridadPropia } from "../tipos"
 import { AccionesMfa } from "./acciones-mfa"
 import { DialogoContrasena } from "./dialogo-contrasena"
-import { SeccionCuenta } from "./seccion-cuenta"
+import { AccionesPie, SeccionCuenta } from "./seccion-cuenta"
 
 function Instante({ valor }: { valor: string }) {
   return (
@@ -107,9 +107,9 @@ export function TarjetaMfa({ seguridad }: { seguridad: SeguridadPropia }) {
               ? "¿Cambiaste de celular? Configura la app en el nuevo antes de borrar la anterior."
               : "Te tomará un minuto con tu celular a mano."}
           </p>
-          <div className="flex flex-wrap justify-end gap-2">
+          <AccionesPie>
             <AccionesMfa activa={activa} obligatoria={obligatoria} />
-          </div>
+          </AccionesPie>
         </>
       }
     >

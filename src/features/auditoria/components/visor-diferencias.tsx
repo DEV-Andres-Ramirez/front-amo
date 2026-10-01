@@ -76,6 +76,17 @@ export function Valor({
           {valor.texto}
         </span>
       )
+    case "color":
+      return (
+        <span className="inline-flex items-center gap-1.5 font-mono text-[0.8125rem]">
+          <span
+            aria-hidden
+            className="size-3.5 shrink-0 rounded-[4px] ring-1 ring-foreground/15"
+            style={{ backgroundColor: valor.texto }}
+          />
+          {valor.texto}
+        </span>
+      )
     case "estado":
       return (
         <span

@@ -37,6 +37,9 @@ function verbo(sube: boolean, plural: boolean): string {
   return plural ? "bajaron" : "bajó"
 }
 
+/** Código DANE de departamento (el explorador solo abre esos). */
+const CODIGO_DEPARTAMENTO = /^\d{2}$/
+
 /** Participación mínima en el cambio para nombrar a un grupo como causa. */
 export const UMBRAL_CAUSA = 0.3
 const PRACTICAMENTE_TODO = 0.995
@@ -159,20 +162,31 @@ function insightDeKpi(
     metrica: kpi,
     valor: variacion,
     magnitud: Math.abs(variacion),
-    accion: {
-      etiqueta: zona
-        ? `Explorar ${zona.fila.nombre} en el mapa`
-        : "Explorar en el mapa",
-      href: construirHref(
-        RUTAS_INSIGHTS.mapa,
-        {
-          metrica: METRICA_MAPA[kpi],
-          departamento: zona?.fila.clave,
-          plataforma: zona ? undefined : plataforma?.fila.clave,
-        },
-        entrada.periodo
-      ),
-    },
+    accion: accionMapa(kpi, zona, entrada.periodo),
+  }
+}
+
+/** El explorador abre el departamento que explica el cambio (si lo hay). */
+function accionMapa(
+  kpi: KpiVariacion,
+  zona: Causa | null,
+  periodo: EntradaInsights["periodo"]
+): Insight["accion"] {
+  const depto =
+    zona && CODIGO_DEPARTAMENTO.test(zona.fila.clave) ? zona.fila : null
+  return {
+    etiqueta: depto
+      ? `Explorar ${depto.nombre} en el mapa`
+      : "Explorar en el mapa",
+    href: construirHref(
+      RUTAS_INSIGHTS.mapa,
+      {
+        metrica: METRICA_MAPA[kpi],
+        nivel: depto ? "departamental" : undefined,
+        depto: depto?.clave,
+      },
+      periodo
+    ),
   }
 }
 

@@ -32,6 +32,8 @@ describe("ItemNotificacion", () => {
     expect(screen.getByText("Urgente")).toBeInTheDocument()
     expect(screen.getByText("Seguridad")).toBeInTheDocument()
 
+    // jsdom no navega entre documentos: basta con comprobar el aviso.
+    enlace.addEventListener("click", (evento) => evento.preventDefault())
     await userEvent.click(enlace)
     expect(onAbrir).toHaveBeenCalledWith(notificacion)
   })

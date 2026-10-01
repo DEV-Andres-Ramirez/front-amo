@@ -8,9 +8,8 @@ import {
   pinturaSinDatos,
   radioCirculo,
 } from "./expresiones"
-import { nombreArchivoMapa } from "./exportar-mapa"
+import { esErrorFatalMapa, mensajeErrorMapa } from "./error-mapa"
 import { crearPatronRayado } from "./patron-rayado"
-import { puntosSparkline } from "./sparkline"
 import { posicionTooltip } from "./tooltip-flotante"
 
 describe("expresiones del coroplético", () => {
@@ -84,16 +83,25 @@ describe("utilidades del mapa", () => {
     )
   })
 
-  it("la sparkline normaliza la serie al lienzo", () => {
-    expect(puntosSparkline([], 28)).toEqual([])
-    const puntos = puntosSparkline([0, 10], 28)
-    expect(puntos[0]).toEqual([0, 26])
-    expect(puntos[1]).toEqual([100, 2])
+  it("solo un error sin fuente ni tesela (el estilo) impide iniciar el mapa", () => {
+    expect(esErrorFatalMapa({ error: new Error("Unauthorized") })).toBe(true)
+    expect(esErrorFatalMapa({ error: new Error(""), sourceId: "composite" })).toBe(false)
+    expect(esErrorFatalMapa({ error: new Error(""), tile: {} })).toBe(false)
   })
 
-  it("el nombre del PNG es seguro y descriptivo", () => {
-    expect(nombreArchivoMapa(["Medios", "Bogotá, D.C.", "2026-09-30"])).toBe(
-      "amo-mapa-medios-bogota-d-c-2026-09-30.png"
+  it("los errores de Mapbox llegan en español y sin el texto original", () => {
+    const token = Object.assign(
+      new Error(
+        "Unauthorized: you may have provided an invalid Mapbox access token. See https://docs.mapbox.com/api/guides/"
+      ),
+      { status: 401 }
     )
+    expect(mensajeErrorMapa(token)).toMatch(/rechazó la credencial/)
+    expect(mensajeErrorMapa({ status: 403 })).toMatch(/rechazó la credencial/)
+    expect(mensajeErrorMapa(new Error("Failed to initialize WebGL"))).toMatch(/WebGL/)
+    const generico = mensajeErrorMapa(new Error("NetworkError when attempting to fetch"))
+    expect(generico).toMatch(/Revisa tu conexión/)
+    expect(generico).not.toMatch(/NetworkError/)
+    expect(mensajeErrorMapa(undefined)).toBe(generico)
   })
 })

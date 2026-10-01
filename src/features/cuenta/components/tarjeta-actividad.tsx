@@ -29,7 +29,13 @@ export async function TarjetaActividad({ usuarioId }: { usuarioId: string }) {
           className="py-6"
         />
       ) : (
-        <ListaActividad inicial={pagina} usuarioId={usuarioId} />
+        // Tras un `refresh()` (p. ej. al cambiar la contraseña) llega un evento
+        // nuevo: la clave vuelve a montar la lista con la primera página al día.
+        <ListaActividad
+          key={pagina.eventos[0]?.id}
+          inicial={pagina}
+          usuarioId={usuarioId}
+        />
       )}
     </SeccionCuenta>
   )

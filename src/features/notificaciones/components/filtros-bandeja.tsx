@@ -62,7 +62,7 @@ function Cifra({
         !enLinea && "ml-auto",
         "relative rounded-full px-1.5 text-[0.6875rem] leading-4 font-semibold cifras",
         activa
-          ? "bg-primary/15 text-primary"
+          ? "bg-primary/15 text-lila-700 dark:text-primary"
           : "bg-foreground/[0.06] text-muted-foreground"
       )}
     >

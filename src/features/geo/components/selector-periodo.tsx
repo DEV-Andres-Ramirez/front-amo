@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import {
+  DIAS_MAXIMOS_RANGO,
   ETIQUETAS_PRESET_MAPA,
   PRESETS_MAPA,
   type PresetMapa,
@@ -122,6 +123,9 @@ export function SelectorPeriodo({
               onSelect={setBorrador}
               defaultMonth={rango.hasta}
               disabled={{ after: hoy }}
+              // Noches entre los extremos: el rango (inclusivo) no supera el
+              // máximo que acepta la API; uno mayor se ignoraría en silencio.
+              max={DIAS_MAXIMOS_RANGO - 1}
               numberOfMonths={1}
               className="p-1"
             />

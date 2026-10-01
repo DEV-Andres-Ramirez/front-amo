@@ -89,29 +89,15 @@ export function SeccionCuenta({
   )
 }
 
-/** Par etiqueta/valor de solo lectura (correo, rol, fechas). */
-export function DatoCuenta({
-  etiqueta,
-  children,
-  ayuda,
-  className,
-}: {
-  etiqueta: string
-  children: ReactNode
-  ayuda?: ReactNode
-  className?: string
-}) {
+/**
+ * Botones del pie: a lo ancho y apilados en móvil (el principal, último en el
+ * código, queda arriba) y alineados a la derecha desde `sm`. Un botón suelto
+ * en el pie ya se comporta así sin envoltura.
+ */
+export function AccionesPie({ children }: { children: ReactNode }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
-      <dt className="text-xs font-medium text-muted-foreground">{etiqueta}</dt>
-      <dd className="min-w-0 text-sm break-words">
-        {children}
-        {ayuda ? (
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            {ayuda}
-          </span>
-        ) : null}
-      </dd>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+      {children}
     </div>
   )
 }

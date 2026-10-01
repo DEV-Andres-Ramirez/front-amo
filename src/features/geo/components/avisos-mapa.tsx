@@ -62,6 +62,7 @@ export function AvisoErrorDatos({
   )
 }
 
+/** El lienzo de Mapbox no arrancó; `mensaje` ya viene en español (`mensajeErrorMapa`). */
 export function AvisoErrorMapa({
   mensaje,
   onReintentar,
@@ -74,7 +75,7 @@ export function AvisoErrorMapa({
       <EstadoError
         compacto
         titulo="El mapa no pudo iniciar"
-        descripcion={`${mensaje}. Revisa tu conexión; si persiste, puede que tu navegador tenga WebGL desactivado. El ranking sigue disponible.`}
+        descripcion={`${mensaje} El ranking sigue disponible.`}
         onReintentar={onReintentar}
       />
     </TarjetaCentrada>
@@ -126,7 +127,7 @@ export function CargaLienzo({ visible }: { visible: boolean }) {
       )}
     >
       <div className="absolute inset-0 patron-puntos opacity-60" />
-      <div className="absolute top-1/2 left-1/2 aspect-[3/4] h-[58%] -translate-1/2 rounded-[42%_38%_46%_40%] esqueleto-shimmer opacity-40 @min-[60rem]/mapa:left-[58%]" />
+      <div className="absolute top-1/2 left-1/2 aspect-[3/4] h-[58%] max-w-[78%] -translate-1/2 rounded-[42%_38%_46%_40%] esqueleto-shimmer opacity-40 @min-[60rem]/mapa:left-[58%]" />
     </div>
   )
 }

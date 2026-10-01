@@ -78,7 +78,7 @@ export function BarraCambios({
               </Button>
               <Button onClick={onRevisar}>
                 Revisar y guardar
-                <Kbd className="ml-0.5 bg-primary-foreground/15 text-primary-foreground max-md:hidden">
+                <Kbd className="ml-0.5 bg-black/20 text-primary-foreground max-md:hidden dark:bg-primary-foreground/15">
                   {atajo}
                 </Kbd>
               </Button>

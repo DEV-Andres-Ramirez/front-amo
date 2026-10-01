@@ -298,9 +298,13 @@ test.describe("mi cuenta", () => {
       .click()
     await expect(page.getByText("Cerramos tus otras sesiones")).toBeVisible()
 
-    // La otra sesión quedó revocada; esta sigue activa.
-    await otra.goto("/cuenta/perfil")
-    await expect(otra).toHaveURL(/\/ingresar/)
+    // La otra sesión quedó revocada; esta sigue activa. El DAL comprueba la
+    // vigencia como máximo una vez por minuto y sesión (una sesión aal1 lo
+    // nota al instante, al consultar sus factores): se reintenta hasta 90 s.
+    await expect(async () => {
+      await otra.goto("/cuenta/perfil")
+      await expect(otra).toHaveURL(/\/ingresar/, { timeout: 2_000 })
+    }).toPass({ intervals: [5_000, 15_000], timeout: 90_000 })
     await otra.context().close()
     await page.goto("/cuenta/perfil")
     await expect(page).toHaveURL(/\/cuenta\/perfil$/)

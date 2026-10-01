@@ -17,9 +17,12 @@ const parsers = {
 /** Filtra el registro a los accesos sospechosos y baja hasta él. */
 export function BotonVerSospechosos({
   children,
+  etiqueta,
   className,
 }: {
   children: ReactNode
+  /** Nombre accesible cuando el texto visible es solo "Ver". */
+  etiqueta?: string
   className?: string
 }) {
   const [, iniciar] = useTransition()
@@ -33,13 +36,15 @@ export function BotonVerSospechosos({
     void fijar({ sospechoso: ["SI"], pagina: null })
     document
       .getElementById(ID_REGISTRO_ACCESOS)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+      // Sin `behavior`: rige el `scroll-behavior` global (suave salvo movimiento reducido).
+      ?.scrollIntoView({ block: "start" })
   }
 
   return (
     <button
       type="button"
       onClick={ver}
+      aria-label={etiqueta}
       className={cn(
         "group/ver inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:anillo-foco",
         className

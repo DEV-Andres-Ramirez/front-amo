@@ -34,7 +34,7 @@ import { actualizarPerfil } from "../actions"
 import { celularParaMostrar } from "../celular"
 import { type EntradaPerfil, esquemaPerfil } from "../schemas"
 import type { PerfilPropio } from "../tipos"
-import { SeccionCuenta } from "./seccion-cuenta"
+import { AccionesPie, SeccionCuenta } from "./seccion-cuenta"
 
 const CAMPOS = ["nombre", "celular"] as const
 
@@ -136,7 +136,7 @@ export function FormularioPerfil({ perfil }: { perfil: PerfilPropio }) {
                 ? "Tienes cambios sin guardar."
                 : "Tus datos están al día."}
             </p>
-            <div className="flex flex-wrap justify-end gap-2">
+            <AccionesPie>
               <Button
                 type="button"
                 variant="ghost"
@@ -153,7 +153,7 @@ export function FormularioPerfil({ perfil }: { perfil: PerfilPropio }) {
                 )}
                 Guardar cambios
               </Button>
-            </div>
+            </AccionesPie>
           </>
         }
       >

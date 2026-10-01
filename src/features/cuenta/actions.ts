@@ -44,6 +44,7 @@ import {
   leerPreferencias,
   type PreferenciasInterfaz,
 } from "./preferencias"
+import { PREFIJO_FACTOR_AUTOMATICO } from "./presentacion"
 import { actividadPropia } from "./queries"
 import {
   type EntradaCambioContrasena,
@@ -352,7 +353,7 @@ export async function iniciarFactorMfa(): Promise<
     const { data, error } = await auth.mfa.enroll({
       factorType: "totp",
       // Supabase exige nombres únicos por cuenta: la fecha los distingue.
-      friendlyName: `Autenticador · ${formatearFechaHora(new Date())}`,
+      friendlyName: `${PREFIJO_FACTOR_AUTOMATICO}${formatearFechaHora(new Date())}`,
       issuer: "AMO",
     })
     if (error) throw error

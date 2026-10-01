@@ -1,17 +1,11 @@
 "use client"
 
-import { Search, SearchX, ShieldPlus, X } from "lucide-react"
+import { SearchX, ShieldPlus } from "lucide-react"
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs"
 import type { ReactNode } from "react"
 
 import { EstadoVacio } from "@/components/feedback/estado-vacio"
 import { Button } from "@/components/ui/button"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
 
 import {
   filtrarRoles,
@@ -21,6 +15,7 @@ import {
   TIPOS_ROL_ETIQUETA,
 } from "../presentacion"
 import type { ActorRoles, RolListado } from "../tipos"
+import { CampoBusqueda } from "./campo-busqueda"
 import { ControlSegmentado } from "./control-segmentado"
 import { useHojaRol } from "./hoja-rol"
 import { TarjetaRol } from "./tarjeta-rol"
@@ -128,32 +123,15 @@ export function ListadoRoles({
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <InputGroup className="md:max-w-80">
-          <InputGroupAddon>
-            <Search aria-hidden />
-          </InputGroupAddon>
-          <InputGroupInput
-            type="search"
-            aria-label="Buscar roles"
-            placeholder="Buscar por nombre, clave o descripción"
-            value={q}
-            onChange={(evento) =>
-              void fijar({ q: evento.target.value || null })
-            }
-          />
-          {q ? (
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton
-                size="icon-xs"
-                aria-label="Limpiar búsqueda"
-                onClick={() => void fijar({ q: null })}
-              >
-                <X aria-hidden />
-              </InputGroupButton>
-            </InputGroupAddon>
-          ) : null}
-        </InputGroup>
+      {/* Se reparte en una fila si cabe; si no, el filtro baja (nunca se recorta). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <CampoBusqueda
+          etiqueta="Buscar roles"
+          placeholder="Buscar por nombre, clave o descripción"
+          valor={q}
+          onCambio={(texto) => void fijar({ q: texto || null })}
+          className="sm:w-80 sm:max-w-full"
+        />
         <ControlSegmentado
           etiqueta="Filtrar por tipo de rol"
           opciones={opcionesTipo}

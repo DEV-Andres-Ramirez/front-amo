@@ -136,8 +136,11 @@ export function perfilesVisibles(
   return perfilesPorClave(unicos.join(","))
 }
 
-/** Ids de personas cuyo nombre o correo coincide con la búsqueda (máx. 50). */
-export async function perfilesQueCoinciden(
+/**
+ * Ids de personas cuyo nombre o correo coincide con la búsqueda (máx. 50).
+ * Memorizado por solicitud: el conteo y la lista de la misma vista lo comparten.
+ */
+export const perfilesQueCoinciden = cache(async function perfilesQueCoinciden(
   patron: string | null
 ): Promise<string[]> {
   if (!patron) return []
@@ -149,7 +152,7 @@ export async function perfilesQueCoinciden(
     .limit(50)
   if (error) fallar("buscar personas", error)
   return data.map((perfil) => perfil.id)
-}
+})
 
 export function nombrePais(iso2: string): string | null {
   return obtenerPais(iso2.toUpperCase())?.nombre ?? null

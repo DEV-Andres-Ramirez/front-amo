@@ -92,22 +92,28 @@ function EventosDeSesion({ conteos }: { conteos: readonly ConteoEvento[] }) {
       </h3>
       <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-1">
         {conteos.map(({ evento, cantidad }) => (
-          <div
-            key={evento}
-            className={cn(
-              "flex min-w-0 items-center gap-2.5",
-              cantidad === 0 && "opacity-60"
-            )}
-          >
+          // Sin actividad: el icono se apaga y la cifra baja de peso; el texto
+          // conserva el contraste AA.
+          <div key={evento} className="flex min-w-0 items-center gap-2.5">
             <IconoEvento
               evento={evento}
               resultado={cantidad === 0 ? "INFO" : EVENTOS[evento].resultado}
-              className="size-6 rounded-md [&_svg]:size-3"
+              className={cn(
+                "size-6 rounded-md [&_svg]:size-3",
+                cantidad === 0 && "opacity-50"
+              )}
             />
             <dt className="min-w-0 flex-1 truncate text-[0.8125rem] text-muted-foreground">
               {EVENTOS[evento].etiqueta}
             </dt>
-            <dd className="text-sm font-medium cifras">
+            <dd
+              className={cn(
+                "text-sm cifras",
+                cantidad === 0
+                  ? "text-muted-foreground"
+                  : "font-medium text-foreground"
+              )}
+            >
               {formatearNumero(cantidad)}
             </dd>
           </div>

@@ -13,6 +13,7 @@ import { toast } from "sonner"
 
 import { parsersBandeja, type FiltrosBandeja } from "../esquemas"
 import { useMarcarNotificaciones } from "../fuente"
+import { leidaEnBandeja } from "../lecturas"
 import type { Notificacion } from "../tipos"
 
 interface ValorBandeja {
@@ -42,12 +43,12 @@ function useLecturasOptimistas() {
   const [lecturas, setLecturas] = useState<ReadonlyMap<number, boolean>>(
     () => new Map()
   )
-  const [todasLeidas, setTodasLeidas] = useState(false)
+  const [todasLeidasHasta, setTodasLeidasHasta] = useState<number | null>(null)
 
   const estaLeida = useCallback(
     (notificacion: Notificacion) =>
-      lecturas.get(notificacion.id) ?? (todasLeidas || notificacion.leida),
-    [lecturas, todasLeidas]
+      leidaEnBandeja(notificacion, lecturas, todasLeidasHasta),
+    [lecturas, todasLeidasHasta]
   )
 
   const fijar = (
@@ -77,15 +78,15 @@ function useLecturasOptimistas() {
   }
 
   const marcarTodas = () => {
-    const anteriores = lecturas
-    setTodasLeidas(true)
+    const anteriores = { lecturas, hasta: todasLeidasHasta }
+    setTodasLeidasHasta(Date.now())
     setLecturas(new Map())
     mutacion.mutate(
       { todas: true },
       {
         onError: (error) => {
-          setTodasLeidas(false)
-          setLecturas(anteriores)
+          setTodasLeidasHasta(anteriores.hasta)
+          setLecturas(anteriores.lecturas)
           avisarError(error)
         },
       }

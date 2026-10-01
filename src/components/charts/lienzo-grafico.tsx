@@ -32,11 +32,18 @@ interface LienzoGraficoProps extends DatosAccesibles {
   instancia: RefObject<InstanciaGrafico | null>
   /** Leyenda del gráfico, para dibujarla en la imagen exportada. */
   leyenda?: readonly ElementoLeyenda[]
+  /** En pantalla la leyenda va al lado (dona): la imagen hace lo mismo. */
+  leyendaAlLado?: boolean
   tooltip: EstadoTooltip | null
   /** `false` si el gráfico muestra el detalle en otro lugar (centro de la dona). */
   mostrarTooltip?: boolean
   /** Cantidad de posiciones navegables con las flechas. */
   posiciones: number
+  /**
+   * Posiciones por fila en una rejilla (mapa de calor): ↑/↓ saltan una fila
+   * y ←/→ una posición. Sin valor, las cuatro flechas avanzan de a una.
+   */
+  columnas?: number
   modo?: ModoNavegacion
   /** Título de la tabla alternativa (normalmente el del gráfico). */
   tituloTabla?: string
@@ -66,15 +73,34 @@ function activar(
   grafico.update()
 }
 
-const TECLAS: Readonly<
-  Record<string, (actual: number, total: number) => number>
-> = {
+type Movimiento = (actual: number, total: number, fila: number) => number
+
+const TECLAS: Readonly<Record<string, Movimiento>> = {
   ArrowRight: (actual, total) => Math.min(actual + 1, total - 1),
-  ArrowDown: (actual, total) => Math.min(actual + 1, total - 1),
+  // Entre filas, en el borde no se mueve (no salta a otra columna).
+  ArrowDown: (actual, total, fila) =>
+    actual < 0 ? 0 : actual + fila <= total - 1 ? actual + fila : actual,
   ArrowLeft: (actual) => Math.max(actual - 1, 0),
-  ArrowUp: (actual) => Math.max(actual - 1, 0),
+  ArrowUp: (actual, _, fila) =>
+    actual < 0 ? 0 : actual - fila >= 0 ? actual - fila : actual,
   Home: () => 0,
   End: (_, total) => total - 1,
+}
+
+const INSTRUCCION = "Usa las flechas para recorrer los valores."
+const INSTRUCCION_REJILLA =
+  "Usa las flechas para recorrer la rejilla: izquierda y derecha dentro de una fila, arriba y abajo entre filas."
+
+/** Siguiente posición activa tras una tecla (`null` si la tecla no navega). */
+export function moverConTecla(
+  tecla: string,
+  actual: number | null,
+  total: number,
+  columnas = 1
+): number | null {
+  const mover = TECLAS[tecla]
+  if (!mover || total <= 0) return null
+  return mover(actual ?? -1, total, Math.max(1, columnas))
 }
 
 /**
@@ -85,9 +111,11 @@ const TECLAS: Readonly<
 export function LienzoGrafico({
   instancia,
   leyenda,
+  leyendaAlLado,
   tooltip,
   mostrarTooltip = true,
   posiciones,
+  columnas,
   modo = "indice",
   resumen,
   tabla,
@@ -96,7 +124,7 @@ export function LienzoGrafico({
   children,
 }: LienzoGraficoProps) {
   const [actual, setActual] = useState<number | null>(null)
-  useRegistrarGrafico(instancia, { resumen, tabla }, leyenda)
+  useRegistrarGrafico(instancia, { resumen, tabla }, leyenda, leyendaAlLado)
 
   function alPulsarTecla(evento: KeyboardEvent<HTMLDivElement>) {
     const grafico = instancia.current
@@ -106,10 +134,9 @@ export function LienzoGrafico({
       activar(grafico, null, modo)
       return
     }
-    const mover = TECLAS[evento.key]
-    if (!mover) return
+    const siguiente = moverConTecla(evento.key, actual, posiciones, columnas)
+    if (siguiente === null) return
     evento.preventDefault()
-    const siguiente = mover(actual ?? -1, posiciones)
     setActual(siguiente)
     activar(grafico, siguiente, modo)
   }
@@ -127,7 +154,7 @@ export function LienzoGrafico({
         tabIndex={0}
         role="group"
         aria-roledescription="gráfico"
-        aria-label={`${resumen}. Usa las flechas para recorrer los valores.`}
+        aria-label={`${resumen}. ${columnas ? INSTRUCCION_REJILLA : INSTRUCCION}`}
         onKeyDown={alPulsarTecla}
         onBlur={alSalir}
         className="relative size-full rounded-md outline-none focus-visible:anillo-foco"

@@ -57,13 +57,14 @@ function Evento({
         <Icono className="size-4" aria-hidden />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        {/* En móvil el instante va siempre bajo el título (no según su largo). */}
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
           <p className="text-sm font-medium">{descrito.titulo}</p>
           <time
             dateTime={evento.at}
             title={formatearFechaHora(evento.at)}
             suppressHydrationWarning
-            className="text-xs cifras text-muted-foreground"
+            className="shrink-0 text-xs cifras text-muted-foreground"
           >
             {formatearRelativo(evento.at)}
           </time>

@@ -188,7 +188,7 @@ test.describe("auditoría y accesos", () => {
     await page.goto(`/administracion/auditoria?q=${auditor.id}`)
 
     const descarga = page.waitForEvent("download")
-    await page.getByRole("button", { name: "Exportar" }).click()
+    await page.getByRole("button", { name: "Exportar", exact: true }).click()
     await page.getByRole("menuitem", { name: "CSV (.csv)" }).click()
     expect((await descarga).suggestedFilename()).toMatch(
       /^bitacora-amo-\d{4}-\d{2}-\d{2}\.csv$/
@@ -258,7 +258,7 @@ test.describe("auditoría y accesos", () => {
         "accesos"
       )
       const descarga = page.waitForEvent("download")
-      await page.getByRole("button", { name: "Exportar" }).click()
+      await page.getByRole("button", { name: "Exportar", exact: true }).click()
       await page.getByRole("menuitem", { name: "Excel (.xlsx)" }).click()
       expect((await descarga).suggestedFilename()).toMatch(
         /^accesos-amo-\d{4}-\d{2}-\d{2}\.xlsx$/

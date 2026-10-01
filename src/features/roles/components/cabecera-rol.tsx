@@ -10,8 +10,9 @@ import {
 } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-import { contarSensibles, TOTAL_PERMISOS } from "../catalogo"
+import { contarSensibles } from "../catalogo"
 import { pluralizar, TIPOS_ROL_ETIQUETA } from "../presentacion"
+import { noAplicables, totalAplicables } from "../reglas"
 import { RUTA_ROLES } from "../rutas"
 import type { ActorRoles, RolDetalle } from "../tipos"
 import {
@@ -20,6 +21,7 @@ import {
   InsigniaMfa,
   InsigniaOrigen,
   InsigniaPropio,
+  InsigniaRevisar,
 } from "./distintivos-rol"
 import { MenuAccionesRol } from "./menu-acciones-rol"
 
@@ -52,6 +54,7 @@ export function CabeceraRol({
   esPropio: boolean
 }) {
   const sensibles = contarSensibles(rol.permisos)
+  const ajenos = noAplicables(rol.tipo, rol.permisos).length
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,9 +111,10 @@ export function CabeceraRol({
                 {esPropio ? <InsigniaPropio /> : null}
                 <InsigniaOrigen esSistema={rol.esSistema} />
                 {rol.requiereMfa ? <InsigniaMfa /> : null}
+                {ajenos > 0 ? <InsigniaRevisar cantidad={ajenos} /> : null}
                 <Dato Icono={ListChecks}>
                   <span className="font-medium cifras text-foreground">
-                    {rol.permisos.length}/{TOTAL_PERMISOS}
+                    {rol.permisos.length}/{totalAplicables(rol.tipo)}
                   </span>{" "}
                   permisos
                 </Dato>
@@ -134,14 +138,18 @@ export function CabeceraRol({
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
             <MenuAccionesRol rol={rol} actor={actor} variante="ficha" />
-            <p
-              className="text-xs text-muted-foreground"
-              title={formatearFechaHora(rol.actualizadoAt)}
-            >
-              {rol.esSistema
-                ? "Incluido con la plataforma"
-                : `Creado el ${formatearFecha(rol.creadoAt, "largo")}`}{" "}
-              · actualizado {formatearRelativo(rol.actualizadoAt)}
+            <p className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground lg:flex-col lg:items-end lg:text-right">
+              <span>
+                {rol.esSistema
+                  ? "Incluido con la plataforma"
+                  : `Creado el ${formatearFecha(rol.creadoAt, "largo")}`}
+              </span>
+              <span aria-hidden className="lg:hidden">
+                ·
+              </span>
+              <span title={formatearFechaHora(rol.actualizadoAt)}>
+                Actualizado {formatearRelativo(rol.actualizadoAt)}
+              </span>
             </p>
           </div>
         </div>

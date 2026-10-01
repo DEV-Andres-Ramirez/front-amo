@@ -35,6 +35,8 @@ begin
   insert into public.anunciantes (id, razon_social, nombre_comercial, nit, digito_verificacion, sector_id, municipio_codigo)
   values ('00000000-0000-4000-c000-0000000000a1', 'Auditoría S.A.S.', 'Auditoría', '900000201', '1',
           (select id from public.sectores where nombre_normalizado = 'retail y comercio'), '11001');
+  -- Desde M7 el estado de un perfil solo cambia por aplicar_transicion: la preparación (owner) lo simula.
+  perform set_config('amo.transicion_autorizada', 'on', true);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'ANUNCIANTE'),
          anunciante_id = '00000000-0000-4000-c000-0000000000a1', estado = 'ACTIVO', debe_cambiar_password = false
    where id = u_anu;
@@ -42,6 +44,7 @@ begin
          estado = 'ACTIVO', debe_cambiar_password = false where id = u_adm;
   update public.perfiles set rol_id = (select id from public.roles where clave = 'OPERACIONES'),
          estado = 'ACTIVO', debe_cambiar_password = false where id = u_ops;
+  perform set_config('amo.transicion_autorizada', '', true);
   insert into auth.sessions (id, user_id, created_at, updated_at, aal, ip, user_agent)
   values (s_anu, u_anu, now(), now(), 'aal1', '198.51.100.7', 'Navegador/1'),
          (s_adm1, u_adm, now(), now(), 'aal1', '198.51.100.8', 'Navegador/1'),

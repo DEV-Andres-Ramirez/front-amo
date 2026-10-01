@@ -1,5 +1,6 @@
 import { useId } from "react"
 
+import { trazarSparkline } from "@/components/charts/trazado-sparkline"
 import { cn } from "@/lib/utils"
 
 interface SparklineProps {
@@ -12,27 +13,13 @@ interface SparklineProps {
 }
 
 const ANCHO = 100
-
-/** Coordenadas normalizadas de la serie en el lienzo 100 × alto. */
-export function puntosSparkline(
-  valores: readonly number[],
-  alto: number
-): [number, number][] {
-  if (valores.length === 0) return []
-  const minimo = Math.min(...valores)
-  const maximo = Math.max(...valores)
-  const rango = maximo - minimo || 1
-  const margen = 2
-  const paso = valores.length > 1 ? ANCHO / (valores.length - 1) : 0
-  return valores.map((valor, i) => [
-    valores.length > 1 ? i * paso : ANCHO / 2,
-    margen + (alto - 2 * margen) * (1 - (valor - minimo) / rango),
-  ])
-}
+const MARGEN = 2
 
 /**
- * Línea de tendencia mínima (SVG) con área degradada y el último punto
- * marcado. Hereda el color (`currentColor`) del contenedor.
+ * Sparkline que ocupa todo el ancho de su contenedor (el SVG se estira y el
+ * trazo no se deforma), con área degradada y el último punto marcado. La
+ * geometría es la de las tarjetas KPI (`trazarSparkline`); hereda el color
+ * (`currentColor`) del contenedor.
  */
 export function Sparkline({
   valores,
@@ -41,14 +28,8 @@ export function Sparkline({
   alto = 28,
 }: SparklineProps) {
   const id = useId()
-  const puntos = puntosSparkline(valores, alto)
-  if (puntos.length === 0) return null
-
-  const linea = puntos
-    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
-    .join(" ")
-  const area = `${linea} L${ANCHO},${alto} L0,${alto} Z`
-  const [ultimoX, ultimoY] = puntos[puntos.length - 1]
+  const { linea, area, ultimo } = trazarSparkline(valores, ANCHO, alto, MARGEN)
+  if (!linea || !ultimo) return null
 
   return (
     <div className={cn("relative h-10 w-full text-primary", className)}>
@@ -80,7 +61,7 @@ export function Sparkline({
       <span
         aria-hidden
         className="absolute size-1.5 -translate-1/2 rounded-full bg-current ring-2 ring-current/25"
-        style={{ left: `${ultimoX}%`, top: `${(ultimoY / alto) * 100}%` }}
+        style={{ left: `${ultimo.x}%`, top: `${(ultimo.y / alto) * 100}%` }}
       />
     </div>
   )

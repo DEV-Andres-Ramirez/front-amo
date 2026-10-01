@@ -117,6 +117,14 @@ describe("presentarValor", () => {
     expect(presentarValor("rol_id", ROL_ID).texto).toBe("01a0f470…")
   })
 
+  it("colores HEX como muestra de color", () => {
+    expect(presentarValor("color", "#5b6cf0")).toEqual({
+      tipo: "color",
+      texto: "#5B6CF0",
+    })
+    expect(presentarValor("color", "#5b6")).toMatchObject({ tipo: "texto" })
+  })
+
   it("estados en MAYÚSCULAS con su nombre legible", () => {
     expect(presentarValor("estado", "EN_REVISION")).toEqual({
       tipo: "estado",
@@ -244,6 +252,18 @@ describe("presentarMetadatos", () => {
       ["Filas", "12"],
       ["Método", "Contraseña temporal"],
       ["Clave rara", "x"],
+    ])
+  })
+
+  it("cierres de sesión legibles y el rol por su nombre", () => {
+    const pares = presentarMetadatos(
+      { alcance: "otras", motivo: "cambio_contrasena", rol: "ADMIN" },
+      { nombres: new Map([["ADMIN", "Administrador"]]) }
+    )
+    expect(pares.map((p) => [p.etiqueta, p.valor.texto])).toEqual([
+      ["Alcance", "Las demás sesiones"],
+      ["Motivo", "Cambio de contraseña"],
+      ["Rol", "Administrador"],
     ])
   })
 

@@ -96,12 +96,22 @@ export function MigasMapa({
                   {indice === 0 ? (
                     <Earth aria-hidden className="size-3.5" />
                   ) : null}
-                  {miga.etiqueta}
+                  {/* En móvil "Mundo" queda solo como ícono: el nivel actual necesita el espacio. */}
+                  <span
+                    className={cn(
+                      indice === 0 && compacto && migas.length > 2 && "sr-only"
+                    )}
+                  >
+                    {miga.etiqueta}
+                  </span>
                 </button>
               ) : (
                 <span
                   aria-current="location"
-                  className="flex min-w-0 items-center gap-1 px-1.5 py-0.5 font-semibold text-foreground"
+                  // Destino del foco al cambiar de nivel (ver `useFocoTrasCambioDeNivel`).
+                  data-miga-actual=""
+                  tabIndex={-1}
+                  className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold text-foreground outline-none focus-visible:anillo-foco"
                 >
                   {indice === 0 ? (
                     <Earth aria-hidden className="size-3.5 shrink-0" />

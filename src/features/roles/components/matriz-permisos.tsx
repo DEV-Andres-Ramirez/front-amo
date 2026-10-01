@@ -6,10 +6,9 @@ import {
   Crown,
   Info,
   Lock,
-  Search,
   SearchX,
+  TriangleAlert,
   UserLock,
-  X,
 } from "lucide-react"
 import type { Route } from "next"
 import { useRouter } from "next/navigation"
@@ -23,12 +22,10 @@ import { NumeroAnimado } from "@/components/motion/numero-animado"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import { type ClavePermiso, PERMISOS } from "@/lib/auth/permisos"
+  CLAVES_PERMISO,
+  type ClavePermiso,
+  PERMISOS,
+} from "@/lib/auth/permisos"
 
 import { guardarPermisosRol } from "../actions"
 import {
@@ -37,13 +34,19 @@ import {
   catalogoPorArea,
   coincideBusqueda,
   contarSensibles,
-  TOTAL_PERMISOS,
   totalCambios,
 } from "../catalogo"
-import { pluralizar } from "../presentacion"
-import { type MotivoSoloLectura, puedeOtorgar } from "../reglas"
-import type { ActorRoles, RolListado } from "../tipos"
+import { pluralizar, TIPOS_ROL_ETIQUETA } from "../presentacion"
+import {
+  esAplicable,
+  type MotivoSoloLectura,
+  noAplicables,
+  puedeOtorgar,
+  totalAplicables,
+} from "../reglas"
+import type { ActorRoles, RolListado, TipoRol } from "../tipos"
 import { BarraCambios } from "./barra-cambios"
+import { CampoBusqueda } from "./campo-busqueda"
 import { useInformarCambios } from "./contexto-cambios"
 import { ControlSegmentado } from "./control-segmentado"
 import { DialogoRevision } from "./dialogo-revision"
@@ -54,12 +57,16 @@ import { useGuardiaSalida } from "./use-guardia-salida"
 
 type Filtro = "todos" | "otorgados" | "sin_otorgar" | "sensibles"
 
-/** Módulos completos del catálogo (contadores y "seleccionar todo"). */
-const PERMISOS_POR_MODULO = new Map(
-  catalogoPorArea()
-    .flatMap((area) => area.modulos)
-    .map((modulo) => [modulo.modulo, modulo.permisos] as const)
-)
+/** Permisos de cada módulo dentro del universo del rol (contadores y "seleccionar todo"). */
+function permisosPorModulo(
+  universo: ReadonlySet<ClavePermiso>
+): Map<string, ClavePermiso[]> {
+  return new Map(
+    catalogoPorArea((clave) => universo.has(clave))
+      .flatMap((area) => area.modulos)
+      .map((modulo) => [modulo.modulo, modulo.permisos] as const)
+  )
+}
 
 const AVISOS: Readonly<
   Record<
@@ -93,15 +100,62 @@ const AVISOS: Readonly<
   },
 }
 
-const AVISO_EXTERNOS =
-  "Los permisos de este rol solo alcanzan los datos de su propia organización (anunciante o medio), aunque el permiso diga «todos»."
+const PORTAL: Readonly<Record<Exclude<TipoRol, "ADMIN">, string>> = {
+  ANUNCIANTE: "del portal de anunciantes",
+  MEDIO: "del portal de medios",
+}
+
+/** Por qué la matriz de un rol externo ofrece solo algunos permisos. */
+function AvisoExterno({
+  tipo,
+  ajenos,
+}: {
+  tipo: Exclude<TipoRol, "ADMIN">
+  /** Permisos internos que el rol ya tiene (solo se pueden retirar). */
+  ajenos: number
+}) {
+  if (ajenos > 0) {
+    return (
+      <Alert variant="destructive">
+        <TriangleAlert aria-hidden />
+        <AlertTitle>
+          {pluralizar(
+            ajenos,
+            "permiso no corresponde",
+            "permisos no corresponden"
+          )}{" "}
+          a un rol de tipo «{TIPOS_ROL_ETIQUETA[tipo]}»
+        </AlertTitle>
+        <AlertDescription>
+          Los permisos del equipo interno le abren datos de toda la plataforma,
+          no solo los de su organización. Retíralos y guarda los cambios.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+  return (
+    <Alert className="border-info/40 bg-info/8">
+      <Info className="text-info" aria-hidden />
+      <AlertDescription>
+        Un rol de tipo «{TIPOS_ROL_ETIQUETA[tipo]}» solo admite los permisos{" "}
+        {PORTAL[tipo]}, que alcanzan únicamente los datos de su propia
+        organización. Los del equipo interno no se ofrecen.
+      </AlertDescription>
+    </Alert>
+  )
+}
 
 function ResumenMatriz({
   marcados,
+  total,
+  interno,
   sensibles,
   color,
 }: {
   marcados: number
+  /** Permisos que el rol admite (todo el catálogo si es interno). */
+  total: number
+  interno: boolean
   sensibles: number
   color: string
 }) {
@@ -113,14 +167,13 @@ function ResumenMatriz({
             <NumeroAnimado valor={marcados} />
           </span>
           <span className="text-sm text-muted-foreground">
-            de {TOTAL_PERMISOS} permisos del catálogo
+            de {total}{" "}
+            {interno
+              ? "permisos del catálogo"
+              : "permisos disponibles para su tipo"}
           </span>
         </p>
-        <BarraCobertura
-          cantidad={marcados}
-          total={TOTAL_PERMISOS}
-          color={color}
-        />
+        <BarraCobertura cantidad={marcados} total={total} color={color} />
       </div>
       <dl className="flex gap-6 text-sm">
         <div className="flex flex-col gap-0.5">
@@ -130,7 +183,7 @@ function ResumenMatriz({
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-muted-foreground">Cobertura</dt>
           <dd className="font-semibold cifras">
-            {Math.round((marcados / TOTAL_PERMISOS) * 100)}%
+            {Math.min(100, Math.round((marcados / total) * 100))}%
           </dd>
         </div>
       </dl>
@@ -182,6 +235,19 @@ export function MatrizPermisos({
   const [destino, setDestino] = useState<string | null>(null)
 
   const original = useMemo(() => new Set<string>(rol.permisos), [rol.permisos])
+  // Lo que el tipo del rol admite, más lo que ya tenga aunque no lo admita
+  // (debe verse para poder retirarlo).
+  const universo = useMemo(
+    () =>
+      new Set(
+        CLAVES_PERMISO.filter(
+          (clave) => esAplicable(rol.tipo, clave) || original.has(clave)
+        )
+      ),
+    [rol.tipo, original]
+  )
+  const porModulo = useMemo(() => permisosPorModulo(universo), [universo])
+  const ajenos = noAplicables(rol.tipo, rol.permisos).length
   const diff = useMemo(
     () => calcularDiff(rol.permisos, seleccion),
     [rol.permisos, seleccion]
@@ -189,8 +255,13 @@ export function MatrizPermisos({
   const cambios = totalCambios(diff)
 
   const puedeTocar = useCallback(
-    (clave: ClavePermiso) => editable && puedeOtorgar(actor, clave),
-    [editable, actor]
+    (clave: ClavePermiso) =>
+      editable && universo.has(clave) && puedeOtorgar(actor, clave),
+    [editable, universo, actor]
+  )
+  const esAjeno = useCallback(
+    (clave: ClavePermiso) => !esAplicable(rol.tipo, clave),
+    [rol.tipo]
   )
   const cambioDe = useCallback(
     (clave: ClavePermiso): CambioPermiso => {
@@ -220,7 +291,7 @@ export function MatrizPermisos({
   }, [cambios])
 
   function visible(clave: ClavePermiso): boolean {
-    if (!coincideBusqueda(clave, busqueda)) return false
+    if (!universo.has(clave) || !coincideBusqueda(clave, busqueda)) return false
     const cambiado = cambioDe(clave) !== null
     switch (filtro) {
       case "otorgados":
@@ -252,8 +323,15 @@ export function MatrizPermisos({
     })
   }
 
+  // "Todos" no toca los permisos que el tipo no admite: esos solo se retiran uno a uno.
   function alternarModulo(permisos: readonly ClavePermiso[]) {
-    setSeleccion((actual) => alternarGrupo(actual, permisos, puedeTocar))
+    setSeleccion((actual) =>
+      alternarGrupo(
+        actual,
+        permisos,
+        (clave) => puedeTocar(clave) && !esAjeno(clave)
+      )
+    )
   }
 
   function contraer(modulo: string) {
@@ -299,7 +377,7 @@ export function MatrizPermisos({
     {
       valor: "sin_otorgar",
       etiqueta: "Sin otorgar",
-      cantidad: TOTAL_PERMISOS - seleccion.size,
+      cantidad: universo.size - seleccion.size,
     },
     { valor: "sensibles", etiqueta: "Sensibles ★" },
   ] as const
@@ -315,42 +393,25 @@ export function MatrizPermisos({
         </Alert>
       ) : null}
       {rol.tipo !== "ADMIN" ? (
-        <Alert className="border-info/40 bg-info/8">
-          <Info className="text-info" aria-hidden />
-          <AlertDescription>{AVISO_EXTERNOS}</AlertDescription>
-        </Alert>
+        <AvisoExterno tipo={rol.tipo} ajenos={ajenos} />
       ) : null}
 
       <ResumenMatriz
         marcados={seleccion.size}
+        total={totalAplicables(rol.tipo)}
+        interno={rol.tipo === "ADMIN"}
         sensibles={contarSensibles([...seleccion])}
         color={rol.color}
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <InputGroup className="lg:max-w-80">
-          <InputGroupAddon>
-            <Search aria-hidden />
-          </InputGroupAddon>
-          <InputGroupInput
-            type="search"
-            aria-label="Buscar permisos"
-            placeholder="Buscar permisos o módulos"
-            value={busqueda}
-            onChange={(evento) => setBusqueda(evento.target.value)}
-          />
-          {busqueda ? (
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton
-                size="icon-xs"
-                aria-label="Limpiar búsqueda"
-                onClick={() => setBusqueda("")}
-              >
-                <X aria-hidden />
-              </InputGroupButton>
-            </InputGroupAddon>
-          ) : null}
-        </InputGroup>
+        <CampoBusqueda
+          etiqueta="Buscar permisos"
+          placeholder="Buscar permisos o módulos"
+          valor={busqueda}
+          onCambio={setBusqueda}
+          className="lg:max-w-80"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <ControlSegmentado<Filtro>
             etiqueta="Filtrar permisos"
@@ -399,7 +460,7 @@ export function MatrizPermisos({
         <div className="flex flex-col gap-8">
           {areas.map((area) => {
             const delArea = area.modulos.flatMap(
-              (modulo) => PERMISOS_POR_MODULO.get(modulo.modulo) ?? []
+              (modulo) => porModulo.get(modulo.modulo) ?? []
             )
             const marcadosArea = delArea.filter((clave) =>
               seleccion.has(clave)
@@ -412,12 +473,12 @@ export function MatrizPermisos({
               >
                 <header className="flex items-end justify-between gap-4 border-b pb-2">
                   <div className="flex min-w-0 flex-col gap-0.5">
-                    <h3
+                    <h2
                       id={`area-${area.id}`}
                       className="text-[0.6875rem] font-semibold tracking-[0.08em] text-primary uppercase"
                     >
                       {area.titulo}
-                    </h3>
+                    </h2>
                     <p className="text-sm text-muted-foreground">
                       {area.descripcion}
                     </p>
@@ -432,13 +493,11 @@ export function MatrizPermisos({
                       key={modulo.modulo}
                       modulo={modulo.modulo}
                       titulo={modulo.titulo}
-                      permisos={
-                        PERMISOS_POR_MODULO.get(modulo.modulo) ??
-                        modulo.permisos
-                      }
+                      permisos={porModulo.get(modulo.modulo) ?? modulo.permisos}
                       visibles={modulo.permisos}
                       seleccion={seleccion}
                       cambioDe={cambioDe}
+                      esAjeno={esAjeno}
                       editable={editable}
                       puedeTocar={puedeTocar}
                       color={rol.color}

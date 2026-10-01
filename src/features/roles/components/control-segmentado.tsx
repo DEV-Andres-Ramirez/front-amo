@@ -69,7 +69,9 @@ export function ControlSegmentado<T extends string>({
               <span
                 className={cn(
                   "relative rounded-full px-1.5 text-[0.6875rem] leading-4 cifras max-sm:hidden",
-                  activa ? "bg-primary/12 text-primary" : "bg-foreground/5"
+                  activa
+                    ? "bg-primary/12 text-primary dark:bg-primary/25 dark:text-foreground"
+                    : "bg-foreground/5"
                 )}
               >
                 {opcion.cantidad}

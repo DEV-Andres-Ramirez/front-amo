@@ -43,6 +43,11 @@ export function formatearValorGeo(
   }
 }
 
+/** Participación de una zona en el total ("12,1 %"). */
+export function formatearParticipacion(fraccion: number): string {
+  return formatearPorcentaje(fraccion, 1)
+}
+
 function decimalesTasa(valor: number): number {
   if (valor < 10) return 2
   return valor < 100 ? 1 : 0

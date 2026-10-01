@@ -178,19 +178,24 @@ export interface CapaGeometria {
   readonly coleccion: GeometriaNivel
 }
 
+const MENSAJE_GEOMETRIA =
+  "No pudimos descargar los límites de las zonas. Revisa tu conexión e intenta de nuevo."
+
 async function pedirGeometria(
   url: string,
   signal?: AbortSignal
 ): Promise<CapaGeometria> {
-  const respuesta = await fetch(url, { signal })
-  if (!respuesta.ok) {
-    throw new ErrorConsultaGeo(
-      respuesta.status,
-      "fallo",
-      "No pudimos cargar los límites del mapa. Intenta de nuevo."
-    )
+  try {
+    const respuesta = await fetch(url, { signal })
+    if (!respuesta.ok) {
+      throw new ErrorConsultaGeo(respuesta.status, "fallo", MENSAJE_GEOMETRIA)
+    }
+    return { url, coleccion: (await respuesta.json()) as GeometriaNivel }
+  } catch (error) {
+    if (signal?.aborted || error instanceof ErrorConsultaGeo) throw error
+    // Red caída o JSON corrupto: el mensaje del navegador llega en inglés.
+    throw new ErrorConsultaGeo(0, "fallo", MENSAJE_GEOMETRIA)
   }
-  return { url, coleccion: (await respuesta.json()) as GeometriaNivel }
 }
 
 const opcionesGeometria = (url: string) => ({
@@ -199,6 +204,7 @@ const opcionesGeometria = (url: string) => ({
   // Archivos versionados con el código: no cambian durante la sesión.
   staleTime: Infinity,
   gcTime: 30 * 60_000,
+  retry: reintentar,
 })
 
 /**

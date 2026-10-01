@@ -42,3 +42,21 @@ export function aplicarAConteo(
   const delta = cambio.leida ? -cambian.length : cambian.length
   return { ...conteo, total: Math.max(0, conteo.total + delta) }
 }
+
+/**
+ * Estado de lectura que muestra la bandeja: la marca hecha en esta visita, si
+ * la hay; si no, lo que dijo el servidor o «Marcar todas» (que solo alcanza a
+ * las creadas hasta ese instante: las que lleguen después siguen sin leer).
+ */
+export function leidaEnBandeja(
+  notificacion: Notificacion,
+  marcas: ReadonlyMap<number, boolean>,
+  todasLeidasHasta: number | null
+): boolean {
+  return (
+    marcas.get(notificacion.id) ??
+    (notificacion.leida ||
+      (todasLeidasHasta !== null &&
+        Date.parse(notificacion.creadaAt) <= todasLeidasHasta))
+  )
+}

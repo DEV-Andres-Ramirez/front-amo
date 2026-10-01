@@ -20,8 +20,8 @@ import { listarNotificaciones } from "./queries"
 import type { PaginaNotificaciones } from "./tipos"
 
 const PERMISO = "notificaciones.ver"
-const MENSAJE_INESPERADO =
-  "No pudimos actualizar tus notificaciones. Intenta de nuevo en unos segundos."
+/** Va como detalle bajo el título del aviso («No pudimos marcar…»). */
+const MENSAJE_INESPERADO = "Intenta de nuevo en unos segundos."
 
 function informar(operacion: string, error: unknown): void {
   const codigo =

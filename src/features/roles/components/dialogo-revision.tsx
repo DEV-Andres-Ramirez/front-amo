@@ -164,7 +164,7 @@ export function DialogoRevision({
 
           <div className="flex flex-col gap-4">
             {grupos.map((grupo) => (
-              <section key={grupo.modulo} aria-label={grupo.titulo}>
+              <div key={grupo.modulo}>
                 <h3 className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                   {grupo.titulo}
                 </h3>
@@ -176,7 +176,7 @@ export function DialogoRevision({
                     <LineaCambio key={clave} clave={clave} tipo="quitar" />
                   ))}
                 </ul>
-              </section>
+              </div>
             ))}
           </div>
 

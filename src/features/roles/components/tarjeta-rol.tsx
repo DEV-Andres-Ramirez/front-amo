@@ -4,7 +4,8 @@ import Link from "next/link"
 import { formatearNumero } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-import { contarSensibles, TOTAL_PERMISOS } from "../catalogo"
+import { contarSensibles } from "../catalogo"
+import { noAplicables, totalAplicables } from "../reglas"
 import { rutaRol } from "../rutas"
 import type { ActorRoles, RolListado } from "../tipos"
 import {
@@ -13,6 +14,7 @@ import {
   IconoRol,
   InsigniaMfa,
   InsigniaOrigen,
+  InsigniaRevisar,
   InsigniaTipo,
 } from "./distintivos-rol"
 import { MenuAccionesRol } from "./menu-acciones-rol"
@@ -51,6 +53,8 @@ export function TarjetaRol({
   indice: number
 }) {
   const sensibles = contarSensibles(rol.permisos)
+  const total = totalAplicables(rol.tipo)
+  const ajenos = noAplicables(rol.tipo, rol.permisos).length
   const usuarios =
     rol.usuarios === null
       ? {
@@ -115,6 +119,7 @@ export function TarjetaRol({
           <InsigniaTipo tipo={rol.tipo} />
           <InsigniaOrigen esSistema={rol.esSistema} />
           {rol.requiereMfa ? <InsigniaMfa /> : null}
+          {ajenos > 0 ? <InsigniaRevisar cantidad={ajenos} /> : null}
         </div>
       </div>
 
@@ -123,7 +128,7 @@ export function TarjetaRol({
           <Cifra Icono={Users} {...usuarios} />
           <Cifra
             Icono={ListChecks}
-            valor={`${formatearNumero(rol.permisos.length)}/${formatearNumero(TOTAL_PERMISOS)}`}
+            valor={`${formatearNumero(rol.permisos.length)}/${formatearNumero(total)}`}
             etiqueta={sensibles > 0 ? `permisos · ${sensibles} ★` : "permisos"}
             titulo={
               sensibles > 0
@@ -134,7 +139,7 @@ export function TarjetaRol({
         </div>
         <BarraCobertura
           cantidad={rol.permisos.length}
-          total={TOTAL_PERMISOS}
+          total={total}
           color={rol.color}
         />
       </footer>

@@ -27,6 +27,7 @@ import {
   ejeCategorias,
   ejeValores,
   fuente,
+  maximoConMargen,
   opcionesTooltip,
   rangoConHolgura,
   retardoEscalonado,
@@ -170,12 +171,19 @@ export function GraficoCombo({
       layout: { padding: { top: 4, right: 8 } },
       scales: {
         x: ejeCategorias(tema),
+        // Las columnas nacen de la línea base del eje X (sin `offset`: en
+        // una escala lineal desplaza el cero media marca hacia arriba). El
+        // aire entre bandas sale del `offset` de la línea y de un margen
+        // sobre la columna más alta, sin marca en ese borde (no sería una
+        // cifra redonda): la última marca de las columnas no queda pegada a
+        // la primera de la línea.
         [EJE_BARRAS]: {
           ...ejeBarras,
+          max: maximoConMargen(barras.valores),
+          ticks: { ...ejeBarras.ticks, includeBounds: false },
           position: "left",
           stack: "combo",
           stackWeight: 3,
-          offset: true,
           title: tituloEje(tema, barras.nombre),
         },
         [EJE_LINEA]: {
@@ -186,7 +194,6 @@ export function GraficoCombo({
           stack: "combo",
           stackWeight: 2,
           offset: true,
-          border: { display: true, color: tema.eje },
           title: tituloEje(tema, linea.nombre),
         },
       },
@@ -199,6 +206,7 @@ export function GraficoCombo({
     tema,
     barras.formato,
     barras.nombre,
+    barras.valores,
     linea.formato,
     linea.nombre,
     linea.valores,

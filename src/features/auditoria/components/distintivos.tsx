@@ -39,7 +39,8 @@ export const CLASES_TONO: Readonly<
   marca: { suave: "bg-primary/12 text-primary", punto: "bg-primary" },
   exito: { suave: "bg-success/12 text-success", punto: "bg-success" },
   info: { suave: "bg-info/12 text-info", punto: "bg-info" },
-  aviso: { suave: "bg-warning/14 text-warning", punto: "bg-warning" },
+  // 10 %: con más tinte, el ámbar del tema claro baja de 4.5:1 en texto de 11–12 px.
+  aviso: { suave: "bg-warning/10 text-warning", punto: "bg-warning" },
   peligro: {
     suave: "bg-destructive/12 text-destructive",
     punto: "bg-destructive",

@@ -1,5 +1,6 @@
 "use client"
 
+import { Slider as SliderPrimitive } from "@base-ui/react/slider"
 import { Move, RotateCcw, ZoomIn, ZoomOut } from "lucide-react"
 import {
   type KeyboardEvent,
@@ -10,7 +11,6 @@ import {
 } from "react"
 
 import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 
 import {
@@ -27,6 +27,52 @@ import {
 export const LADO_VISOR = 272
 const PASO_TECLADO = 12
 const PASO_ZOOM = 0.1
+
+const formatoPorcentaje = new Intl.NumberFormat("es-CO", {
+  style: "percent",
+  maximumFractionDigits: 0,
+})
+
+/**
+ * Control de acercamiento. Se compone sobre Base UI (y no sobre
+ * `components/ui/slider`) para dar nombre accesible al propio control
+ * deslizante: la etiqueta del grupo no llega al `input` del pulgar.
+ */
+function ControlAcercamiento({
+  zoom,
+  deshabilitado,
+  onCambio,
+}: {
+  zoom: number
+  deshabilitado: boolean
+  onCambio: (zoom: number) => void
+}) {
+  return (
+    <SliderPrimitive.Root
+      value={zoom}
+      min={ZOOM_MINIMO}
+      max={ZOOM_MAXIMO}
+      step={0.01}
+      disabled={deshabilitado}
+      thumbAlignment="edge"
+      onValueChange={(valor) =>
+        onCambio(Array.isArray(valor) ? valor[0] : valor)
+      }
+      className="min-w-0 flex-1"
+    >
+      <SliderPrimitive.Control className="relative flex w-full touch-none items-center py-2 select-none data-disabled:opacity-50">
+        <SliderPrimitive.Track className="relative h-1 grow overflow-hidden rounded-full bg-foreground/15 select-none">
+          <SliderPrimitive.Indicator className="h-full bg-primary select-none" />
+        </SliderPrimitive.Track>
+        <SliderPrimitive.Thumb
+          aria-label="Acercamiento"
+          getAriaValueText={(_, valor) => formatoPorcentaje.format(valor)}
+          className="relative block size-3.5 shrink-0 rounded-full border border-ring bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3"
+        />
+      </SliderPrimitive.Control>
+    </SliderPrimitive.Root>
+  )
+}
 
 interface RecortadorAvatarProps {
   url: string
@@ -173,7 +219,7 @@ export function RecortadorAvatar({
         <span
           aria-hidden
           className={cn(
-            "pointer-events-none absolute bottom-2.5 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[0.6875rem] font-medium text-white backdrop-blur-sm transition-opacity",
+            "pointer-events-none absolute bottom-2.5 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[0.6875rem] font-medium whitespace-nowrap text-white backdrop-blur-sm transition-opacity",
             arrastrando ? "opacity-0" : "opacity-100"
           )}
         >
@@ -187,19 +233,10 @@ export function RecortadorAvatar({
           aria-hidden
           className="size-4 shrink-0 text-muted-foreground"
         />
-        <Slider
-          aria-label="Acercamiento"
-          min={ZOOM_MINIMO}
-          max={ZOOM_MAXIMO}
-          step={0.01}
-          value={[encuadre.zoom]}
-          disabled={deshabilitado}
-          onValueChange={(valor) =>
-            fijar({
-              ...encuadre,
-              zoom: Array.isArray(valor) ? valor[0] : valor,
-            })
-          }
+        <ControlAcercamiento
+          zoom={encuadre.zoom}
+          deshabilitado={deshabilitado}
+          onCambio={(zoom) => fijar({ ...encuadre, zoom })}
         />
         <ZoomIn aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         <Button

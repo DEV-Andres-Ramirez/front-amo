@@ -94,6 +94,60 @@ describe("componerImagenGrafico", () => {
     expect(resultado.height).toBe(300 + 48 + 52 + 22)
   })
 
+  it("dibuja la leyenda arriba en gráficos anchos", () => {
+    const leyenda = [
+      { nombre: "GMV", color: "#8c66ee", marca: "bloque" as const },
+      { nombre: "Take rate", color: "#d95926", marca: "linea" as const },
+    ]
+    const resultado = componerImagenGrafico(lienzo(600, 300), {
+      estilo: ESTILO,
+      leyenda,
+      conSello: false,
+    })
+    // Una fila de 18 px + 12 de separación; el ancho no cambia.
+    expect(resultado.width).toBe(648)
+    expect(resultado.height).toBe(300 + 48 + 30)
+  })
+
+  it("en gráficos casi cuadrados (dona) la leyenda va al lado", () => {
+    const leyenda = ["A", "B", "C"].map((nombre) => ({
+      nombre,
+      color: "#8c66ee",
+      marca: "bloque" as const,
+      valor: "10 %",
+    }))
+    const resultado = componerImagenGrafico(lienzo(240, 240), {
+      estilo: ESTILO,
+      leyenda,
+      conSello: false,
+    })
+    expect(resultado.width).toBeGreaterThan(240 + 48 + 24)
+    expect(resultado.height).toBe(240 + 48)
+  })
+
+  it("la disposición pedida manda sobre la forma del gráfico", () => {
+    const leyenda = [
+      { nombre: "GMV", color: "#8c66ee", marca: "bloque" as const },
+    ]
+    // Combo estirado por su fila (casi cuadrado): la leyenda sigue arriba.
+    const arriba = componerImagenGrafico(lienzo(400, 380), {
+      estilo: ESTILO,
+      leyenda,
+      leyendaAlLado: false,
+      conSello: false,
+    })
+    expect(arriba.width).toBe(400 + 48)
+    expect(arriba.height).toBe(380 + 48 + 30)
+    const alLado = componerImagenGrafico(lienzo(900, 300), {
+      estilo: ESTILO,
+      leyenda,
+      leyendaAlLado: true,
+      conSello: false,
+    })
+    expect(alLado.width).toBeGreaterThan(900 + 48 + 24)
+    expect(alLado.height).toBe(300 + 48)
+  })
+
   it("respeta la densidad del lienzo (devicePixelRatio)", () => {
     const resultado = componerImagenGrafico(lienzo(1200, 600, 600), {
       estilo: ESTILO,

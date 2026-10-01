@@ -53,6 +53,25 @@ export function describirNavegador(
   return navegador
 }
 
+// ── Factores de verificación ─────────────────────────────────────────────────
+
+/**
+ * Prefijo del nombre que pone `iniciarFactorMfa`: Supabase exige nombres
+ * únicos por cuenta y la fecha los distingue, pero en pantalla sobra (la
+ * fecha de alta ya se muestra aparte).
+ */
+export const PREFIJO_FACTOR_AUTOMATICO = "Autenticador · "
+
+/** «App autenticadora» para los nombres automáticos; los demás, tal cual. */
+export function nombreVisibleFactor(
+  nombre: string | null | undefined,
+  indice: number
+): string {
+  const limpio = nombre?.trim()
+  if (limpio && !limpio.startsWith(PREFIJO_FACTOR_AUTOMATICO)) return limpio
+  return indice === 0 ? "App autenticadora" : `App autenticadora ${indice + 1}`
+}
+
 // ── Actividad propia (`mi_actividad`) ───────────────────────────────────────
 
 export type TonoActividad = "seguridad" | "edicion" | "datos" | "neutro"

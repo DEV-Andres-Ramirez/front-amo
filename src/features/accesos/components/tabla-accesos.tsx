@@ -161,8 +161,9 @@ function CeldaEvento({ fila }: { fila: AccesoFila }) {
         resultado={fila.resultado}
         className="mt-0.5"
       />
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pt-0.5">
-        <span className="min-w-0">{fila.etiquetaEvento}</span>
+      {/* Envuelve: en la tarjeta móvil la celda mide media tarjeta. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 whitespace-normal">
+        <span className="min-w-0 break-words">{fila.etiquetaEvento}</span>
         <InsigniaResultado resultado={fila.resultado} />
         {fila.sospechoso ? (
           <InsigniaSospecha motivo={fila.motivoSospecha} />

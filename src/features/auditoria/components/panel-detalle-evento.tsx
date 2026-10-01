@@ -376,7 +376,8 @@ export function PanelDetalleEvento({
               </SheetClose>
             </SheetHeader>
 
-            <Cuerpo evento={evento} />
+            {/* Con `key`, otro evento empieza arriba y con los campos vacíos plegados. */}
+            <Cuerpo key={evento.id} evento={evento} />
 
             <SheetFooter
               className={cn(

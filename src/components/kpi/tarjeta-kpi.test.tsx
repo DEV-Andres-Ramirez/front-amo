@@ -61,6 +61,8 @@ describe("TarjetaKpi", () => {
       />
     )
     expect(screen.getByText("n = 7 · muestra pequeña")).toBeInTheDocument()
+    // La variación se informa en tono neutro: con n chico no es una mejora.
+    expect(screen.getByText("+2,0 pp").parentElement).toHaveClass("bg-muted")
   })
 
   it("sin datos en el periodo muestra una raya", () => {

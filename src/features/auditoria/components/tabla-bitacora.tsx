@@ -171,7 +171,13 @@ export function TablaBitacora({ filas, total, opciones }: TablaBitacoraProps) {
           id: "origen",
           header: "Origen",
           meta: { titulo: "Origen", ocultarBajo: "xl", tarjeta: "oculta" },
-          cell: ({ row }) => <InsigniaOrigen origen={row.original.origen} />,
+          // Lo habitual (la app) va en texto discreto; los demás orígenes resaltan.
+          cell: ({ row }) =>
+            row.original.origen === "APP" ? (
+              <span className="text-xs text-muted-foreground">Aplicación</span>
+            ) : (
+              <InsigniaOrigen origen={row.original.origen} />
+            ),
         }),
         columna.accessor((fila) => fila.at, {
           id: "fecha",

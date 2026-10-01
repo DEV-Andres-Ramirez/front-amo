@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Lock, Minus, Star } from "lucide-react"
+import { Check, Lock, Minus, Star, TriangleAlert } from "lucide-react"
 
 import { Switch } from "@/components/ui/switch"
 import {
@@ -45,7 +45,7 @@ function EstadoLectura({ marcado }: { marcado: boolean }) {
     <span
       role="img"
       aria-label="No otorgado"
-      className="grid size-6 place-items-center rounded-full text-muted-foreground/60"
+      className="grid size-6 place-items-center rounded-full text-muted-foreground"
     >
       <Minus className="size-3.5" aria-hidden />
     </span>
@@ -57,13 +57,13 @@ const MARCA_CAMBIO = {
     texto: "Se otorgará",
     fila: "bg-success/6",
     acento: "bg-success",
-    insignia: "bg-success/12 text-success",
+    insignia: "bg-card text-success ring-1 ring-success/30 ring-inset",
   },
   quitado: {
     texto: "Se retirará",
     fila: "bg-destructive/6",
     acento: "bg-destructive",
-    insignia: "bg-destructive/10 text-destructive",
+    insignia: "bg-card text-destructive ring-1 ring-destructive/30 ring-inset",
   },
 } as const
 
@@ -77,6 +77,7 @@ export function FilaPermiso({
   clave,
   marcado,
   cambio,
+  ajeno = false,
   editable,
   bloqueado,
   onAlternar,
@@ -84,6 +85,8 @@ export function FilaPermiso({
   clave: ClavePermiso
   marcado: boolean
   cambio: CambioPermiso
+  /** El tipo del rol no admite este permiso: se muestra para poder retirarlo. */
+  ajeno?: boolean
   /** El rol admite edición (no es de sistema, ni propio, y el actor gestiona roles). */
   editable: boolean
   /** Editable, pero el actor no tiene este permiso. */
@@ -134,10 +137,19 @@ export function FilaPermiso({
           </p>
         )}
         <div className="flex flex-wrap items-center gap-1.5">
-          <code className="font-mono text-[0.6875rem] text-muted-foreground/80">
+          <code className="font-mono text-[0.6875rem] text-muted-foreground">
             {clave}
           </code>
           {esSensible ? <InsigniaSensible /> : null}
+          {ajeno ? (
+            <span
+              className="inline-flex h-4.5 items-center gap-1 rounded-full bg-destructive/10 px-1.5 text-[0.6875rem] font-medium text-destructive"
+              title="Permiso del equipo interno: en un rol externo abre datos de toda la plataforma"
+            >
+              <TriangleAlert className="size-2.5" aria-hidden />
+              No corresponde a su tipo
+            </span>
+          ) : null}
           {marca ? (
             <span
               className={cn(

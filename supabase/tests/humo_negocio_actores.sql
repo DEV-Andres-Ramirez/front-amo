@@ -48,6 +48,8 @@ begin
   insert into public.medios (id, nombre, tipo, municipio_codigo, lon, lat)
   values (me_a, 'Noticias Humo A', 'PAGINA_NOTICIAS', '05001', -75.5812, 6.2442),
          (me_b, 'Noticias Humo B', 'CREADOR', '76001', -76.5320, 3.4516);
+  -- Desde M7 el estado de un perfil solo cambia por aplicar_transicion: la preparación (owner) lo simula.
+  perform set_config('amo.transicion_autorizada', 'on', true);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'ADMIN'), estado = 'ACTIVO',
          debe_cambiar_password = false where id in (u_adm, u_tmp);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'FINANZAS'), estado = 'ACTIVO',
@@ -56,6 +58,7 @@ begin
          debe_cambiar_password = false, anunciante_id = case id when u_ana then an_a else an_b end where id in (u_ana, u_anb);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'MEDIO'), estado = 'ACTIVO',
          debe_cambiar_password = false, medio_id = case id when u_mea then me_a else me_b end where id in (u_mea, u_meb);
+  perform set_config('amo.transicion_autorizada', '', true);
   insert into auth.sessions (id, user_id, created_at, updated_at, aal) values
     (s_adm1, u_adm, now(), now(), 'aal1'), (s_adm2, u_adm, now(), now(), 'aal2'), (s_fin, u_fin, now(), now(), 'aal2'),
     (s_ana, u_ana, now(), now(), 'aal1'), (s_anb, u_anb, now(), now(), 'aal1'),
@@ -312,8 +315,12 @@ begin
                                            and cambios ->> 'contacto_email' = 'c***@humo-a.test' and actor_id = u_ana));
 
   -- ── (d) Verificación de cuenta: aprobación (efecto de transicionar_srv, M7) ────────────────────────
-  perform set_config('amo.actor_id', u_adm::text, true);
-  update public.verificaciones_cuenta set estado_validacion = 'APROBADA' where id = v_ver;
+  -- Desde M7 la aprobación va por transicionar_srv (servidor, admin aal2 con medios.verificar).
+  perform set_config('request.jwt.claims', '{"role": "service_role"}', true);
+  execute 'set local role service_role';
+  perform public.transicionar_srv('verificaciones_cuenta', v_ver, 'APROBADA', u_adm, s_adm2);
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
   perform set_config('amo.actor_id', '', true);
   select * into v_rec from public.cuentas_sociales where id = v_cuenta;
   r := r || jsonb_build_object('d1_aprobar_deriva_la_cuenta',

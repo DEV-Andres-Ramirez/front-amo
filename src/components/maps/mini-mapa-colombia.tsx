@@ -145,9 +145,11 @@ export function MiniMapaColombia({
                 d={PATHS_DEPARTAMENTOS[codigo]}
                 style={sinDato ? undefined : estiloDe(codigo)}
                 fill={sinDato ? `url(#${patron})` : undefined}
-                tabIndex={enlazar ? 0 : -1}
-                role={enlazar ? "link" : undefined}
-                aria-label={enlazar ? texto : undefined}
+                // Sin enlaces, cada departamento sigue siendo legible (nombre y
+                // cifra) para lectores de pantalla, sin ser un control.
+                tabIndex={enlazar ? 0 : undefined}
+                role={enlazar ? "link" : "img"}
+                aria-label={texto}
                 onPointerEnter={() => setHover(codigo)}
                 onPointerLeave={() => setHover(null)}
                 onFocus={() => setHover(codigo)}
@@ -180,8 +182,9 @@ export function MiniMapaColombia({
           })}
         </svg>
 
+        {/* Lectura visual del puntero; el nombre accesible de cada zona ya la trae. */}
         <div
-          aria-live="polite"
+          aria-hidden
           className={cn(
             "vidrio pointer-events-none absolute right-2 bottom-2 rounded-lg px-2.5 py-1.5 text-xs shadow-sm transition-opacity duration-200",
             departamentoActivo ? "opacity-100" : "opacity-0"

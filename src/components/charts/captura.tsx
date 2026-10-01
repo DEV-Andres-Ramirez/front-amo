@@ -18,14 +18,16 @@ import type { ModoTema } from "./paleta"
 import { construirTemaGraficos, estiloLienzo } from "./tema"
 import { ContextoTemaForzado } from "./use-tema-graficos"
 
-export interface OpcionesCaptura extends Pick<
+type Composicion = Pick<
   OpcionesImagenGrafico,
-  "titulo" | "descripcion" | "pie"
-> {
+  "titulo" | "descripcion" | "pie" | "conSello"
+>
+
+export interface OpcionesCaptura extends Composicion {
   /** Tamaño CSS del área del gráfico. */
   ancho?: number
   alto?: number
-  /** Tema del documento: los PDF son claros aunque la app esté en oscuro. */
+  /** Tema de la imagen: los PDF van en claro aunque la app esté en oscuro. */
   modo?: ModoTema
   /** Píxeles por punto CSS (2 = nítido al imprimir). */
   densidad?: number
@@ -54,28 +56,7 @@ async function esperarLienzo(
   throw new Error("El gráfico no se dibujó a tiempo para la captura")
 }
 
-/**
- * Dibuja un gráfico fuera de pantalla en el tema pedido (claro por defecto),
- * sin animación y a doble densidad, y devuelve su imagen con leyenda y marca
- * para incrustarla en un PDF (`SeccionPdf` de tipo "imagen").
- *
- * @example
- * const imagen = await capturarGrafico(
- *   <GraficoCombo titulo="GMV y take rate" etiquetas={meses} barras={…} linea={…} />,
- *   { ancho: 960, alto: 380 }
- * )
- */
-export async function capturarGrafico(
-  grafico: ReactNode,
-  {
-    ancho = 960,
-    alto = 380,
-    modo = "claro",
-    densidad = 2,
-    esperaMaximaMs = 4000,
-    ...composicion
-  }: OpcionesCaptura = {}
-): Promise<ImagenPng> {
+function contenedorFueraDePantalla(ancho: number, alto: number) {
   const contenedor = document.createElement("div")
   contenedor.setAttribute("aria-hidden", "true")
   Object.assign(contenedor.style, {
@@ -87,11 +68,36 @@ export async function capturarGrafico(
     pointerEvents: "none",
   })
   document.body.append(contenedor)
+  return contenedor
+}
+
+/**
+ * Dibuja un gráfico fuera de pantalla en el tema pedido (claro por defecto),
+ * sin animación y a doble densidad, y devuelve el lienzo compuesto con su
+ * leyenda. Lo usa "Exportar PNG"; para documentos, `capturarGrafico`.
+ */
+export async function capturarLienzo(
+  grafico: ReactNode,
+  {
+    ancho = 960,
+    alto = 380,
+    modo = "claro",
+    densidad = 2,
+    esperaMaximaMs = 4000,
+    conSello = false,
+    ...composicion
+  }: OpcionesCaptura = {}
+): Promise<HTMLCanvasElement> {
+  // Salir del contexto síncrono del llamador: dentro de una acción de
+  // `useTransition`, React retendría este render hasta que la acción
+  // termine (y la acción espera a este render).
+  await siguienteCuadro()
+  const contenedor = contenedorFueraDePantalla(ancho, alto)
   const raiz = createRoot(contenedor)
   // Objeto contenedor: el gráfico se registra desde un efecto (otro turno).
   const captura: { grafico: GraficoRegistrado | null } = { grafico: null }
-  const registrar = (grafico: GraficoRegistrado | null) => {
-    if (grafico) captura.grafico = grafico
+  const registrar = (registrado: GraficoRegistrado | null) => {
+    if (registrado) captura.grafico = registrado
   }
 
   try {
@@ -109,15 +115,32 @@ export async function capturarGrafico(
     const fuente = getComputedStyle(document.documentElement).getPropertyValue(
       "--font-geist-sans"
     )
-    const compuesto = componerImagenGrafico(lienzo, {
+    return componerImagenGrafico(lienzo, {
       estilo: estiloLienzo(construirTemaGraficos({ modo, fuente })),
       leyenda: captura.grafico?.leyenda,
-      conSello: false,
+      leyendaAlLado: captura.grafico?.leyendaAlLado,
+      conSello,
       ...composicion,
     })
-    return lienzoAPng(compuesto)
   } finally {
     raiz.unmount()
     contenedor.remove()
   }
+}
+
+/**
+ * Imagen de un gráfico para incrustar en un PDF (`SeccionPdf` de tipo
+ * "imagen"): en claro, sin animación, a doble densidad y con su leyenda.
+ *
+ * @example
+ * const imagen = await capturarGrafico(
+ *   <GraficoCombo titulo="GMV y take rate" etiquetas={meses} barras={…} linea={…} />,
+ *   { ancho: 960, alto: 380 }
+ * )
+ */
+export async function capturarGrafico(
+  grafico: ReactNode,
+  opciones: OpcionesCaptura = {}
+): Promise<ImagenPng> {
+  return lienzoAPng(await capturarLienzo(grafico, opciones))
 }

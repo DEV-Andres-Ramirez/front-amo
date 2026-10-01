@@ -84,7 +84,7 @@ function AyudaKpi({
         openOnHover
         delay={250}
         aria-label={`Qué es ${definicion.nombre}`}
-        className="relative z-10 grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:anillo-foco"
+        className="relative z-10 -m-0.5 grid size-6 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:anillo-foco"
       >
         <Info aria-hidden className="size-3.5" />
       </PopoverTrigger>
@@ -123,9 +123,10 @@ function EsqueletoContenido() {
         <Esqueleto className="size-7 rounded-lg" />
       </div>
       <Esqueleto className="h-7 w-32" />
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex items-end justify-between gap-3">
         <Esqueleto className="h-5 w-16" />
-        <Esqueleto className="h-8 w-20" />
+        {/* Mismo ancho que la sparkline real (más angosta en móvil). */}
+        <Esqueleto className="h-8 w-14 sm:w-20" />
       </div>
     </>
   )
@@ -183,7 +184,7 @@ export function TarjetaKpi({
   return (
     <article className={clases} style={estilo}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-1">
+        <div className="flex min-w-0 items-start gap-1 max-sm:min-h-10">
           <h3 className="line-clamp-2 min-w-0 text-[0.8125rem] leading-5 font-medium text-pretty text-muted-foreground">
             {href ? (
               <Link
@@ -250,7 +251,9 @@ export function TarjetaKpi({
               <span
                 className={cn(
                   "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold cifras whitespace-nowrap",
-                  TONOS[delta.tono]
+                  // Con muestra pequeña la variación se informa sin juzgarla
+                  // (docs/kpis.md §0.4): comparar grupos chicos engaña.
+                  TONOS[muestraInsuficiente ? "neutro" : delta.tono]
                 )}
               >
                 <IconoTendencia tipo={delta.tipo} tendencia={delta.tendencia} />

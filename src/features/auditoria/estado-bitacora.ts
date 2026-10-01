@@ -77,8 +77,18 @@ export type VistaBitacora = (typeof VISTAS_BITACORA)[number]
 export const parseAsVista =
   parseAsStringLiteral(VISTAS_BITACORA).withDefault("tabla")
 
-/** Evento abierto en el panel de detalle (solo cliente; el servidor lo precarga). */
-export const parseAsEvento = parseAsInteger
+/**
+ * Evento abierto en el panel de detalle (solo cliente; el servidor lo precarga).
+ * Solo ids positivos y seguros: un número fuera del rango de `bigint` haría
+ * fallar la consulta y, con ella, toda la sección de registros.
+ */
+export const parseAsEvento = createParser<number>({
+  parse: (valor) => {
+    const id = parseAsInteger.parse(valor)
+    return id !== null && Number.isSafeInteger(id) && id > 0 ? id : null
+  },
+  serialize: (valor) => String(valor),
+})
 
 // ── Filtros independientes de la vista ──────────────────────────────────────
 

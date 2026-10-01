@@ -93,6 +93,23 @@ describe("esquemaCrearRol", () => {
     })
   })
 
+  it("pide el nombre y la clave cuando están vacíos (primer error de cada campo)", () => {
+    const resultado = esquemaCrearRol.safeParse({
+      ...BASE,
+      nombre: "  ",
+      clave: "",
+    })
+    const primeros = new Map<string, string>()
+    for (const issue of resultado.error?.issues ?? []) {
+      const campo = issue.path.join(".")
+      if (!primeros.has(campo)) primeros.set(campo, issue.message)
+    }
+    expect(Object.fromEntries(primeros)).toEqual({
+      nombre: "Escribe el nombre del rol.",
+      clave: "Escribe la clave del rol.",
+    })
+  })
+
   it("reserva las claves de los roles de sistema", () => {
     const resultado = esquemaCrearRol.safeParse({ ...BASE, clave: "admin" })
     expect(errores(resultado)).toEqual({

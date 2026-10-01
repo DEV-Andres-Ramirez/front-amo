@@ -41,7 +41,7 @@ describe("reglaAccesosInusuales", () => {
       "3 inicios de sesión desde países inusuales (Nigeria y Rusia) para 2 usuarios."
     )
     expect(insight?.accion?.href).toBe(
-      "/administracion/accesos?motivo=PAIS_INUSUAL&desde=2026-09-01&hasta=2026-09-30"
+      "/administracion/accesos?motivo=PAIS_INUSUAL&periodo=personalizado&desde=2026-09-01&hasta=2026-09-30"
     )
   })
 

@@ -14,7 +14,7 @@ import { usePathname } from "next/navigation"
 import { perteneceA, RUTA_PERFIL, RUTA_SEGURIDAD } from "@/lib/auth/navegacion"
 import { cn } from "@/lib/utils"
 
-export const RUTA_PREFERENCIAS = "/cuenta/preferencias" as Route
+const RUTA_PREFERENCIAS: Route = "/cuenta/preferencias"
 
 interface SeccionNavegable {
   href: Route
@@ -33,7 +33,7 @@ const SECCIONES: readonly SeccionNavegable[] = [
   {
     href: RUTA_SEGURIDAD,
     titulo: "Seguridad",
-    descripcion: "Contraseña, 2 pasos y sesiones",
+    descripcion: "Contraseña y sesiones",
     icono: LockKeyhole,
   },
   {

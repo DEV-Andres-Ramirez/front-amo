@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { ACCIONES_SENSIBLES, ENTIDADES_CONFIGURACION } from "./catalogo"
 import {
   ACTOR_SISTEMA,
+  cargarPresentacion,
   esquemaFiltrosBitacora,
   estadoTablaBitacora,
   type FiltrosBitacora,
@@ -69,6 +70,16 @@ describe("estado en la URL", () => {
       esquemaFiltrosBitacora.safeParse({ ...SIN_FILTROS, q: "x".repeat(101) })
         .success
     ).toBe(false)
+  })
+
+  it("evento del panel: solo ids positivos dentro del rango seguro", async () => {
+    const evento = async (valor: string) =>
+      (await cargarPresentacion(Promise.resolve({ evento: valor }))).evento
+    expect(await evento("2279")).toBe(2279)
+    expect(await evento("0")).toBeNull()
+    expect(await evento("-5")).toBeNull()
+    expect(await evento("99999999999999999999")).toBeNull()
+    expect(await evento("abc")).toBeNull()
   })
 
   it("la firma cambia con el periodo o los filtros", () => {

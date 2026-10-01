@@ -42,7 +42,12 @@ import type {
   TramoLineaTiempo,
 } from "../tipos"
 import { useDetalleEvento } from "./contexto-detalle"
-import { AvatarActor, IconoAccion, InsigniaOrigen } from "./distintivos"
+import {
+  AvatarActor,
+  CLASES_TONO,
+  IconoAccion,
+  InsigniaOrigen,
+} from "./distintivos"
 import { filtrosFacetadosBitacora } from "./filtros-bitacora"
 
 /** Retraso máximo de la entrada escalonada (los tramos nuevos también entran así). */
@@ -94,6 +99,13 @@ function MetaEvento({
 }) {
   return (
     <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+      {/* En móvil no hay columna de hora: va primero, sin separador colgando al final. */}
+      <span className="cifras sm:hidden">
+        {hora ?? formatearHora(evento.at)}
+      </span>
+      <span aria-hidden className="sm:hidden">
+        ·
+      </span>
       <span className="flex min-w-0 items-center gap-1.5">
         <AvatarActor actor={evento.actor} tamano="xs" />
         <span className="truncate text-foreground/85">
@@ -102,9 +114,6 @@ function MetaEvento({
       </span>
       <span aria-hidden>·</span>
       <span className="truncate">{evento.nombreEntidad}</span>
-      <span className="cifras sm:hidden">
-        · {hora ?? formatearHora(evento.at)}
-      </span>
       {evento.origen !== "APP" ? (
         <InsigniaOrigen origen={evento.origen} />
       ) : null}
@@ -114,7 +123,12 @@ function MetaEvento({
 
 function InsigniaSensible() {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/14 px-1.5 py-0.5 text-[0.6875rem] font-medium text-warning">
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[0.6875rem] font-medium",
+        CLASES_TONO.aviso.suave
+      )}
+    >
       <ShieldAlert className="size-3" aria-hidden />
       Sensible
     </span>
@@ -268,13 +282,14 @@ function RafagaLinea({
                     "bg-primary/8 ring-1 ring-primary/25"
                 )}
               >
-                <span className="w-16 shrink-0 text-xs cifras text-muted-foreground">
+                <span className="w-14 shrink-0 text-xs cifras text-muted-foreground sm:w-16">
                   {formatearHora(evento.at)}
                 </span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="line-clamp-2 min-w-0 flex-1 sm:line-clamp-1">
                   {evento.resumen ?? evento.titulo}
                 </span>
-                <span className="shrink-0 font-mono text-[0.6875rem] cifras text-muted-foreground">
+                {/* El número del evento cede su sitio al texto en móvil (está en el panel). */}
+                <span className="shrink-0 font-mono text-[0.6875rem] cifras text-muted-foreground max-sm:hidden">
                   #{evento.id}
                 </span>
               </button>

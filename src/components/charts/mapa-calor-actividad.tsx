@@ -189,6 +189,7 @@ export function MapaCalorActividad({
         leyenda={leyendaEscala}
         tooltip={tooltip}
         posiciones={matriz.length}
+        columnas={HORAS.length}
         modo="elemento"
         resumen={accesibles.resumen}
         tabla={accesibles.tabla}

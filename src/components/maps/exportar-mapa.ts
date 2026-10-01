@@ -3,6 +3,7 @@
  * (título y periodo), la leyenda y la atribución obligatoria de Mapbox y
  * OpenStreetMap (sus términos exigen conservarla también en imágenes).
  */
+import { descargarArchivo, MIME, nombreArchivo } from "@/lib/export/descarga"
 import type { TemaMapa } from "@/lib/geo/escalas"
 
 export const ATRIBUCION_MAPA = "© Mapbox · © OpenStreetMap"
@@ -146,34 +147,26 @@ export function componerImagenMapa({
   return lienzo
 }
 
-export function descargarLienzo(lienzo: HTMLCanvasElement, nombre: string) {
+/**
+ * Descarga la imagen como PNG con el criterio de nombres de las demás
+ * exportaciones: "amo-mapa-medios-antioquia-2026-09-30.png" (fecha de Bogotá).
+ */
+export function descargarMapaPng(
+  lienzo: HTMLCanvasElement,
+  partesNombre: readonly string[]
+): Promise<void> {
   return new Promise<void>((resolver, rechazar) => {
     lienzo.toBlob((blob) => {
       if (!blob) {
         rechazar(new Error("No se pudo generar la imagen."))
         return
       }
-      const url = URL.createObjectURL(blob)
-      const enlace = document.createElement("a")
-      enlace.href = url
-      enlace.download = nombre
-      document.body.append(enlace)
-      enlace.click()
-      enlace.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      descargarArchivo(
+        blob,
+        nombreArchivo(["amo-mapa", ...partesNombre].join("-"), "png"),
+        MIME.png
+      )
       resolver()
-    }, "image/png")
+    }, MIME.png)
   })
-}
-
-/** Nombre de archivo seguro: "amo-mapa-medios-antioquia-2026-09-30.png". */
-export function nombreArchivoMapa(partes: readonly string[]): string {
-  const limpio = partes
-    .join("-")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-  return `amo-mapa-${limpio}.png`
 }

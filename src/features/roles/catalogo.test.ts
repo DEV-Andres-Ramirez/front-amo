@@ -17,7 +17,6 @@ import {
   estadoSeleccion,
   normalizarBusqueda,
   permisosValidos,
-  TOTAL_PERMISOS,
   totalCambios,
 } from "./catalogo"
 
@@ -31,8 +30,8 @@ describe("catalogoPorArea (agrupación por módulo)", () => {
 
   it("incluye cada permiso del catálogo exactamente una vez", () => {
     const claves = modulos.flatMap((modulo) => modulo.permisos)
-    expect(claves).toHaveLength(TOTAL_PERMISOS)
-    expect(new Set(claves).size).toBe(TOTAL_PERMISOS)
+    expect(claves).toHaveLength(CLAVES_PERMISO.length)
+    expect(new Set(claves).size).toBe(CLAVES_PERMISO.length)
   })
 
   it("agrupa por módulo y conserva el orden del catálogo dentro de cada uno", () => {

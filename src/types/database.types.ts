@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHIVO GENERADO — no editar a mano.
 // Origen: Supabase generate_typescript_types (proyecto zygfqfvqwfvhbirmjojp, esquema public),
-// última migración aplicada: 20260930222842_negocio_actores.
+// última migración aplicada: 20261001002838_negocio_transacciones_politicas.
 // Regenerar con `pnpm db:types` (scripts/db/generar-tipos.ts; requiere `supabase login`).
 // ─────────────────────────────────────────────────────────────────────────────
 export type Json =
@@ -304,6 +304,297 @@ export type Database = {
           },
         ]
       }
+      asignacion_montos: {
+        Row: {
+          asignacion_id: string
+          comision_excepcion_id: string | null
+          comision_origen: Database["public"]["Enums"]["comision_origen"]
+          created_at: string
+          medio_id: string
+          monto_bruto: number
+          monto_comision: number
+          monto_medio: number | null
+          monto_neto: number | null
+          monto_retenciones: number | null
+          porcentaje_comision: number
+          retenciones_aplicadas: Json | null
+          updated_at: string
+        }
+        Insert: {
+          asignacion_id: string
+          comision_excepcion_id?: string | null
+          comision_origen: Database["public"]["Enums"]["comision_origen"]
+          created_at?: string
+          medio_id: string
+          monto_bruto: number
+          monto_comision: number
+          monto_medio?: number | null
+          monto_neto?: number | null
+          monto_retenciones?: number | null
+          porcentaje_comision: number
+          retenciones_aplicadas?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          asignacion_id?: string
+          comision_excepcion_id?: string | null
+          comision_origen?: Database["public"]["Enums"]["comision_origen"]
+          created_at?: string
+          medio_id?: string
+          monto_bruto?: number
+          monto_comision?: number
+          monto_medio?: number | null
+          monto_neto?: number | null
+          monto_retenciones?: number | null
+          porcentaje_comision?: number
+          retenciones_aplicadas?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignacion_montos_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: true
+            referencedRelation: "asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignacion_montos_comision_excepcion_id_fkey"
+            columns: ["comision_excepcion_id"]
+            isOneToOne: false
+            referencedRelation: "comisiones_excepcion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignacion_montos_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asignaciones: {
+        Row: {
+          aceptada_at: string | null
+          anunciante_id: string
+          campana_id: string
+          cancelada_at: string | null
+          causa_cancelacion:
+            | Database["public"]["Enums"]["cancelacion_causa"]
+            | null
+          clave_idempotencia: string | null
+          contenido_descargado_at: string | null
+          created_at: string
+          creativo_descargado_id: string | null
+          cuenta_social_id: string | null
+          en_disputa_at: string | null
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["asignacion_estado"]
+          estado_previo_disputa:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          evidencia_validada_at: string | null
+          factura_id: string | null
+          fecha_limite_publicacion: string | null
+          franja_clave: string | null
+          franja_id: string | null
+          id: string
+          liquidacion_id: string | null
+          liquidada_at: string | null
+          medio_id: string
+          metricas_atrasadas_at: string | null
+          metricas_cargadas_at: string | null
+          monto_bruto: number | null
+          motivo: string | null
+          multiplicador_calidad_aplicado: number | null
+          multiplicador_exclusividad_aplicado: number | null
+          multiplicador_geografico_aplicado: number | null
+          oferta_id: string
+          pagada_at: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          publicaciones: number | null
+          publicada_at: string | null
+          rechazada_at: string | null
+          seguidores_al_aceptar: number | null
+          slot: number
+          tarifa_base_aplicada: number | null
+          tarifa_id: string | null
+          updated_at: string
+          vencida_at: string | null
+          verificada_at: string | null
+        }
+        Insert: {
+          aceptada_at?: string | null
+          anunciante_id: string
+          campana_id: string
+          cancelada_at?: string | null
+          causa_cancelacion?:
+            | Database["public"]["Enums"]["cancelacion_causa"]
+            | null
+          clave_idempotencia?: string | null
+          contenido_descargado_at?: string | null
+          created_at?: string
+          creativo_descargado_id?: string | null
+          cuenta_social_id?: string | null
+          en_disputa_at?: string | null
+          es_demo?: boolean
+          estado: Database["public"]["Enums"]["asignacion_estado"]
+          estado_previo_disputa?:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          evidencia_validada_at?: string | null
+          factura_id?: string | null
+          fecha_limite_publicacion?: string | null
+          franja_clave?: string | null
+          franja_id?: string | null
+          id?: string
+          liquidacion_id?: string | null
+          liquidada_at?: string | null
+          medio_id: string
+          metricas_atrasadas_at?: string | null
+          metricas_cargadas_at?: string | null
+          monto_bruto?: number | null
+          motivo?: string | null
+          multiplicador_calidad_aplicado?: number | null
+          multiplicador_exclusividad_aplicado?: number | null
+          multiplicador_geografico_aplicado?: number | null
+          oferta_id: string
+          pagada_at?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          publicaciones?: number | null
+          publicada_at?: string | null
+          rechazada_at?: string | null
+          seguidores_al_aceptar?: number | null
+          slot?: number
+          tarifa_base_aplicada?: number | null
+          tarifa_id?: string | null
+          updated_at?: string
+          vencida_at?: string | null
+          verificada_at?: string | null
+        }
+        Update: {
+          aceptada_at?: string | null
+          anunciante_id?: string
+          campana_id?: string
+          cancelada_at?: string | null
+          causa_cancelacion?:
+            | Database["public"]["Enums"]["cancelacion_causa"]
+            | null
+          clave_idempotencia?: string | null
+          contenido_descargado_at?: string | null
+          created_at?: string
+          creativo_descargado_id?: string | null
+          cuenta_social_id?: string | null
+          en_disputa_at?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["asignacion_estado"]
+          estado_previo_disputa?:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          evidencia_validada_at?: string | null
+          factura_id?: string | null
+          fecha_limite_publicacion?: string | null
+          franja_clave?: string | null
+          franja_id?: string | null
+          id?: string
+          liquidacion_id?: string | null
+          liquidada_at?: string | null
+          medio_id?: string
+          metricas_atrasadas_at?: string | null
+          metricas_cargadas_at?: string | null
+          monto_bruto?: number | null
+          motivo?: string | null
+          multiplicador_calidad_aplicado?: number | null
+          multiplicador_exclusividad_aplicado?: number | null
+          multiplicador_geografico_aplicado?: number | null
+          oferta_id?: string
+          pagada_at?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          publicaciones?: number | null
+          publicada_at?: string | null
+          rechazada_at?: string | null
+          seguidores_al_aceptar?: number | null
+          slot?: number
+          tarifa_base_aplicada?: number | null
+          tarifa_id?: string | null
+          updated_at?: string
+          vencida_at?: string | null
+          verificada_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_campana_id_fkey"
+            columns: ["campana_id"]
+            isOneToOne: false
+            referencedRelation: "campanas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_creativo_descargado_id_fkey"
+            columns: ["creativo_descargado_id"]
+            isOneToOne: false
+            referencedRelation: "creativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_cuenta_social_id_fkey"
+            columns: ["cuenta_social_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_sociales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_franja_id_fkey"
+            columns: ["franja_id"]
+            isOneToOne: false
+            referencedRelation: "franjas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_liquidacion_id_fkey"
+            columns: ["liquidacion_id"]
+            isOneToOne: false
+            referencedRelation: "liquidaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_tarifa_id_fkey"
+            columns: ["tarifa_id"]
+            isOneToOne: false
+            referencedRelation: "tarifas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bitacora: {
         Row: {
           accion: string
@@ -378,6 +669,84 @@ export type Database = {
           },
         ]
       }
+      campanas: {
+        Row: {
+          activada_at: string | null
+          anunciante_id: string
+          cancelada_at: string | null
+          creada_por: string | null
+          created_at: string
+          deleted_at: string | null
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["campana_estado"]
+          fecha_fin: string
+          fecha_inicio: string
+          finalizada_at: string | null
+          id: string
+          marca: string
+          nombre: string
+          objetivo: string | null
+          presupuesto_comprometido: number
+          presupuesto_total: number
+          updated_at: string
+        }
+        Insert: {
+          activada_at?: string | null
+          anunciante_id: string
+          cancelada_at?: string | null
+          creada_por?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["campana_estado"]
+          fecha_fin: string
+          fecha_inicio: string
+          finalizada_at?: string | null
+          id?: string
+          marca: string
+          nombre: string
+          objetivo?: string | null
+          presupuesto_comprometido?: number
+          presupuesto_total: number
+          updated_at?: string
+        }
+        Update: {
+          activada_at?: string | null
+          anunciante_id?: string
+          cancelada_at?: string | null
+          creada_por?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["campana_estado"]
+          fecha_fin?: string
+          fecha_inicio?: string
+          finalizada_at?: string | null
+          id?: string
+          marca?: string
+          nombre?: string
+          objetivo?: string | null
+          presupuesto_comprometido?: number
+          presupuesto_total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanas_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanas_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias: {
         Row: {
           activo: boolean
@@ -413,6 +782,67 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      comisiones_excepcion: {
+        Row: {
+          anunciante_id: string | null
+          campana_id: string | null
+          creada_por: string | null
+          created_at: string
+          id: string
+          motivo: string
+          porcentaje: number
+          updated_at: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          anunciante_id?: string | null
+          campana_id?: string | null
+          creada_por?: string | null
+          created_at?: string
+          id?: string
+          motivo: string
+          porcentaje: number
+          updated_at?: string
+          vigente_desde: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          anunciante_id?: string | null
+          campana_id?: string | null
+          creada_por?: string | null
+          created_at?: string
+          id?: string
+          motivo?: string
+          porcentaje?: number
+          updated_at?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comisiones_excepcion_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comisiones_excepcion_campana_id_fkey"
+            columns: ["campana_id"]
+            isOneToOne: false
+            referencedRelation: "campanas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comisiones_excepcion_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       configuracion: {
         Row: {
@@ -469,6 +899,126 @@ export type Database = {
             columns: ["actualizado_por"]
             isOneToOne: false
             referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creativo_archivos: {
+        Row: {
+          alto: number | null
+          ancho: number | null
+          archivo_path: string
+          created_at: string
+          creativo_id: string
+          duracion_segundos: number | null
+          id: string
+          mime: string
+          orden: number
+          sha256: string | null
+          tamano_bytes: number
+        }
+        Insert: {
+          alto?: number | null
+          ancho?: number | null
+          archivo_path: string
+          created_at?: string
+          creativo_id: string
+          duracion_segundos?: number | null
+          id?: string
+          mime: string
+          orden?: number
+          sha256?: string | null
+          tamano_bytes: number
+        }
+        Update: {
+          alto?: number | null
+          ancho?: number | null
+          archivo_path?: string
+          created_at?: string
+          creativo_id?: string
+          duracion_segundos?: number | null
+          id?: string
+          mime?: string
+          orden?: number
+          sha256?: string | null
+          tamano_bytes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creativo_archivos_creativo_id_fkey"
+            columns: ["creativo_id"]
+            isOneToOne: false
+            referencedRelation: "creativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creativos: {
+        Row: {
+          copy_sugerido: string | null
+          creado_por: string | null
+          created_at: string
+          enlace_destino: string | null
+          hashtags: string[]
+          id: string
+          menciones: string[]
+          oferta_id: string
+          reemplaza_a: string | null
+          tipo: Database["public"]["Enums"]["creativo_tipo"]
+          updated_at: string
+          version: number
+          vigente: boolean
+        }
+        Insert: {
+          copy_sugerido?: string | null
+          creado_por?: string | null
+          created_at?: string
+          enlace_destino?: string | null
+          hashtags?: string[]
+          id?: string
+          menciones?: string[]
+          oferta_id: string
+          reemplaza_a?: string | null
+          tipo: Database["public"]["Enums"]["creativo_tipo"]
+          updated_at?: string
+          version?: number
+          vigente?: boolean
+        }
+        Update: {
+          copy_sugerido?: string | null
+          creado_por?: string | null
+          created_at?: string
+          enlace_destino?: string | null
+          hashtags?: string[]
+          id?: string
+          menciones?: string[]
+          oferta_id?: string
+          reemplaza_a?: string | null
+          tipo?: Database["public"]["Enums"]["creativo_tipo"]
+          updated_at?: string
+          version?: number
+          vigente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creativos_creado_por_fkey"
+            columns: ["creado_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creativos_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creativos_reemplaza_a_fkey"
+            columns: ["reemplaza_a"]
+            isOneToOne: false
+            referencedRelation: "creativos"
             referencedColumns: ["id"]
           },
         ]
@@ -622,6 +1172,182 @@ export type Database = {
           },
         ]
       }
+      descargas_contenido: {
+        Row: {
+          asignacion_id: string
+          creativo_id: string
+          descargado_at: string
+          id: number
+        }
+        Insert: {
+          asignacion_id: string
+          creativo_id: string
+          descargado_at?: string
+          id?: never
+        }
+        Update: {
+          asignacion_id?: string
+          creativo_id?: string
+          descargado_at?: string
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "descargas_contenido_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "descargas_contenido_creativo_id_fkey"
+            columns: ["creativo_id"]
+            isOneToOne: false
+            referencedRelation: "creativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispersiones: {
+        Row: {
+          archivo_path: string
+          cantidad_liquidaciones: number
+          created_at: string
+          es_demo: boolean
+          generada_por: string | null
+          id: string
+          monto_total: number
+        }
+        Insert: {
+          archivo_path: string
+          cantidad_liquidaciones: number
+          created_at?: string
+          es_demo?: boolean
+          generada_por?: string | null
+          id?: string
+          monto_total: number
+        }
+        Update: {
+          archivo_path?: string
+          cantidad_liquidaciones?: number
+          created_at?: string
+          es_demo?: boolean
+          generada_por?: string | null
+          id?: string
+          monto_total?: number
+        }
+        Relationships: []
+      }
+      disputa_mensajes: {
+        Row: {
+          adjunto_path: string | null
+          autor_id: string
+          created_at: string
+          disputa_id: string
+          id: number
+          interno: boolean
+          mensaje: string
+        }
+        Insert: {
+          adjunto_path?: string | null
+          autor_id?: string
+          created_at?: string
+          disputa_id: string
+          id?: never
+          interno?: boolean
+          mensaje: string
+        }
+        Update: {
+          adjunto_path?: string | null
+          autor_id?: string
+          created_at?: string
+          disputa_id?: string
+          id?: never
+          interno?: boolean
+          mensaje?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputa_mensajes_disputa_id_fkey"
+            columns: ["disputa_id"]
+            isOneToOne: false
+            referencedRelation: "disputas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      disputas: {
+        Row: {
+          abierta_por: string
+          asignacion_id: string
+          created_at: string
+          descripcion: string
+          estado: Database["public"]["Enums"]["disputa_estado"]
+          estado_asignacion_origen: Database["public"]["Enums"]["asignacion_estado"]
+          estado_asignacion_resultante:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          fecha_resolucion: string | null
+          id: string
+          motivo: Database["public"]["Enums"]["disputa_motivo"]
+          parte: Database["public"]["Enums"]["disputa_parte"]
+          resolucion: string | null
+          resuelta_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          abierta_por: string
+          asignacion_id: string
+          created_at?: string
+          descripcion: string
+          estado?: Database["public"]["Enums"]["disputa_estado"]
+          estado_asignacion_origen: Database["public"]["Enums"]["asignacion_estado"]
+          estado_asignacion_resultante?:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          fecha_resolucion?: string | null
+          id?: string
+          motivo: Database["public"]["Enums"]["disputa_motivo"]
+          parte: Database["public"]["Enums"]["disputa_parte"]
+          resolucion?: string | null
+          resuelta_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abierta_por?: string
+          asignacion_id?: string
+          created_at?: string
+          descripcion?: string
+          estado?: Database["public"]["Enums"]["disputa_estado"]
+          estado_asignacion_origen?: Database["public"]["Enums"]["asignacion_estado"]
+          estado_asignacion_resultante?:
+            | Database["public"]["Enums"]["asignacion_estado"]
+            | null
+          fecha_resolucion?: string | null
+          id?: string
+          motivo?: Database["public"]["Enums"]["disputa_motivo"]
+          parte?: Database["public"]["Enums"]["disputa_parte"]
+          resolucion?: string | null
+          resuelta_por?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputas_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputas_resuelta_por_fkey"
+            columns: ["resuelta_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos_anunciante: {
         Row: {
           anunciante_id: string
@@ -756,6 +1482,184 @@ export type Database = {
           },
         ]
       }
+      documentos_soporte: {
+        Row: {
+          anulado_at: string | null
+          archivo_path: string | null
+          consecutivo: number | null
+          created_at: string
+          cuds: string | null
+          emitido_at: string | null
+          estado: Database["public"]["Enums"]["documento_soporte_estado"]
+          fecha_emision: string | null
+          id: string
+          liquidacion_id: string
+          numero: string | null
+          prefijo: string | null
+          resolucion_id: string | null
+          updated_at: string
+          valor_total: number
+        }
+        Insert: {
+          anulado_at?: string | null
+          archivo_path?: string | null
+          consecutivo?: number | null
+          created_at?: string
+          cuds?: string | null
+          emitido_at?: string | null
+          estado?: Database["public"]["Enums"]["documento_soporte_estado"]
+          fecha_emision?: string | null
+          id?: string
+          liquidacion_id: string
+          numero?: string | null
+          prefijo?: string | null
+          resolucion_id?: string | null
+          updated_at?: string
+          valor_total: number
+        }
+        Update: {
+          anulado_at?: string | null
+          archivo_path?: string | null
+          consecutivo?: number | null
+          created_at?: string
+          cuds?: string | null
+          emitido_at?: string | null
+          estado?: Database["public"]["Enums"]["documento_soporte_estado"]
+          fecha_emision?: string | null
+          id?: string
+          liquidacion_id?: string
+          numero?: string | null
+          prefijo?: string | null
+          resolucion_id?: string | null
+          updated_at?: string
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_soporte_liquidacion_id_fkey"
+            columns: ["liquidacion_id"]
+            isOneToOne: false
+            referencedRelation: "liquidaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_soporte_resolucion_id_fkey"
+            columns: ["resolucion_id"]
+            isOneToOne: false
+            referencedRelation: "resoluciones_dian"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturas: {
+        Row: {
+          anulada_at: string | null
+          anunciante_id: string
+          archivo_path: string | null
+          campana_id: string | null
+          consecutivo: number | null
+          created_at: string
+          cufe: string | null
+          emitida_at: string | null
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["factura_estado"]
+          fecha_emision: string | null
+          fecha_vencimiento: string | null
+          id: string
+          iva: number
+          numero: string | null
+          pagada_at: string | null
+          pagado: number
+          periodo_desde: string | null
+          periodo_hasta: string | null
+          prefijo: string | null
+          resolucion_id: string | null
+          saldo: number | null
+          subtotal: number
+          total: number | null
+          updated_at: string
+          vencida_at: string | null
+        }
+        Insert: {
+          anulada_at?: string | null
+          anunciante_id: string
+          archivo_path?: string | null
+          campana_id?: string | null
+          consecutivo?: number | null
+          created_at?: string
+          cufe?: string | null
+          emitida_at?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["factura_estado"]
+          fecha_emision?: string | null
+          fecha_vencimiento?: string | null
+          id?: string
+          iva?: number
+          numero?: string | null
+          pagada_at?: string | null
+          pagado?: number
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          prefijo?: string | null
+          resolucion_id?: string | null
+          saldo?: number | null
+          subtotal?: number
+          total?: number | null
+          updated_at?: string
+          vencida_at?: string | null
+        }
+        Update: {
+          anulada_at?: string | null
+          anunciante_id?: string
+          archivo_path?: string | null
+          campana_id?: string | null
+          consecutivo?: number | null
+          created_at?: string
+          cufe?: string | null
+          emitida_at?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["factura_estado"]
+          fecha_emision?: string | null
+          fecha_vencimiento?: string | null
+          id?: string
+          iva?: number
+          numero?: string | null
+          pagada_at?: string | null
+          pagado?: number
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          prefijo?: string | null
+          resolucion_id?: string | null
+          saldo?: number | null
+          subtotal?: number
+          total?: number | null
+          updated_at?: string
+          vencida_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturas_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturas_campana_id_fkey"
+            columns: ["campana_id"]
+            isOneToOne: false
+            referencedRelation: "campanas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturas_resolucion_id_fkey"
+            columns: ["resolucion_id"]
+            isOneToOne: false
+            referencedRelation: "resoluciones_dian"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formatos: {
         Row: {
           activo: boolean
@@ -827,6 +1731,125 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      liquidaciones: {
+        Row: {
+          alerta_seg_social: boolean
+          anulada_at: string | null
+          aprobada_at: string | null
+          aprobada_por: string | null
+          cantidad_asignaciones: number
+          creada_por: string | null
+          created_at: string
+          dispersion_id: string | null
+          es_demo: boolean
+          estado: Database["public"]["Enums"]["liquidacion_estado"]
+          factura_medio_path: string | null
+          fecha_pago: string | null
+          id: string
+          medio_id: string
+          monto_bruto: number
+          monto_comision: number
+          monto_medio: number
+          monto_neto: number
+          monto_retenciones: number
+          numero_factura_medio: string | null
+          pagada_at: string | null
+          periodo_fin: string
+          periodo_inicio: string
+          referencia_pago: string | null
+          requiere_documento_soporte: boolean
+          soporte_pago_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          alerta_seg_social?: boolean
+          anulada_at?: string | null
+          aprobada_at?: string | null
+          aprobada_por?: string | null
+          cantidad_asignaciones?: number
+          creada_por?: string | null
+          created_at?: string
+          dispersion_id?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["liquidacion_estado"]
+          factura_medio_path?: string | null
+          fecha_pago?: string | null
+          id?: string
+          medio_id: string
+          monto_bruto?: number
+          monto_comision?: number
+          monto_medio?: number
+          monto_neto?: number
+          monto_retenciones?: number
+          numero_factura_medio?: string | null
+          pagada_at?: string | null
+          periodo_fin: string
+          periodo_inicio: string
+          referencia_pago?: string | null
+          requiere_documento_soporte: boolean
+          soporte_pago_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alerta_seg_social?: boolean
+          anulada_at?: string | null
+          aprobada_at?: string | null
+          aprobada_por?: string | null
+          cantidad_asignaciones?: number
+          creada_por?: string | null
+          created_at?: string
+          dispersion_id?: string | null
+          es_demo?: boolean
+          estado?: Database["public"]["Enums"]["liquidacion_estado"]
+          factura_medio_path?: string | null
+          fecha_pago?: string | null
+          id?: string
+          medio_id?: string
+          monto_bruto?: number
+          monto_comision?: number
+          monto_medio?: number
+          monto_neto?: number
+          monto_retenciones?: number
+          numero_factura_medio?: string | null
+          pagada_at?: string | null
+          periodo_fin?: string
+          periodo_inicio?: string
+          referencia_pago?: string | null
+          requiere_documento_soporte?: boolean
+          soporte_pago_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liquidaciones_aprobada_por_fkey"
+            columns: ["aprobada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liquidaciones_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liquidaciones_dispersion_id_fkey"
+            columns: ["dispersion_id"]
+            isOneToOne: false
+            referencedRelation: "dispersiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liquidaciones_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medio_audiencia_paises: {
         Row: {
@@ -1126,6 +2149,141 @@ export type Database = {
           },
         ]
       }
+      metricas: {
+        Row: {
+          alcance: number | null
+          alcance_norm: number | null
+          alerta_desviacion: boolean
+          alerta_multiplo: boolean
+          anunciante_id: string
+          asignacion_id: string
+          captura_path: string
+          clics_enlace: number | null
+          comentarios: number | null
+          compartidos: number | null
+          corte: Database["public"]["Enums"]["corte_metrica"]
+          created_at: string
+          detalle_alertas: Json
+          espectadores_unicos: number | null
+          estado_validacion: Database["public"]["Enums"]["validacion_estado"]
+          fecha_corte: string
+          fuente: Database["public"]["Enums"]["metrica_fuente"]
+          guardados: number | null
+          id: string
+          impresiones: number | null
+          impresiones_norm: number | null
+          interacciones: number | null
+          me_gusta: number | null
+          medio_id: string
+          miniatura_path: string | null
+          observaciones: string | null
+          periodo_desde: string | null
+          periodo_hasta: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          porcentaje_reproduccion_completa: number | null
+          publicacion_id: string
+          reproducciones: number | null
+          tiempo_promedio_visualizacion_s: number | null
+          updated_at: string
+          validada_at: string | null
+          validada_por: string | null
+          visitas_perfil: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          alcance_norm?: number | null
+          alerta_desviacion?: boolean
+          alerta_multiplo?: boolean
+          anunciante_id: string
+          asignacion_id: string
+          captura_path: string
+          clics_enlace?: number | null
+          comentarios?: number | null
+          compartidos?: number | null
+          corte: Database["public"]["Enums"]["corte_metrica"]
+          created_at?: string
+          detalle_alertas?: Json
+          espectadores_unicos?: number | null
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          fecha_corte: string
+          fuente?: Database["public"]["Enums"]["metrica_fuente"]
+          guardados?: number | null
+          id?: string
+          impresiones?: number | null
+          impresiones_norm?: number | null
+          interacciones?: number | null
+          me_gusta?: number | null
+          medio_id: string
+          miniatura_path?: string | null
+          observaciones?: string | null
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          porcentaje_reproduccion_completa?: number | null
+          publicacion_id: string
+          reproducciones?: number | null
+          tiempo_promedio_visualizacion_s?: number | null
+          updated_at?: string
+          validada_at?: string | null
+          validada_por?: string | null
+          visitas_perfil?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          alcance_norm?: number | null
+          alerta_desviacion?: boolean
+          alerta_multiplo?: boolean
+          anunciante_id?: string
+          asignacion_id?: string
+          captura_path?: string
+          clics_enlace?: number | null
+          comentarios?: number | null
+          compartidos?: number | null
+          corte?: Database["public"]["Enums"]["corte_metrica"]
+          created_at?: string
+          detalle_alertas?: Json
+          espectadores_unicos?: number | null
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          fecha_corte?: string
+          fuente?: Database["public"]["Enums"]["metrica_fuente"]
+          guardados?: number | null
+          id?: string
+          impresiones?: number | null
+          impresiones_norm?: number | null
+          interacciones?: number | null
+          me_gusta?: number | null
+          medio_id?: string
+          miniatura_path?: string | null
+          observaciones?: string | null
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          porcentaje_reproduccion_completa?: number | null
+          publicacion_id?: string
+          reproducciones?: number | null
+          tiempo_promedio_visualizacion_s?: number | null
+          updated_at?: string
+          validada_at?: string | null
+          validada_por?: string | null
+          visitas_perfil?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metricas_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metricas_publicacion_id_fkey"
+            columns: ["publicacion_id"]
+            isOneToOne: false
+            referencedRelation: "publicaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       municipios: {
         Row: {
           activo: boolean
@@ -1221,6 +2379,318 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      oferta_cupos: {
+        Row: {
+          created_at: string
+          cupos_ocupados: number
+          cupos_totales: number
+          franja_id: string
+          oferta_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cupos_ocupados?: number
+          cupos_totales: number
+          franja_id: string
+          oferta_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cupos_ocupados?: number
+          cupos_totales?: number
+          franja_id?: string
+          oferta_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oferta_cupos_franja_id_fkey"
+            columns: ["franja_id"]
+            isOneToOne: false
+            referencedRelation: "franjas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oferta_cupos_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oferta_vistas: {
+        Row: {
+          id: number
+          medio_id: string
+          oferta_id: string
+          primera_vista_at: string
+          ultima_vista_at: string
+          veces: number
+        }
+        Insert: {
+          id?: never
+          medio_id: string
+          oferta_id: string
+          primera_vista_at?: string
+          ultima_vista_at?: string
+          veces?: number
+        }
+        Update: {
+          id?: never
+          medio_id?: string
+          oferta_id?: string
+          primera_vista_at?: string
+          ultima_vista_at?: string
+          veces?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oferta_vistas_medio_id_fkey"
+            columns: ["medio_id"]
+            isOneToOne: false
+            referencedRelation: "medios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oferta_vistas_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ofertas: {
+        Row: {
+          anunciante_id: string
+          campana_id: string
+          cancelada_at: string | null
+          categorias_objetivo: string[]
+          cerrada_at: string | null
+          comentario_moderacion: string | null
+          cortes_requeridos: Database["public"]["Enums"]["corte_metrica"][]
+          creada_por: string | null
+          created_at: string
+          cupos_completos_at: string | null
+          cupos_ocupados: number
+          cupos_totales: number
+          deleted_at: string | null
+          departamentos_objetivo: string[]
+          devuelta_at: string | null
+          en_ejecucion_at: string | null
+          enviada_at: string | null
+          estado: Database["public"]["Enums"]["oferta_estado"]
+          exclusividad_dias: number | null
+          fecha_limite_aceptacion: string
+          formato_id: string
+          id: string
+          instrucciones: string | null
+          llena_at: string | null
+          medios_excluidos: string[]
+          moderada_por: string | null
+          municipios_objetivo: string[]
+          permanencia_minima_dias: number
+          permite_multiples_cupos: boolean
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          presupuesto_comprometido: number
+          presupuesto_maximo: number
+          publicaciones_por_medio: number
+          publicada_at: string | null
+          restricciones: string | null
+          seguidores_minimos: number | null
+          titulo: string
+          tope_porcentaje_por_medio: number
+          updated_at: string
+          vencida_at: string | null
+          ventana_fin: string
+          ventana_inicio: string
+        }
+        Insert: {
+          anunciante_id: string
+          campana_id: string
+          cancelada_at?: string | null
+          categorias_objetivo?: string[]
+          cerrada_at?: string | null
+          comentario_moderacion?: string | null
+          cortes_requeridos: Database["public"]["Enums"]["corte_metrica"][]
+          creada_por?: string | null
+          created_at?: string
+          cupos_completos_at?: string | null
+          cupos_ocupados?: number
+          cupos_totales?: number
+          deleted_at?: string | null
+          departamentos_objetivo?: string[]
+          devuelta_at?: string | null
+          en_ejecucion_at?: string | null
+          enviada_at?: string | null
+          estado?: Database["public"]["Enums"]["oferta_estado"]
+          exclusividad_dias?: number | null
+          fecha_limite_aceptacion: string
+          formato_id: string
+          id?: string
+          instrucciones?: string | null
+          llena_at?: string | null
+          medios_excluidos?: string[]
+          moderada_por?: string | null
+          municipios_objetivo?: string[]
+          permanencia_minima_dias?: number
+          permite_multiples_cupos?: boolean
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          presupuesto_comprometido?: number
+          presupuesto_maximo: number
+          publicaciones_por_medio?: number
+          publicada_at?: string | null
+          restricciones?: string | null
+          seguidores_minimos?: number | null
+          titulo: string
+          tope_porcentaje_por_medio: number
+          updated_at?: string
+          vencida_at?: string | null
+          ventana_fin: string
+          ventana_inicio: string
+        }
+        Update: {
+          anunciante_id?: string
+          campana_id?: string
+          cancelada_at?: string | null
+          categorias_objetivo?: string[]
+          cerrada_at?: string | null
+          comentario_moderacion?: string | null
+          cortes_requeridos?: Database["public"]["Enums"]["corte_metrica"][]
+          creada_por?: string | null
+          created_at?: string
+          cupos_completos_at?: string | null
+          cupos_ocupados?: number
+          cupos_totales?: number
+          deleted_at?: string | null
+          departamentos_objetivo?: string[]
+          devuelta_at?: string | null
+          en_ejecucion_at?: string | null
+          enviada_at?: string | null
+          estado?: Database["public"]["Enums"]["oferta_estado"]
+          exclusividad_dias?: number | null
+          fecha_limite_aceptacion?: string
+          formato_id?: string
+          id?: string
+          instrucciones?: string | null
+          llena_at?: string | null
+          medios_excluidos?: string[]
+          moderada_por?: string | null
+          municipios_objetivo?: string[]
+          permanencia_minima_dias?: number
+          permite_multiples_cupos?: boolean
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          presupuesto_comprometido?: number
+          presupuesto_maximo?: number
+          publicaciones_por_medio?: number
+          publicada_at?: string | null
+          restricciones?: string | null
+          seguidores_minimos?: number | null
+          titulo?: string
+          tope_porcentaje_por_medio?: number
+          updated_at?: string
+          vencida_at?: string | null
+          ventana_fin?: string
+          ventana_inicio?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_campana_id_fkey"
+            columns: ["campana_id"]
+            isOneToOne: false
+            referencedRelation: "campanas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ofertas_formato_fkey"
+            columns: ["formato_id", "plataforma"]
+            isOneToOne: false
+            referencedRelation: "formatos"
+            referencedColumns: ["id", "plataforma"]
+          },
+          {
+            foreignKeyName: "ofertas_moderada_por_fkey"
+            columns: ["moderada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagos_anunciante: {
+        Row: {
+          anunciante_id: string
+          created_at: string
+          es_demo: boolean
+          factura_id: string
+          fecha_pago: string
+          id: string
+          medio_pago: string
+          monto: number
+          referencia: string | null
+          registrado_por: string | null
+          soporte_path: string | null
+        }
+        Insert: {
+          anunciante_id: string
+          created_at?: string
+          es_demo?: boolean
+          factura_id: string
+          fecha_pago: string
+          id?: string
+          medio_pago: string
+          monto: number
+          referencia?: string | null
+          registrado_por?: string | null
+          soporte_path?: string | null
+        }
+        Update: {
+          anunciante_id?: string
+          created_at?: string
+          es_demo?: boolean
+          factura_id?: string
+          fecha_pago?: string
+          id?: string
+          medio_pago?: string
+          monto?: number
+          referencia?: string | null
+          registrado_por?: string | null
+          soporte_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_anunciante_anunciante_id_fkey"
+            columns: ["anunciante_id"]
+            isOneToOne: false
+            referencedRelation: "anunciantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_anunciante_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       paises: {
         Row: {
@@ -1507,6 +2977,93 @@ export type Database = {
           variables?: string[]
         }
         Relationships: []
+      }
+      publicaciones: {
+        Row: {
+          anunciante_id: string
+          asignacion_id: string
+          captura_path: string
+          created_at: string
+          estado_validacion: Database["public"]["Enums"]["validacion_estado"]
+          etiqueta_publicidad_confirmada: boolean
+          etiqueta_verificada: boolean
+          fecha_publicacion: string
+          id: string
+          medio_id: string
+          miniatura_path: string | null
+          numero: number
+          observaciones: string | null
+          permanencia_hasta: string
+          permanencia_verificada_at: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          retirada_detectada_at: string | null
+          updated_at: string
+          url_post: string
+          validada_at: string | null
+          validada_por: string | null
+        }
+        Insert: {
+          anunciante_id: string
+          asignacion_id: string
+          captura_path: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          etiqueta_publicidad_confirmada?: boolean
+          etiqueta_verificada?: boolean
+          fecha_publicacion: string
+          id?: string
+          medio_id: string
+          miniatura_path?: string | null
+          numero?: number
+          observaciones?: string | null
+          permanencia_hasta: string
+          permanencia_verificada_at?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          retirada_detectada_at?: string | null
+          updated_at?: string
+          url_post: string
+          validada_at?: string | null
+          validada_por?: string | null
+        }
+        Update: {
+          anunciante_id?: string
+          asignacion_id?: string
+          captura_path?: string
+          created_at?: string
+          estado_validacion?: Database["public"]["Enums"]["validacion_estado"]
+          etiqueta_publicidad_confirmada?: boolean
+          etiqueta_verificada?: boolean
+          fecha_publicacion?: string
+          id?: string
+          medio_id?: string
+          miniatura_path?: string | null
+          numero?: number
+          observaciones?: string | null
+          permanencia_hasta?: string
+          permanencia_verificada_at?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma"]
+          retirada_detectada_at?: string | null
+          updated_at?: string
+          url_post?: string
+          validada_at?: string | null
+          validada_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publicaciones_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publicaciones_validada_por_fkey"
+            columns: ["validada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       resoluciones_dian: {
         Row: {
@@ -1934,6 +3491,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      abrir_disputa_srv: {
+        Args: {
+          p_actor_id: string
+          p_asignacion_id: string
+          p_descripcion: string
+          p_motivo: Database["public"]["Enums"]["disputa_motivo"]
+          p_session_id: string
+        }
+        Returns: string
+      }
       activar_perfil_srv: { Args: { p_usuario_id: string }; Returns: undefined }
       anunciantes_publico: {
         Args: { p_ids?: string[] }
@@ -1967,6 +3534,26 @@ export type Database = {
         }
         Returns: number
       }
+      cotizar_oferta: {
+        Args: { p_cuenta_social_id: string; p_oferta_id: string }
+        Returns: {
+          comision_excepcion_id: string
+          comision_origen: Database["public"]["Enums"]["comision_origen"]
+          franja_clave: string
+          franja_id: string
+          monto_bruto: number
+          monto_comision: number
+          monto_medio: number
+          multiplicador_calidad: number
+          multiplicador_exclusividad: number
+          multiplicador_geografico: number
+          porcentaje_comision: number
+          publicaciones: number
+          seguidores: number
+          tarifa_base: number
+          tarifa_id: string
+        }[]
+      }
       editar_privado_srv: {
         Args: {
           p_actor_id: string
@@ -1985,6 +3572,46 @@ export type Database = {
           p_usuario_id: string
         }
         Returns: undefined
+      }
+      emitir_documento_soporte_srv: {
+        Args: {
+          p_actor_id: string
+          p_liquidacion_id: string
+          p_session_id: string
+        }
+        Returns: string
+      }
+      emitir_factura_srv: {
+        Args: { p_actor_id: string; p_factura_id: string; p_session_id: string }
+        Returns: Json
+      }
+      estimar_oferta: {
+        Args: {
+          p_categorias: string[]
+          p_cupos: Json
+          p_departamentos: string[]
+          p_exclusividad_dias?: number
+          p_formato_id: string
+          p_municipios: string[]
+          p_seguidores_minimos: number
+        }
+        Returns: {
+          alcance_mediano_estimado: number
+          franja_id: string
+          inversion_estimada: number
+          medios_elegibles: number
+          precio_mediano: number
+        }[]
+      }
+      generar_liquidacion_srv: {
+        Args: {
+          p_actor_id: string
+          p_medio_id: string
+          p_periodo_fin: string
+          p_periodo_inicio: string
+          p_session_id: string
+        }
+        Returns: string
       }
       listar_usuarios: {
         Args: {
@@ -2064,12 +3691,117 @@ export type Database = {
           ultimo_acceso_at: string
         }[]
       }
+      mis_asignaciones_medio: {
+        Args: {
+          p_antes_id?: string
+          p_estados?: Database["public"]["Enums"]["asignacion_estado"][]
+          p_limite?: number
+        }
+        Returns: {
+          aceptada_at: string
+          anunciante_id: string
+          campana_id: string
+          cancelada_at: string
+          causa_cancelacion: Database["public"]["Enums"]["cancelacion_causa"]
+          contenido_descargado_at: string
+          created_at: string
+          creativo_descargado_id: string
+          cuenta_social_id: string
+          en_disputa_at: string
+          estado: Database["public"]["Enums"]["asignacion_estado"]
+          estado_previo_disputa: Database["public"]["Enums"]["asignacion_estado"]
+          evidencia_validada_at: string
+          fecha_limite_publicacion: string
+          franja_clave: string
+          franja_id: string
+          id: string
+          liquidacion_id: string
+          liquidada_at: string
+          metricas_atrasadas_at: string
+          metricas_cargadas_at: string
+          monto_bruto: number
+          monto_comision: number
+          monto_medio: number
+          monto_neto: number
+          monto_retenciones: number
+          motivo: string
+          multiplicador_calidad_aplicado: number
+          multiplicador_exclusividad_aplicado: number
+          multiplicador_geografico_aplicado: number
+          oferta_id: string
+          pagada_at: string
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          porcentaje_comision: number
+          publicaciones: number
+          publicada_at: string
+          rechazada_at: string
+          retenciones_aplicadas: Json
+          seguidores_al_aceptar: number
+          slot: number
+          tarifa_base_aplicada: number
+          updated_at: string
+          vencida_at: string
+          verificada_at: string
+        }[]
+      }
+      ofertas_para_medio: {
+        Args: { p_oferta_id?: string }
+        Returns: {
+          anunciante_id: string
+          anunciante_nombre: string
+          cortes_requeridos: Database["public"]["Enums"]["corte_metrica"][]
+          cupos_restantes_mi_franja: Json
+          estado: Database["public"]["Enums"]["oferta_estado"]
+          exclusividad_dias: number
+          fecha_limite_aceptacion: string
+          formato_id: string
+          id: string
+          instrucciones: string
+          marca: string
+          permanencia_minima_dias: number
+          permite_multiples_cupos: boolean
+          plataforma: Database["public"]["Enums"]["plataforma"]
+          publicaciones_por_medio: number
+          restricciones: string
+          sector_id: string
+          titulo: string
+          ventana_fin: string
+          ventana_inicio: string
+        }[]
+      }
+      preparar_dispersion_srv: {
+        Args: {
+          p_actor_id: string
+          p_archivo_path: string
+          p_liquidacion_ids: string[]
+          p_session_id: string
+        }
+        Returns: {
+          datos_pago_cifrados: string
+          liquidacion_id: string
+          medio_id: string
+          metodo_pago: Database["public"]["Enums"]["metodo_pago"]
+          monto_neto: number
+          numero_documento_cifrado: string
+          tipo_documento: Database["public"]["Enums"]["documento_identidad_tipo"]
+          titular_nombre: string
+        }[]
+      }
       programar_tarifa: {
         Args: {
           p_desde: string
           p_formato_id: string
           p_franja_id: string
           p_valor: number
+        }
+        Returns: string
+      }
+      rechazar_oferta_srv: {
+        Args: {
+          p_actor_id: string
+          p_motivo?: string
+          p_oferta_id: string
+          p_session_id: string
         }
         Returns: string
       }
@@ -2097,6 +3829,14 @@ export type Database = {
           motivo: string
         }[]
       }
+      registrar_descarga_srv: {
+        Args: {
+          p_actor_id: string
+          p_asignacion_id: string
+          p_session_id: string
+        }
+        Returns: Json
+      }
       registrar_evento_srv: {
         Args: {
           p_accion: string
@@ -2112,9 +3852,68 @@ export type Database = {
         }
         Returns: number
       }
+      registrar_evidencia_srv: {
+        Args: {
+          p_actor_id: string
+          p_asignacion_id: string
+          p_captura_path: string
+          p_etiqueta_confirmada: boolean
+          p_fecha_publicacion: string
+          p_miniatura_path: string
+          p_numero: number
+          p_session_id: string
+          p_url: string
+        }
+        Returns: string
+      }
       registrar_intento_login_srv: {
         Args: { p_email: string; p_exito: boolean; p_ip: unknown }
         Returns: undefined
+      }
+      registrar_pago_anunciante_srv: {
+        Args: {
+          p_actor_id: string
+          p_factura_id: string
+          p_fecha: string
+          p_medio_pago: string
+          p_monto: number
+          p_referencia: string
+          p_session_id: string
+          p_soporte_path: string
+        }
+        Returns: string
+      }
+      registrar_pago_liquidacion_srv: {
+        Args: {
+          p_actor_id: string
+          p_fecha: string
+          p_liquidacion_id: string
+          p_referencia: string
+          p_session_id: string
+          p_soporte_path: string
+        }
+        Returns: Json
+      }
+      registrar_vista_oferta: {
+        Args: { p_oferta_id: string }
+        Returns: undefined
+      }
+      reservar_cupo_srv: {
+        Args: {
+          p_actor_id: string
+          p_clave_idempotencia?: string
+          p_cuenta_social_id: string
+          p_medio_id: string
+          p_oferta_id: string
+          p_session_id: string
+        }
+        Returns: {
+          asignacion_id: string
+          cupos_restantes_franja: number
+          franja_clave: string
+          monto_bruto: number
+          monto_medio: number
+        }[]
       }
       resumen_usuarios: {
         Args: never
@@ -2214,9 +4013,29 @@ export type Database = {
         | "RECUPERACION_SOLICITADA"
         | "CONTRASENA_CAMBIADA"
       anunciante_estado: "PENDIENTE" | "VERIFICADO" | "RECHAZADO" | "SUSPENDIDO"
+      asignacion_estado:
+        | "ACEPTADA"
+        | "CONTENIDO_ENTREGADO"
+        | "PUBLICADA"
+        | "EVIDENCIA_VALIDADA"
+        | "METRICAS_CARGADAS"
+        | "VERIFICADA"
+        | "LIQUIDADA"
+        | "PAGADA"
+        | "RECHAZADA"
+        | "VENCIDA_SIN_PUBLICAR"
+        | "EN_DISPUTA"
+        | "CANCELADA"
       audiencia_fuente: "DECLARADA" | "VERIFICADA_MANUAL" | "API"
       auditoria_tratamiento: "OMITIR" | "HASH" | "ENMASCARAR"
       bitacora_origen: "APP" | "DB" | "API_DIRECTA" | "DEMO"
+      campana_estado: "BORRADOR" | "ACTIVA" | "FINALIZADA" | "CANCELADA"
+      cancelacion_causa:
+        | "ADMINISTRATIVA"
+        | "ACUERDO"
+        | "INCUMPLIMIENTO_MEDIO"
+        | "FRAUDE"
+      comision_origen: "GLOBAL" | "EXCEPCION_ANUNCIANTE" | "EXCEPCION_CAMPANA"
       config_tipo:
         | "ENTERO"
         | "DECIMAL"
@@ -2225,6 +4044,17 @@ export type Database = {
         | "TEXTO"
         | "LISTA_TEXTO"
         | "MAPA_DECIMAL"
+      corte_metrica: "H24" | "H72" | "D7" | "PERSONALIZADO"
+      creativo_tipo: "IMAGEN" | "VIDEO" | "CARRUSEL"
+      disputa_estado: "ABIERTA" | "EN_REVISION" | "RESUELTA" | "DESCARTADA"
+      disputa_motivo:
+        | "INCUMPLIMIENTO"
+        | "METRICAS"
+        | "CONTENIDO"
+        | "PERMANENCIA"
+        | "PAGO"
+        | "OTRO"
+      disputa_parte: "ANUNCIANTE" | "MEDIO" | "ADMIN"
       documento_anunciante_tipo:
         | "RUT"
         | "CAMARA_COMERCIO"
@@ -2243,6 +4073,15 @@ export type Database = {
         | "CERT_BANCARIA"
         | "CERT_BILLETERA"
         | "SEG_SOCIAL"
+      documento_soporte_estado: "BORRADOR" | "EMITIDO" | "ANULADO"
+      factura_estado:
+        | "BORRADOR"
+        | "EMITIDA"
+        | "PAGADA_PARCIAL"
+        | "PAGADA"
+        | "VENCIDA"
+        | "ANULADA"
+      liquidacion_estado: "BORRADOR" | "APROBADA" | "PAGADA" | "ANULADA"
       medio_estado: "PENDIENTE" | "VERIFICADO" | "RECHAZADO" | "SUSPENDIDO"
       medio_tipo:
         | "PAGINA_NOTICIAS"
@@ -2254,7 +4093,18 @@ export type Database = {
         | "OTRO"
       metodo_pago: "BANCARIO" | "BILLETERA"
       metodo_verificacion: "MANUAL" | "CODIGO_HISTORIA" | "API"
+      metrica_fuente: "MANUAL" | "API"
       notificacion_canal: "APP" | "EMAIL" | "WHATSAPP" | "PUSH"
+      oferta_estado:
+        | "BORRADOR"
+        | "EN_REVISION"
+        | "DEVUELTA"
+        | "PUBLICADA"
+        | "CUPOS_COMPLETOS"
+        | "EN_EJECUCION"
+        | "VENCIDA"
+        | "CERRADA"
+        | "CANCELADA"
       perfil_estado: "INVITADO" | "ACTIVO" | "SUSPENDIDO" | "DESACTIVADO"
       plataforma: "FACEBOOK" | "INSTAGRAM" | "TIKTOK"
       retencion_tipo: "RETEFUENTE" | "RETEICA" | "RETEIVA"
@@ -2264,6 +4114,7 @@ export type Database = {
         | "TERMINOS_ANUNCIANTE"
         | "POLITICA_DATOS"
         | "CONDICIONES_COMERCIALES"
+      transicion_actor: "ADMIN" | "ANUNCIANTE" | "MEDIO" | "SISTEMA"
       validacion_estado: "PENDIENTE" | "APROBADA" | "RECHAZADA"
     }
     CompositeTypes: {
@@ -2406,9 +4257,31 @@ export const Constants = {
         "CONTRASENA_CAMBIADA",
       ],
       anunciante_estado: ["PENDIENTE", "VERIFICADO", "RECHAZADO", "SUSPENDIDO"],
+      asignacion_estado: [
+        "ACEPTADA",
+        "CONTENIDO_ENTREGADO",
+        "PUBLICADA",
+        "EVIDENCIA_VALIDADA",
+        "METRICAS_CARGADAS",
+        "VERIFICADA",
+        "LIQUIDADA",
+        "PAGADA",
+        "RECHAZADA",
+        "VENCIDA_SIN_PUBLICAR",
+        "EN_DISPUTA",
+        "CANCELADA",
+      ],
       audiencia_fuente: ["DECLARADA", "VERIFICADA_MANUAL", "API"],
       auditoria_tratamiento: ["OMITIR", "HASH", "ENMASCARAR"],
       bitacora_origen: ["APP", "DB", "API_DIRECTA", "DEMO"],
+      campana_estado: ["BORRADOR", "ACTIVA", "FINALIZADA", "CANCELADA"],
+      cancelacion_causa: [
+        "ADMINISTRATIVA",
+        "ACUERDO",
+        "INCUMPLIMIENTO_MEDIO",
+        "FRAUDE",
+      ],
+      comision_origen: ["GLOBAL", "EXCEPCION_ANUNCIANTE", "EXCEPCION_CAMPANA"],
       config_tipo: [
         "ENTERO",
         "DECIMAL",
@@ -2418,6 +4291,18 @@ export const Constants = {
         "LISTA_TEXTO",
         "MAPA_DECIMAL",
       ],
+      corte_metrica: ["H24", "H72", "D7", "PERSONALIZADO"],
+      creativo_tipo: ["IMAGEN", "VIDEO", "CARRUSEL"],
+      disputa_estado: ["ABIERTA", "EN_REVISION", "RESUELTA", "DESCARTADA"],
+      disputa_motivo: [
+        "INCUMPLIMIENTO",
+        "METRICAS",
+        "CONTENIDO",
+        "PERMANENCIA",
+        "PAGO",
+        "OTRO",
+      ],
+      disputa_parte: ["ANUNCIANTE", "MEDIO", "ADMIN"],
       documento_anunciante_tipo: [
         "RUT",
         "CAMARA_COMERCIO",
@@ -2438,6 +4323,16 @@ export const Constants = {
         "CERT_BILLETERA",
         "SEG_SOCIAL",
       ],
+      documento_soporte_estado: ["BORRADOR", "EMITIDO", "ANULADO"],
+      factura_estado: [
+        "BORRADOR",
+        "EMITIDA",
+        "PAGADA_PARCIAL",
+        "PAGADA",
+        "VENCIDA",
+        "ANULADA",
+      ],
+      liquidacion_estado: ["BORRADOR", "APROBADA", "PAGADA", "ANULADA"],
       medio_estado: ["PENDIENTE", "VERIFICADO", "RECHAZADO", "SUSPENDIDO"],
       medio_tipo: [
         "PAGINA_NOTICIAS",
@@ -2450,7 +4345,19 @@ export const Constants = {
       ],
       metodo_pago: ["BANCARIO", "BILLETERA"],
       metodo_verificacion: ["MANUAL", "CODIGO_HISTORIA", "API"],
+      metrica_fuente: ["MANUAL", "API"],
       notificacion_canal: ["APP", "EMAIL", "WHATSAPP", "PUSH"],
+      oferta_estado: [
+        "BORRADOR",
+        "EN_REVISION",
+        "DEVUELTA",
+        "PUBLICADA",
+        "CUPOS_COMPLETOS",
+        "EN_EJECUCION",
+        "VENCIDA",
+        "CERRADA",
+        "CANCELADA",
+      ],
       perfil_estado: ["INVITADO", "ACTIVO", "SUSPENDIDO", "DESACTIVADO"],
       plataforma: ["FACEBOOK", "INSTAGRAM", "TIKTOK"],
       retencion_tipo: ["RETEFUENTE", "RETEICA", "RETEIVA"],
@@ -2461,6 +4368,7 @@ export const Constants = {
         "POLITICA_DATOS",
         "CONDICIONES_COMERCIALES",
       ],
+      transicion_actor: ["ADMIN", "ANUNCIANTE", "MEDIO", "SISTEMA"],
       validacion_estado: ["PENDIENTE", "APROBADA", "RECHAZADA"],
     },
   },

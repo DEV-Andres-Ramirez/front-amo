@@ -8,7 +8,13 @@ import {
   RotateCcw,
   ShieldPlus,
 } from "lucide-react"
-import { useEffect, useMemo, useState, useTransition } from "react"
+import {
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react"
 import { Controller, FormProvider, useForm, useWatch } from "react-hook-form"
 
 import { aplicarErroresServidor } from "@/features/usuarios/components/errores-formulario"
@@ -120,14 +126,29 @@ function OpcionTipo({ tipo }: { tipo: TipoRol }) {
   )
 }
 
+function AvisoOmitidos({ children }: { children: ReactNode }) {
+  return (
+    <Alert className="border-warning/40 bg-warning/8 py-2">
+      <Info className="text-warning" aria-hidden />
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
+  )
+}
+
 function ResumenClonado({
   origen,
   actor,
+  tipo,
 }: {
   origen: RolListado
   actor: ActorRoles
+  tipo: TipoRol
 }) {
-  const { copiables, omitidos } = permisosClonables(origen.permisos, actor)
+  const { copiables, sinAlcance, noAplicables } = permisosClonables(
+    origen.permisos,
+    actor,
+    tipo
+  )
   return (
     <div className="flex flex-col gap-2">
       <FieldDescription className="flex items-start gap-1.5">
@@ -137,18 +158,25 @@ function ResumenClonado({
           {origen.nombre}». Después podrás ajustarlos.
         </span>
       </FieldDescription>
-      {omitidos.length > 0 ? (
-        <Alert className="border-warning/40 bg-warning/8 py-2">
-          <Info className="text-warning" aria-hidden />
-          <AlertDescription>
-            {pluralizar(
-              omitidos.length,
-              "permiso no se copiará",
-              "permisos no se copiarán"
-            )}{" "}
-            porque tú no los tienes.
-          </AlertDescription>
-        </Alert>
+      {noAplicables.length > 0 ? (
+        <AvisoOmitidos>
+          {pluralizar(
+            noAplicables.length,
+            "permiso no se copiará",
+            "permisos no se copiarán"
+          )}{" "}
+          porque un rol de tipo «{TIPOS_ROL_ETIQUETA[tipo]}» no los admite.
+        </AvisoOmitidos>
+      ) : null}
+      {sinAlcance.length > 0 ? (
+        <AvisoOmitidos>
+          {pluralizar(
+            sinAlcance.length,
+            "permiso no se copiará",
+            "permisos no se copiarán"
+          )}{" "}
+          porque tú no los tienes.
+        </AvisoOmitidos>
       ) : null}
     </div>
   )
@@ -191,6 +219,9 @@ export function FormularioCrearRol({
     setError,
   } = formulario
   const [claveManual, setClaveManual] = useState(false)
+  // Si la persona eligió el tipo (aunque sea el predeterminado), el rol de
+  // origen ya no lo cambia.
+  const [tipoManual, setTipoManual] = useState(false)
   // Si la persona no tocó el interruptor de MFA, sigue al tipo (y al rol de origen).
   const [mfaManual, setMfaManual] = useState(false)
   const [pendiente, iniciar] = useTransition()
@@ -237,6 +268,7 @@ export function FormularioCrearRol({
   }
 
   function elegirTipo(tipoElegido: TipoRol) {
+    setTipoManual(true)
     setValue("tipo", tipoElegido, { shouldDirty: true, shouldTouch: true })
     ajustarMfa(tipoElegido, false)
   }
@@ -244,8 +276,8 @@ export function FormularioCrearRol({
   function elegirOrigen(id: string) {
     setValue("clonarDesde", id, { shouldDirty: true })
     const elegido = roles.find((rol) => rol.id === id)
-    // Sugerencia: el mismo tipo del rol de origen, si aún no se eligió otro.
-    if (elegido && !formState.dirtyFields.tipo) {
+    // Sugerencia: el mismo tipo del rol de origen, si aún no se eligió uno.
+    if (elegido && !tipoManual) {
       setValue("tipo", elegido.tipo)
       ajustarMfa(elegido.tipo, elegido.requiereMfa)
     }
@@ -422,7 +454,7 @@ export function FormularioCrearRol({
               </SelectContent>
             </Select>
             {origen ? (
-              <ResumenClonado origen={origen} actor={actor} />
+              <ResumenClonado origen={origen} actor={actor} tipo={tipo} />
             ) : (
               <FieldDescription>
                 Crea el rol vacío y elige sus permisos en la matriz, o parte de

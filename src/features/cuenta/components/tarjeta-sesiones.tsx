@@ -68,7 +68,7 @@ function FilaSesion({ sesion }: { sesion: SesionPropia }) {
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
           <span>{sesion.navegador ?? "Navegador desconocido"}</span>
           {sesion.esActual ? (
-            <Badge className="h-5 bg-primary/15 px-2 text-[0.6875rem] text-primary hover:bg-primary/15">
+            <Badge className="h-5 bg-primary/15 px-2 text-[0.6875rem] text-lila-700 hover:bg-primary/15 dark:text-primary">
               Este dispositivo
             </Badge>
           ) : null}

@@ -238,6 +238,8 @@ async function contextoPara(
     perfilesVisibles(filas.flatMap(perfilesReferenciados)),
   ])
   const nombres = new Map<string, string>(roles.porId)
+  // Las claves de rol ("ADMIN") aparecen en metadatos como `rol`.
+  for (const [clave, rol] of roles.porClave) nombres.set(clave, rol.nombre)
   for (const [id, perfil] of perfiles) {
     nombres.set(id, perfil.nombre?.trim() || perfil.email)
   }

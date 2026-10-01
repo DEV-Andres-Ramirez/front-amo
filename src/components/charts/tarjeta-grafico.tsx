@@ -28,9 +28,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { exportarPngGrafico } from "@/lib/export/imagen"
+import { componerImagenGrafico, descargarLienzoPng } from "@/lib/export/imagen"
 import { cn } from "@/lib/utils"
 
+import { capturarLienzo } from "./captura"
 import {
   ContextoRegistroGrafico,
   type GraficoRegistrado,
@@ -99,8 +100,14 @@ function BotonAccion({
   deshabilitado,
   children,
 }: {
+  /** Nombre accesible y tooltip. */
   etiqueta: string
   onClick: () => void
+  /**
+   * Solo visual: el botón de vista cambia de nombre ("Ver datos" ↔ "Ver
+   * gráfico"), así que no usa además `aria-pressed` (el nombre de un botón
+   * de alternancia no debe cambiar).
+   */
   activo?: boolean
   deshabilitado?: boolean
   children: ReactNode
@@ -113,7 +120,6 @@ function BotonAccion({
             variant="ghost"
             size="icon-sm"
             aria-label={etiqueta}
-            aria-pressed={activo}
             disabled={deshabilitado}
             onClick={onClick}
             className={cn(
@@ -156,6 +162,8 @@ export function TarjetaGrafico({
   const [exportando, iniciarExportacion] = useTransition()
   const [registrado, setRegistrado] = useState<GraficoRegistrado | null>(null)
   const registroAmpliado = useRef<GraficoRegistrado | null>(null)
+  const areaGrafico = useRef<HTMLDivElement>(null)
+  const areaAmpliada = useRef<HTMLDivElement>(null)
 
   const registrarAmpliado = useCallback((grafico: GraficoRegistrado | null) => {
     registroAmpliado.current = grafico
@@ -165,20 +173,47 @@ export function TarjetaGrafico({
   const verTabla = vista === "tabla" && registrado !== null
   const tablaVisible = vista === "tabla" ? registrado?.tabla : undefined
 
+  /**
+   * Vuelve a dibujar el gráfico fuera de pantalla (a doble densidad, sin
+   * puntero ni tooltip, con leyenda y total de la dona en el lienzo); si no
+   * puede, compone el lienzo visible.
+   */
+  async function lienzoParaExportar(
+    grafico: GraficoRegistrado,
+    area: HTMLElement | null
+  ): Promise<HTMLCanvasElement> {
+    const composicion = {
+      titulo,
+      descripcion: typeof descripcion === "string" ? descripcion : undefined,
+      conSello: true,
+    }
+    try {
+      return await capturarLienzo(children, {
+        ...composicion,
+        modo: tema.modo,
+        ancho: area?.clientWidth || undefined,
+        alto: area?.clientHeight || undefined,
+      })
+    } catch {
+      const origen = grafico.instancia.current?.canvas
+      if (!origen) throw new Error("Gráfico sin lienzo")
+      return componerImagenGrafico(origen, {
+        ...composicion,
+        leyenda: grafico.leyenda,
+        leyendaAlLado: grafico.leyendaAlLado,
+        estilo: estiloLienzo(tema),
+      })
+    }
+  }
+
   function exportar() {
     const grafico = ampliado ? registroAmpliado.current : registrado
-    const origen = grafico?.instancia.current?.canvas
-    if (!origen) return
+    if (!grafico) return
+    const area = ampliado ? areaAmpliada.current : areaGrafico.current
     iniciarExportacion(async () => {
       try {
-        await exportarPngGrafico(origen, {
-          nombreBase: nombreArchivo,
-          titulo,
-          descripcion:
-            typeof descripcion === "string" ? descripcion : undefined,
-          leyenda: grafico?.leyenda,
-          estilo: estiloLienzo(tema),
-        })
+        const lienzo = await lienzoParaExportar(grafico, area)
+        await descargarLienzoPng(lienzo, nombreArchivo)
         toast.success("Imagen descargada", { description: titulo })
       } catch {
         toast.error("No se pudo generar la imagen. Intenta de nuevo.")
@@ -186,8 +221,15 @@ export function TarjetaGrafico({
     })
   }
 
+  // Ocultas (sin perder su espacio) hasta que el gráfico se registra: si el
+  // gráfico falla, la tarjeta no ofrece acciones que no harían nada.
   const accionesEstandar = disponible ? (
-    <>
+    <div
+      className={cn(
+        "flex items-center gap-0.5 transition-opacity duration-200",
+        !registrado && "invisible opacity-0"
+      )}
+    >
       <BotonAccion
         etiqueta={verTabla ? "Ver gráfico" : "Ver datos"}
         activo={verTabla}
@@ -210,7 +252,7 @@ export function TarjetaGrafico({
       >
         <Maximize2 aria-hidden />
       </BotonAccion>
-    </>
+    </div>
   ) : null
 
   function cuerpo() {
@@ -273,6 +315,7 @@ export function TarjetaGrafico({
       </header>
 
       <div
+        ref={areaGrafico}
         aria-busy={actualizando || undefined}
         className={cn(
           "relative flex-auto transition-opacity duration-300",
@@ -292,9 +335,11 @@ export function TarjetaGrafico({
       ) : null}
 
       <Dialog open={ampliado} onOpenChange={setAmpliado}>
+        {/* Fondo de tarjeta: las separaciones de 2 px y los anillos de los
+            marcadores usan el color de la superficie del gráfico. */}
         <DialogContent
           showCloseButton={false}
-          className="flex h-[min(92dvh,56rem)] w-[min(96vw,80rem)] max-w-none flex-col gap-4 p-5 sm:max-w-none sm:p-6"
+          className="flex h-[min(92dvh,56rem)] w-[min(96vw,80rem)] max-w-none flex-col gap-4 bg-card p-5 text-card-foreground sm:max-w-none sm:p-6"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-col gap-1">
@@ -326,7 +371,7 @@ export function TarjetaGrafico({
               </DialogClose>
             </div>
           </div>
-          <div className="relative min-h-0 flex-1">
+          <div ref={areaAmpliada} className="relative min-h-0 flex-1">
             <LimiteErrorGrafico titulo={titulo}>
               <ContextoRegistroGrafico value={registrarAmpliado}>
                 {children}

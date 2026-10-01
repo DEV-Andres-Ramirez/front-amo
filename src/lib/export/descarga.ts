@@ -12,6 +12,8 @@ export const MIME = {
 
 export type ExtensionExportacion = keyof typeof MIME
 
+const LIBERAR_URL_MS = 10_000
+
 /** Mismo criterio de nombre que la exportación de tablas: sin tildes y con fecha de Bogotá. */
 export function nombreArchivo(
   base: string,
@@ -38,6 +40,7 @@ export function descargarArchivo(
   document.body.append(enlace)
   enlace.click()
   enlace.remove()
-  // El navegador ya tomó el Blob tras el clic; se libera en el siguiente ciclo.
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  // Se libera con margen: revocar en el mismo ciclo del clic cancela la
+  // descarga en algunos navegadores (Safari, Firefox con archivos grandes).
+  setTimeout(() => URL.revokeObjectURL(url), LIBERAR_URL_MS)
 }

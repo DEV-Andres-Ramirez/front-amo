@@ -45,9 +45,12 @@ describe("MiniMapaColombia", () => {
     expect(push).toHaveBeenLastCalledWith("/analitica/mapa")
   })
 
-  it("sin enlaces no expone controles y muestra la leyenda", () => {
+  it("sin enlaces no expone controles, pero cada cifra sigue siendo legible", () => {
     render(<MiniMapaColombia valores={VALORES} metrica="medios" etiqueta="Medios" />)
     expect(screen.queryAllByRole("link")).toHaveLength(0)
+    expect(screen.getByRole("img", { name: "Antioquia: 123" })).not.toHaveAttribute(
+      "tabindex"
+    )
     expect(screen.getByText("Sin datos")).toBeInTheDocument()
   })
 })

@@ -187,6 +187,19 @@ describe("describirEvento", () => {
       CONTEXTO
     )
     expect(evento.titulo).toBe("Activó la verificación en dos pasos")
+    // El nombre del evento ya es el título: no se repite en los detalles.
+    expect(evento.metadatos.map((par) => par.clave)).toEqual([])
+    const desactivada = describirEvento(
+      fila({
+        accion: "OTRO",
+        metadatos: { evento: "MFA_DESACTIVADA", factor: "totp" },
+      }),
+      CONTEXTO
+    )
+    expect(desactivada.titulo).toBe("Desactivó la verificación en dos pasos")
+    expect(desactivada.metadatos.map((par) => par.valor.texto)).toEqual([
+      "App de autenticación (TOTP)",
+    ])
   })
 
   it("sin actor es el sistema; un actor sin perfil visible muestra su correo enmascarado", () => {

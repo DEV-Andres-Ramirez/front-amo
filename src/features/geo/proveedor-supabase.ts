@@ -36,8 +36,9 @@ import {
  * deciden) con el cliente del USUARIO. Mientras la migración 9 no exista,
  * responde "no disponible" con un mensaje claro en lugar de fallar.
  *
- * La RPC aún no está en `database.types.ts`: se llama sin tipos y cada fila
- * se valida con zod. Al regenerar los tipos puede volver a ser tipada.
+ * La RPC aún no está en `database.types.ts`: solo esa llamada va sin tipos
+ * y cada fila se valida con zod (al regenerar los tipos puede tiparse). Las
+ * tablas `accesos` y `medios` sí usan el cliente tipado.
  */
 
 const FUNCION_INEXISTENTE = new Set(["PGRST202", "42883"])
@@ -46,7 +47,8 @@ const SIN_PERMISO = new Set(["42501"])
 const MENSAJE_NO_DISPONIBLE =
   "El explorador todavía no tiene datos: falta la función de analítica geo_metricas en la base de datos (migración 9)."
 
-const LIMITE_ACCESOS = 20_000
+/** Tope de filas para el mapa de calor (más no cambia su forma). */
+const LIMITE_PUNTOS = 20_000
 
 interface ErrorPostgrest {
   code?: string | null
@@ -121,17 +123,14 @@ function aFila(
   }
 }
 
-type Cliente = SupabaseClient
-
-async function cliente(): Promise<Cliente> {
-  return (await crearClienteServidor()) as unknown as Cliente
-}
+type Cliente = Awaited<ReturnType<typeof crearClienteServidor>>
 
 async function geoMetricas(
   supabase: Cliente,
   consulta: ConsultaMapaGeo
 ): Promise<FilaMetricaGeo[]> {
-  const { data, error } = await supabase.rpc("geo_metricas", {
+  const sinTipos = supabase as unknown as SupabaseClient
+  const { data, error } = await sinTipos.rpc("geo_metricas", {
     p_nivel: NIVEL_RPC[consulta.nivel],
     p_metrica: consulta.metrica,
     p_desde: consulta.desde,
@@ -170,7 +169,7 @@ async function puntosAccesos(
     .lt("created_at", rango.hastaExclusivo)
     .not("lat", "is", null)
     .not("lon", "is", null)
-    .limit(LIMITE_ACCESOS)
+    .limit(LIMITE_PUNTOS)
   if (consulta.nivel === "nacional") {
     peticion = peticion.eq("pais_iso2", CODIGO_COLOMBIA)
   }
@@ -179,11 +178,8 @@ async function puntosAccesos(
   }
   const { data, error } = await peticion
   if (error) return null
-  const filas = z
-    .array(z.object({ lat: numeroNulo, lon: numeroNulo }))
-    .parse(data ?? [])
   return fundirPuntos(
-    filas.flatMap(({ lat, lon }) =>
+    data.flatMap(({ lat, lon }) =>
       lat === null || lon === null ? [] : [[lon, lat, 1] as const]
     )
   )
@@ -199,17 +195,16 @@ async function puntosMedios(
     .select("municipio_codigo")
     .eq("estado", "VERIFICADO")
     .is("deleted_at", null)
+    .limit(LIMITE_PUNTOS)
   if (consulta.nivel === "departamental" && consulta.departamento) {
-    peticion = peticion.like("municipio_codigo", `${consulta.departamento}%`)
+    peticion = peticion.eq("departamento_codigo", consulta.departamento)
   }
   const { data, error } = await peticion
   // Sin la tabla (migración 6) o con un fallo, el mapa sigue sin capa de calor.
   if (error) return null
   const conteos = new Map<string, number>()
-  for (const { municipio_codigo: codigo } of z
-    .array(z.object({ municipio_codigo: z.string().nullable() }))
-    .parse(data ?? [])) {
-    if (codigo) conteos.set(codigo, (conteos.get(codigo) ?? 0) + 1)
+  for (const { municipio_codigo: codigo } of data) {
+    conteos.set(codigo, (conteos.get(codigo) ?? 0) + 1)
   }
   return [...conteos].flatMap(([codigo, total]) => {
     const municipio = obtenerMunicipio(codigo)
@@ -313,7 +308,7 @@ async function topSubzonas(
 export function crearProveedorSupabase(): ProveedorMetricasGeo {
   return {
     async mapa(consulta): Promise<RespuestaMapaGeo> {
-      const supabase = await cliente()
+      const supabase = await crearClienteServidor()
       const [filas, puntos] = await Promise.all([
         geoMetricas(supabase, consulta),
         puntosDe(supabase, consulta).catch(() => null),
@@ -328,7 +323,7 @@ export function crearProveedorSupabase(): ProveedorMetricasGeo {
     },
 
     async detalle(consulta): Promise<RespuestaDetalleGeo> {
-      const supabase = await cliente()
+      const supabase = await crearClienteServidor()
       const [kpis, top] = await Promise.all([
         kpisDeZona(supabase, consulta),
         topSubzonas(supabase, consulta),

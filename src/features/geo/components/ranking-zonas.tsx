@@ -6,7 +6,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 import type { FilaRanking, Ranking } from "../agregacion"
-import { formatearValorGeo } from "../formato"
+import { formatearParticipacion, formatearValorGeo } from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 
 interface RankingZonasProps {
@@ -22,6 +22,8 @@ interface RankingZonasProps {
   onSeleccionar: (codigo: string) => void
   onExplorar: (codigo: string) => void
   zonaSingular: string
+  /** Filas fuera del foco de la leyenda se atenúan (`null`: sin foco). */
+  enFoco?: ((fila: FilaRanking) => boolean) | null
   className?: string
 }
 
@@ -57,6 +59,7 @@ export function RankingZonas({
   onSeleccionar,
   onExplorar,
   zonaSingular,
+  enFoco = null,
   className,
 }: RankingZonasProps) {
   const filas = ranking.filas
@@ -115,15 +118,17 @@ export function RankingZonas({
         const explorable = puedeExplorar(fila.codigo)
         const seleccionada = fila.codigo === seleccionado
         const conDato = fila.valor !== null
+        // Mínimo visible solo para valores positivos: un cero no lleva barra.
         const ancho =
-          conDato && ranking.maximo > 0
-            ? Math.max(3, ((fila.valor ?? 0) / ranking.maximo) * 100)
+          fila.valor !== null && fila.valor > 0 && ranking.maximo > 0
+            ? Math.max(3, (fila.valor / ranking.maximo) * 100)
             : 0
         return (
           <li
             key={fila.codigo}
             className={cn(
-              "group/fila relative flex items-center rounded-xl transition-colors duration-150",
+              "group/fila relative flex items-center rounded-xl transition-[background-color,opacity] duration-150",
+              enFoco && !enFoco(fila) && "opacity-40",
               seleccionada
                 ? "bg-primary/12 ring-1 ring-primary/35"
                 : resaltado === fila.codigo
@@ -191,7 +196,7 @@ export function RankingZonas({
               </span>
               <span className="sr-only">
                 {fila.participacion !== null
-                  ? `, ${formatearValorGeo(fila.participacion, "cumplimiento")} del total`
+                  ? `, ${formatearParticipacion(fila.participacion)} del total`
                   : ""}
               </span>
             </button>

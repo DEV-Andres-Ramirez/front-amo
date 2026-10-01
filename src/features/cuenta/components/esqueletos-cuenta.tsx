@@ -1,6 +1,36 @@
 import { Esqueleto } from "@/components/feedback/esqueletos"
 import { cn } from "@/lib/utils"
 
+/** Encabezado de una tarjeta de ajustes: icono, título y descripción. */
+function EncabezadoEsqueleto({
+  anchoTitulo = "w-40",
+}: {
+  anchoTitulo?: string
+}) {
+  return (
+    <div className="flex items-start gap-3.5">
+      <Esqueleto className="size-9 shrink-0 rounded-xl" />
+      <div className="flex flex-1 flex-col gap-2 pt-0.5">
+        <Esqueleto className={cn("h-4", anchoTitulo)} />
+        <Esqueleto className="h-3.5 w-64 max-w-full" />
+      </div>
+    </div>
+  )
+}
+
+function PieEsqueleto({
+  anchoPrincipal = "w-32",
+}: {
+  anchoPrincipal?: string
+}) {
+  return (
+    <div className="flex justify-end gap-2 border-t bg-muted/30 px-5 py-3.5 sm:px-6">
+      <Esqueleto className="h-8 w-24" />
+      <Esqueleto className={cn("h-8", anchoPrincipal)} />
+    </div>
+  )
+}
+
 /** Tarjeta de ajustes en carga: encabezado con icono, filas y pie opcional. */
 export function EsqueletoSeccion({
   filas = 3,
@@ -15,12 +45,8 @@ export function EsqueletoSeccion({
     <div
       className={cn("overflow-hidden rounded-2xl border bg-card", className)}
     >
-      <div className="flex items-start gap-3.5 px-5 pt-5 sm:px-6 sm:pt-6">
-        <Esqueleto className="size-9 shrink-0 rounded-xl" />
-        <div className="flex flex-1 flex-col gap-2 pt-0.5">
-          <Esqueleto className="h-4 w-40" />
-          <Esqueleto className="h-3.5 w-64 max-w-full" />
-        </div>
+      <div className="px-5 pt-5 sm:px-6 sm:pt-6">
+        <EncabezadoEsqueleto />
       </div>
       <div
         className={cn(
@@ -40,12 +66,7 @@ export function EsqueletoSeccion({
           </div>
         ))}
       </div>
-      {conPie ? (
-        <div className="flex justify-end gap-2 border-t bg-muted/30 px-5 py-3.5 sm:px-6">
-          <Esqueleto className="h-8 w-24" />
-          <Esqueleto className="h-8 w-32" />
-        </div>
-      ) : null}
+      {conPie ? <PieEsqueleto /> : null}
     </div>
   )
 }
@@ -59,8 +80,8 @@ export function EsqueletoPerfil() {
         <Esqueleto className="size-20 shrink-0 rounded-full sm:size-24" />
         <div className="flex flex-1 flex-col gap-2">
           <Esqueleto className="h-3 w-24" />
-          <Esqueleto className="h-7 w-56" />
-          <Esqueleto className="h-4 w-48" />
+          <Esqueleto className="h-7 w-56 max-w-full" />
+          <Esqueleto className="h-4 w-48 max-w-full" />
           <div className="mt-1 flex gap-2">
             <Esqueleto className="h-6 w-32 rounded-full" />
             <Esqueleto className="h-6 w-40 rounded-full" />
@@ -69,12 +90,8 @@ export function EsqueletoPerfil() {
         <Esqueleto className="h-8 w-32" />
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card">
-        <div className="flex items-start gap-3.5 px-5 pt-5 sm:px-6 sm:pt-6">
-          <Esqueleto className="size-9 shrink-0 rounded-xl" />
-          <div className="flex flex-1 flex-col gap-2 pt-0.5">
-            <Esqueleto className="h-4 w-40" />
-            <Esqueleto className="h-3.5 w-64 max-w-full" />
-          </div>
+        <div className="px-5 pt-5 sm:px-6 sm:pt-6">
+          <EncabezadoEsqueleto />
         </div>
         <div className="grid gap-x-6 gap-y-5 px-5 py-5 sm:px-6 sm:py-6 md:grid-cols-2">
           {Array.from({ length: 4 }, (_, indice) => (
@@ -85,10 +102,7 @@ export function EsqueletoPerfil() {
             </div>
           ))}
         </div>
-        <div className="flex justify-end gap-2 border-t bg-muted/30 px-5 py-3.5 sm:px-6">
-          <Esqueleto className="h-8 w-24" />
-          <Esqueleto className="h-8 w-36" />
-        </div>
+        <PieEsqueleto anchoPrincipal="w-36" />
       </div>
     </div>
   )
@@ -107,27 +121,38 @@ export function EsqueletoSeguridad() {
   )
 }
 
-/** Carga de Preferencias: tema con tres vistas previas y el resto de ajustes. */
+/** Tarjeta con opciones de vista previa (tema, densidad, números). */
+function EsqueletoOpciones({ columnas }: { columnas: 2 | 3 }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card p-5 sm:p-6">
+      <EncabezadoEsqueleto anchoTitulo="w-28" />
+      <div
+        className={cn(
+          "mt-5 grid gap-2 sm:gap-3",
+          columnas === 3 ? "grid-cols-3" : "grid-cols-2"
+        )}
+      >
+        {Array.from({ length: columnas }, (_, indice) => (
+          <Esqueleto
+            key={indice}
+            className="h-[6.5rem] rounded-xl sm:h-40 lg:h-[11.5rem]"
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Carga de Preferencias: el mismo orden y las mismas rejillas del panel. */
 export function EsqueletoPreferencias() {
   return (
     <div role="status" aria-busy="true" className="flex flex-col gap-6">
       <span className="sr-only">Cargando tus preferencias…</span>
-      <div className="overflow-hidden rounded-2xl border bg-card p-5 sm:p-6">
-        <div className="flex items-start gap-3.5">
-          <Esqueleto className="size-9 shrink-0 rounded-xl" />
-          <div className="flex flex-1 flex-col gap-2 pt-0.5">
-            <Esqueleto className="h-4 w-24" />
-            <Esqueleto className="h-3.5 w-72 max-w-full" />
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          {Array.from({ length: 3 }, (_, indice) => (
-            <Esqueleto key={indice} className="h-40 rounded-xl" />
-          ))}
-        </div>
-      </div>
-      <EsqueletoSeccion filas={3} />
-      <EsqueletoSeccion filas={2} />
+      <Esqueleto className="h-4 w-80 max-w-full" />
+      <EsqueletoOpciones columnas={3} />
+      <EsqueletoOpciones columnas={3} />
+      <EsqueletoSeccion filas={1} />
+      <EsqueletoOpciones columnas={2} />
     </div>
   )
 }

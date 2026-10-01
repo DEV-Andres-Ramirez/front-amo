@@ -82,8 +82,9 @@ describe("TarjetaGrafico", () => {
       </TarjetaGrafico>
     )
     await usuario.click(screen.getByRole("button", { name: "Ver datos" }))
+    // El nombre cambia con la vista: no es además un botón de alternancia.
     const boton = screen.getByRole("button", { name: "Ver gráfico" })
-    expect(boton).toHaveAttribute("aria-pressed", "true")
+    expect(boton).not.toHaveAttribute("aria-pressed")
     expect(
       screen.getAllByRole("table", { name: "Embudo" }).length
     ).toBeGreaterThan(0)

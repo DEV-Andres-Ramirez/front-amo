@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react"
@@ -91,11 +92,14 @@ export function usePantallaCompleta() {
   return { activa, alternar }
 }
 
+const SELECTOR_HOJA = '[data-slot="drawer-popup"]'
+
 const SELECTOR_CAPAS_ABIERTAS = [
   '[data-slot="popover-content"]',
   '[data-slot="select-content"]',
   '[data-slot="dropdown-menu-content"]',
-  '[data-slot="drawer-popup"]',
+  '[data-slot="tooltip-content"]',
+  SELECTOR_HOJA,
   '[data-slot="dialog-content"]',
   '[data-slot="sheet-content"]',
 ].join(",")
@@ -125,4 +129,33 @@ export function useTeclaEscape(habilitada: boolean, alPulsar: () => void) {
     window.addEventListener("keydown", alTeclear)
     return () => window.removeEventListener("keydown", alTeclear)
   }, [habilitada])
+}
+
+/**
+ * Al cambiar de nivel desaparece el control que tenía el foco (la fila del
+ * ranking, «Explorar», una miga): sin esto el foco cae en `<body>` y quien
+ * usa teclado vuelve al inicio de la página. Se lleva a la miga del nivel
+ * nuevo (`data-miga-actual`), que además anuncia dónde se está.
+ */
+export function useFocoTrasCambioDeNivel(
+  raiz: RefObject<HTMLElement | null>,
+  ambito: string
+) {
+  const previo = useRef(ambito)
+  useEffect(() => {
+    if (previo.current === ambito) return
+    previo.current = ambito
+    const contenedor = raiz.current
+    if (!contenedor) return
+    const activo = document.activeElement
+    const perdido = !activo || activo === document.body
+    const enExplorador =
+      activo !== null &&
+      (contenedor.contains(activo) || activo.closest(SELECTOR_HOJA) !== null)
+    if (perdido || enExplorador) {
+      contenedor
+        .querySelector<HTMLElement>("[data-miga-actual]")
+        ?.focus({ preventScroll: true })
+    }
+  }, [raiz, ambito])
 }

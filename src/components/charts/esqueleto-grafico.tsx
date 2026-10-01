@@ -54,11 +54,13 @@ export function EsqueletoTarjetaGrafico({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-2">
-          <Esqueleto className="h-4 w-44" />
-          <Esqueleto className="h-3 w-64 max-w-full" />
+        {/* Anchos en %, con tope: un ancho fijo impone su mínimo a la
+            rejilla y desborda la página en móvil. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <Esqueleto className="h-4 w-1/2 max-w-44" />
+          <Esqueleto className="h-3 w-11/12 max-w-64" />
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex shrink-0 gap-1.5">
           <Esqueleto className="size-7 rounded-lg" />
           <Esqueleto className="size-7 rounded-lg" />
           <Esqueleto className="size-7 rounded-lg" />

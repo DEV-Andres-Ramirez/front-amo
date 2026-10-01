@@ -41,6 +41,11 @@ export interface TemaGraficos {
   reducirMovimiento: boolean
   /** `devicePixelRatio` del lienzo; sin valor, el de la pantalla. */
   densidad?: number
+  /**
+   * Dibujo para una imagen (captura para documentos): lo que en pantalla es
+   * HTML superpuesto, como el total de la dona, se pinta en el lienzo.
+   */
+  captura?: boolean
 }
 
 /** Colores y fuente para componer la imagen exportada de un gráfico. */

@@ -827,6 +827,37 @@ GRANT authenticated `select, insert (cuenta_social_id, metodo, seguidores_report
 Enums: `campana_estado ('BORRADOR','ACTIVA','FINALIZADA','CANCELADA')`, `oferta_estado ('BORRADOR','EN_REVISION','DEVUELTA','PUBLICADA','CUPOS_COMPLETOS','EN_EJECUCION','VENCIDA','CERRADA','CANCELADA')`, `asignacion_estado ('ACEPTADA','CONTENIDO_ENTREGADO','PUBLICADA','EVIDENCIA_VALIDADA','METRICAS_CARGADAS','VERIFICADA','LIQUIDADA','PAGADA','RECHAZADA','VENCIDA_SIN_PUBLICAR','EN_DISPUTA','CANCELADA')`, `creativo_tipo ('IMAGEN','VIDEO','CARRUSEL')`, `corte_metrica ('H24','H72','D7','PERSONALIZADO')`, `metrica_fuente ('MANUAL','API')`, `comision_origen ('GLOBAL','EXCEPCION_ANUNCIANTE','EXCEPCION_CAMPANA')`, `cancelacion_causa ('ADMINISTRATIVA','ACUERDO','INCUMPLIMIENTO_MEDIO','FRAUDE')`, `liquidacion_estado ('BORRADOR','APROBADA','PAGADA','ANULADA')`, `documento_soporte_estado ('BORRADOR','EMITIDO','ANULADO')`, `factura_estado ('BORRADOR','EMITIDA','PAGADA_PARCIAL','PAGADA','VENCIDA','ANULADA')`, `disputa_estado ('ABIERTA','EN_REVISION','RESUELTA','DESCARTADA')`, `disputa_motivo ('INCUMPLIMIENTO','METRICAS','CONTENIDO','PERMANENCIA','PAGO','OTRO')`, `disputa_parte ('ANUNCIANTE','MEDIO','ADMIN')`, `transicion_actor ('ADMIN','ANUNCIANTE','MEDIO','SISTEMA')` (`validacion_estado` viene de M6).
 También crea `private.transiciones_estado` (§4) y la semilla completa de transiciones de todas las entidades (incluidas las de M3/M6: `perfiles`, `anunciantes`, `medios`, `documentos_*`, `verificaciones_cuenta`), y adjunta `trg_<t>_a_validar_transicion` a esas tablas.
 
+**Real (M7 aplicada en siete migraciones, §11.2):**
+- `negocio_transacciones_tablas` (7a: enums, `private.transiciones_estado` con la semilla de **141** filas verificada contra los enums y las `columna_at`, las 19 tablas con RLS habilitada y sin políticas), `…_funciones` (7b: helpers, núcleo de transiciones, precio y cupos, funciones de trigger y triggers, incluidos `a_validar_transicion`/`a_estado_inicial` de las tablas de M6), `…_transiciones` (7c: `transicionar_srv`, `activar_perfil_srv`, trigger de `perfiles`, procedimientos del medio), `…_procedimientos` (7d: finanzas, cotización y SRF), `…_seguridad` (7e: políticas, grants y auditoría), `…_ajustes` (7f: correcciones de `aplicar_transicion` y de la condición de métricas) y `…_politicas` (7g: una sola permisiva de UPDATE por tabla).
+- `metricas.id` es **uuid** (no bigint), porque `transicionar_srv` tiene la firma fija `p_id uuid`.
+- `documentos_soporte` no usa `liquidacion_id unique`. Usa un índice único parcial `(liquidacion_id) where estado <> 'ANULADO'`, para poder reemitir tras anular. La numeración es coherente (todos los campos juntos), con `estado <> 'EMITIDO' or consecutivo is not null` y `estado <> 'BORRADOR' or consecutivo is null`; así un borrador anulado no consume número.
+- `facturas` sigue la misma lógica: `estado in ('BORRADOR','ANULADA') or consecutivo is not null`, y además `pagado <= total`.
+- `liquidaciones_pagada_chk` exige también `fecha_pago`.
+- `asignacion_montos` exige `monto_neto = monto_bruto − monto_comision − monto_retenciones` y coherencia entre `comision_origen` y `comision_excepcion_id`.
+- En `publicaciones` y `metricas`, `anunciante_id` y `medio_id` se copian sin FK (son derivados e inmutables).
+- **Estado inicial:** el trigger `trg_<t>_a_estado_inicial` (`private.fn_validar_estado_inicial`, definer, BEFORE INSERT, salvo `modo_carga`) está en anunciantes, medios, documentos_*, campanas, ofertas, asignaciones, publicaciones, metricas, liquidaciones, documentos_soporte, facturas y disputas. Una fila nace en un estado `NUEVO → x` de §4.2, o en `PENDIENTE` si la entidad no tiene filas NUEVO.
+- **Guardas invoker** (`a_guardar`, `a_congelado`, `a_guardar_edicion`): «procedimiento de la BD» significa `current_user = 'postgres'`, que solo se cumple dentro de una función definer o como owner; service_role y authenticated nunca lo cumplen. Triggers reales por tabla:
+  - `campanas`: `a_guardar` en lugar de `a_guardar_presupuesto`. Solo los procedimientos cambian anunciante y contador; presupuesto ≥ comprometido; una campaña cerrada no se edita y solo se archiva en BORRADOR/CANCELADA/FINALIZADA. Más `b_derivar`.
+  - `ofertas`: `a_guardar` (invoker). El contenido solo se edita en BORRADOR/DEVUELTA y se archiva solo en BORRADOR/DEVUELTA/CANCELADA/VENCIDA/CERRADA. `b_derivar` es definer.
+  - `oferta_cupos`: `a_guardar` (solo con la oferta en BORRADOR/DEVUELTA y franja activa) y `z_total`.
+  - `creativos`: `a_guardar` y `b_version`.
+  - `creativo_archivos`: `a_validar` (ruta y tamaño). En una oferta publicada solo admite versiones que nadie ha descargado.
+  - `asignaciones`: `a_congelado`; el INSERT solo lo hace un procedimiento.
+  - `asignacion_montos`: `a_congelado`.
+  - `publicaciones`: `b_derivar` y `a_validar_ruta`.
+  - `metricas`: `a_derivar`, `a_guardar_edicion`, `a_validar_ruta`, `b_alertas` y `z_completitud`.
+  - `facturas`: `b_derivar` (definer) y `a_guardar`.
+  - `liquidaciones`: `a_guardar`.
+  - `disputa_mensajes`: `b_sellar`.
+- **Append-only** con `private.fn_solo_insercion`: `descargas_contenido`, `dispersiones`, `pagos_anunciante` y `disputa_mensajes`. En ellas service_role solo tiene `select, insert`.
+- **Auditoría:** sin `z_auditar` en `oferta_vistas`, `descargas_contenido` y `disputa_mensajes` (por volumen, o porque la propia tabla es la evidencia). Columnas `OMITIR` en la bitácora: los contadores (`campanas.presupuesto_comprometido`, `ofertas.cupos_ocupados`/`presupuesto_comprometido`, `oferta_cupos.cupos_ocupados`), `asignaciones.clave_idempotencia`, `creativo_archivos.sha256`, `publicaciones`/`metricas.miniatura_path` y `metricas.detalle_alertas`.
+- **RLS:**
+  - campanas, ofertas y metricas tienen una sola permisiva de UPDATE (`using`/`with check` = interno OR dueño, 7g).
+  - El medio no lee campañas, ofertas ni asignaciones en la tabla base; usa `ofertas_para_medio` y `mis_asignaciones_medio`.
+  - El UPDATE de métricas del medio exige `asignaciones.ejecutar`.
+  - El select de `pagos_anunciante` del anunciante exige `facturas.ver_propias`.
+- **Notificaciones:** `private.notificar` es **provisional**: no hace nada y devuelve 0, pero ya tiene la firma definitiva `(uuid[], text, jsonb, text, text, text, smallint default 0) returns integer`. M8 la redefine y añade los triggers `notificar_transicion`. Hoy solo la llama `creativos.b_version`.
+
 **Estados «que consumen cupo»** (constante `private.estados_con_cupo()` = `{ACEPTADA, CONTENIDO_ENTREGADO, PUBLICADA, EVIDENCIA_VALIDADA, METRICAS_CARGADAS, VERIFICADA, LIQUIDADA, PAGADA, EN_DISPUTA}`); **liberan cupo**: `RECHAZADA` (nunca lo consumió o lo devuelve), `VENCIDA_SIN_PUBLICAR`, `CANCELADA`. **Excepción:** una asignación `EN_DISPUTA` con `estado_previo_disputa = 'VENCIDA_SIN_PUBLICAR'` **no** consume cupo (el cupo se liberó al vencer). Predicado único `private.consume_cupo(p_estado asignacion_estado, p_previo asignacion_estado) returns boolean` (immutable) = `p_estado = any(private.estados_con_cupo()) and not (p_estado = 'EN_DISPUTA' and p_previo = 'VENCIDA_SIN_PUBLICAR')`; todo contador, tope, KPI `CON_CUPO` e invariante de la prueba de carrera lo usa.
 
 **`public.campanas`**
@@ -1098,6 +1129,10 @@ create table private.transiciones_estado (
 - **Columna de estado por entidad:** `estado` salvo `anunciantes.estado_verificacion`, `documentos_*.estado_validacion`, `verificaciones_cuenta.estado_validacion`, `publicaciones.estado_validacion`, `metricas.estado_validacion`.
 - Actor `ADMIN` = cualquier rol de `tipo = 'ADMIN'` que tenga `permiso`. Actor `ANUNCIANTE`/`MEDIO` = perfil de ese tipo **y** dueño de la fila (`private.verificar_propiedad`, §5.2) **y** con `permiso`. Actor `SISTEMA` = efecto aplicado por `private.aplicar_transicion(..., 'SISTEMA', ...)` desde un procedimiento, trigger o cron (nunca a petición directa de la API).
 - **Modos de timestamp** (`modo_at`): `PRIMERA` = `col := coalesce(col, private.ahora())` (anclas de KPI: nunca se sobrescriben al restaurar, reactivar, cambiar de nivel o re-liquidar); `SIEMPRE` = `col := private.ahora()` (último evento); `LIMPIAR` = `col := null` (el hecho dejó de ser cierto).
+- **Real:**
+  - La semilla aplicada tiene **141** filas: perfiles 8, anunciantes 5, medios 6, documentos_medio 3, documentos_anunciante 3, verificaciones_cuenta 2, campanas 10, ofertas 26, asignaciones 41, publicaciones 3, metricas 4, liquidaciones 5, documentos_soporte 6, facturas 11 y disputas 8.
+  - `a_validar_transicion` existe en las 15 entidades. El de `perfiles` llega en 7c: desde entonces `perfiles.estado` solo cambia por `transicionar_srv`/`activar_perfil_srv` (o `modo_carga`). Un UPDATE directo que cambie el estado falla con `AMO_ESTADO_SOLO_VIA_TRANSICION`, también en los scripts de bootstrap.
+  - `a_estado_inicial` valida el estado con que nace cada fila (§3.6 «Real»).
 
 **Mapa de timestamps** (semilla de `columna_at`/`modo_at`; «—» = null; las filas `NUEVO → …` no tocan timestamps: la creación fija `created_at` y, en asignaciones, `reservar_cupo` fija `aceptada_at`):
 | Entidad | Transición (hacia, o desde → hacia) | `columna_at` | `modo_at` |
@@ -1548,6 +1583,28 @@ Test obligatorio (`rls.sql` / prueba de servidor): el medio A invocando cualquie
    - perfil SUSPENDIDO ⇒ la Server Action llama además `suspender_usuario_srv`.
 7. Retorna el resultado de `aplicar_transicion`.
 
+**Real (7b, 7c y 7f):**
+- **`aplicar_transicion`** escribe columnas propias de cada entidad a partir de una lista blanca de `p_datos`:
+  - `nivel`, `seguidores_verificados`, `observaciones`, `comentario_moderacion`, `etiqueta_verificada` y `causa`;
+  - `fecha_pago`, `referencia_pago` y `soporte_pago_path`;
+  - la numeración DIAN (`resolucion_id`, `prefijo`, `consecutivo`, `fecha_emision` y `fecha_vencimiento`), en el **mismo UPDATE** que pasa a EMITIDO/EMITIDA;
+  - `estado_asignacion_resultante` y `resolucion`.
+
+  Los fragmentos del SET se concatenan como `text`; 7f corrige el 22P02 del primer despliegue.
+- **`transicionar_srv`** se reparte en tres funciones internas:
+  - `private.bloquear_transicion`: bloqueos canónicos. El advisory del medio solo se toma si la transición puede volver a consumir cupo.
+  - `private.validar_condicion_transicion`: condición adicional de §4.2. 7f añade que `metricas PENDIENTE → APROBADA` exige la publicación APROBADA.
+  - `private.ejecutar_transicion`: re-consumo previo, aplicación y efectos encadenados.
+- **Transiciones que `transicionar_srv` rechaza** a petición directa, porque solo las hace un procedimiento:
+  - asignaciones `ACEPTADA → CONTENIDO_ENTREGADO` (`registrar_descarga_srv`) y `CONTENIDO_ENTREGADO → PUBLICADA` (`registrar_evidencia_srv`);
+  - asignaciones `VERIFICADA → LIQUIDADA` y `LIQUIDADA → *` (liquidación);
+  - entrar o salir de `EN_DISPUTA` (`abrir_disputa_srv` y la resolución de la disputa);
+  - publicaciones y métricas `RECHAZADA → PENDIENTE` (corrección del medio);
+  - facturas `BORRADOR → EMITIDA` y documentos soporte `BORRADOR → EMITIDO` (`emitir_*_srv`).
+- **Reglas de perfiles:** se conservan las del provisional. Nadie cambia el estado de su propia cuenta, y si falla `puede_gestionar` el error es `AMO_ESCALADA_PERMISOS`.
+- **`activar_perfil_srv`** aplica `INVITADO → ACTIVO` (SISTEMA) con `aplicar_transicion` y es idempotente.
+- Las notificaciones de los efectos (por ejemplo, oferta publicada) quedan para M8.
+
 ### 5.3 Auditoría (M4)
 **`private.fn_auditar()`** — trigger AFTER INSERT/UPDATE/DELETE FOR EACH ROW, definer. `TG_ARGV[0]` = columna PK (default `'id'`).
 ```
@@ -1830,6 +1887,30 @@ notificar al medio (asignacion.vencida / asignacion.cancelada) y, si la oferta v
 | `registrar_pago_anunciante_srv(p_factura_id, p_fecha date, p_monto, p_medio_pago, p_referencia, p_soporte_path, p_actor_id, p_session_id) → uuid` | `pagos.registrar` | Bloquea factura, inserta pago, `pagado += monto` (no puede exceder total), transiciona PAGADA_PARCIAL/PAGADA con `aplicar_transicion(…, 'SISTEMA', …)` |
 | `registrar_pago_liquidacion_srv(p_liquidacion_id, p_fecha date, p_referencia, p_soporte_path, p_actor_id, p_session_id)` | `liquidaciones.registrar_pago` | Liquidación APROBADA → PAGADA (condiciones de §4.2, incluido documento soporte o factura del medio) y asignaciones → PAGADA; notifica `liquidacion.pagada` |
 | `preparar_dispersion_srv(p_liquidacion_ids uuid[], p_archivo_path text, p_actor_id, p_session_id) → table (liquidacion_id, medio_id, titular_nombre, tipo_documento, numero_documento_cifrado, metodo_pago, datos_pago_cifrados, monto_neto)` | `liquidaciones.registrar_pago` **y** `datos_sensibles.ver` | §7.3.6: solo liquidaciones APROBADA; crea `dispersiones` (el `p_archivo_path` lo construye el servidor como `dispersion/{id}/{uuid}.csv`), fija `liquidaciones.dispersion_id`, registra `EXPORTAR` (una fila con filtros y conteo) y `REVELAR_DATO` **por cada medio**; la Server Action descifra, arma el CSV del banco y lo sube a `soportes` |
+
+
+**Real (7b–7d):**
+- **Precio y elegibilidad:**
+  - `private.calcular_precio(p_oferta_id, p_cuenta_social_id, p_en timestamptz)` es definer **con** EXECUTE para authenticated/service_role, pero se autoprotege: fuera de un procedimiento, quien no tiene `ofertas.ver` solo cotiza cuentas de su propio medio.
+  - `private.medio_elegible` no tiene EXECUTE para authenticated: con un medio arbitrario revelaría segmentación y exclusiones ajenas.
+- **Reserva:** `reservar_cupo` toma además `pg_advisory_xact_lock(hashtextextended('amo.medio:' || medio_id, 0))` antes de las asignaciones. `public.reservar_cupo_srv` solo tiene EXECUTE para service_role.
+- **Cotización y visibilidad del medio:**
+  - `cotizar_oferta` (invoker, EXECUTE authenticated): sin `comision.visible_para_medio`, oculta al medio el bruto, la comisión **y** la tarifa base.
+  - `mis_asignaciones_medio(p_estados, p_limite default 50, p_antes_id)` oculta además los multiplicadores y pagina por keyset de `id`.
+  - `estimar_oferta` es invoker sobre `private.estimar_oferta_agregado` (definer, solo agregados).
+- **Firmas y rutas:**
+  - `registrar_evidencia_srv` recibe `p_numero integer`.
+  - En `preparar_dispersion_srv` el archivo debe ser `dispersion/{uuid}/{nombre}.csv`, y ese uuid pasa a ser el `id` de la dispersión.
+- **`generar_liquidacion_srv`:**
+  - Toma `pg_advisory_xact_lock` sobre `'amo.liquidacion:' || medio`.
+  - RETEFUENTE y RETEIVA salen de `retenciones_config`. RETEIVA solo aplica si el medio es responsable de IVA, con base `monto_medio × facturacion.iva`.
+  - RETEICA sale de `reteica_municipal`.
+  - Las retenciones se evalúan sobre el total y se prorratean.
+  - El mes de la seguridad social es el de `periodo_fin`.
+  - Crea el documento soporte en BORRADOR.
+- **Ofertas y campañas:**
+  - La anticipación mínima de la oferta se valida al enviarla a revisión; al publicar solo se exige que no haya pasado la fecha límite.
+  - La cascada de una campaña CANCELADA (también desde BORRADOR) solo afecta a ofertas BORRADOR/EN_REVISION/DEVUELTA/PUBLICADA.
 
 ### 5.8 Procesos programados, notificaciones y purga (M8/M11)
 Todos en `private`, sin EXECUTE para API; los agenda `pg_cron` como `postgres`. Cada uno procesa en lotes, es idempotente, fija `statement_timeout` local de 60 s por transacción y aplica sus transiciones con `private.aplicar_transicion(…, 'SISTEMA', null, …)`. Los dos procesos que tocan muchas filas con bloqueos de negocio (`vencer_asignaciones`, `actualizar_estados`) son **`procedure`** (invoker, sin cláusula `SET`, §5.0) y hacen `commit` cada 50 elementos para no retener los bloqueos de campañas y ofertas todo el lote. Patrón:
@@ -2249,7 +2330,7 @@ Nombres: `supabase/migrations/<version>_<nombre>.sql`, aplicadas con MCP `apply_
 | 4 | `bitacora_accesos` | enums; `bitacora`, `private.auditoria_columnas`, `fn_auditar`, `fn_bitacora_inmutable`, `fn_sellar_registro`; `accesos`, `private.intentos_login`; `login_bloqueado_srv` (+ test de spraying), `registrar_intento_login_srv`, `registrar_acceso_srv`, `registrar_evento_srv`, `revelar_privado_srv`, `editar_privado_srv`, `cerrar_sesiones_usuario_srv`, `suspender_usuario_srv`, SRF `mi_actividad`; `revoke insert on bitacora, accesos from service_role`; adjunta `z_auditar` a tablas de M3 y a `departamentos`/`municipios`; snapshot de borrado definitivo |
 | 5 | `configuracion` (+ `configuracion_semillas`) | enums; `franjas`, `formatos`, `tarifas`, `niveles_verificacion`, `parametros_tributarios`, `retenciones_config`, `reteica_municipal`, `resoluciones_dian` (+ exclusión de rangos y trigger de consecutivo), `plantillas_notificacion`, `terminos_versiones`, `aceptaciones_terminos`; `fn_validar_configuracion` (**ya creada en M3**); `programar_tarifa`, `cancelar_tarifa_programada`; `siguiente_consecutivo`; semillas de §7 y catálogos. Aplicada como `20260930221629_configuracion` (DDL) y `20260930221740_configuracion_semillas` (datos) |
 | 6 | `negocio_actores` | enums (incluido `validacion_estado`); `anunciantes` (+`_privado`, `documentos_anunciante`), `medios` (+`_privado`), `medio_categorias`, `medio_audiencia_paises`, `medio_pertinencia_geografica`, `documentos_medio`, `cuentas_sociales`, `verificaciones_cuenta`; helpers `cuenta_vigente` (+ `anunciante_ve_medio`/`medio_ve_anunciante` provisionales); SRF `anunciantes_publico`, `medios_publico`; semilla del anunciante E2E **antes** de las FKs `perfiles → anunciantes/medios`. Aplicada como `20260930222842_negocio_actores` |
-| 7 | `negocio_transacciones` | enums; `private.transiciones_estado` (con `columna_at`/`modo_at`) + semilla completa (§4.1–§4.2) y triggers `a_validar_transicion` en todas las entidades (incluidas M3/M6); `campanas`, `ofertas`, `oferta_cupos`, `oferta_vistas`, `creativos`, `creativo_archivos`, `comisiones_excepcion`, `asignaciones`, `asignacion_montos`, `descargas_contenido`, `publicaciones`, `metricas`, `dispersiones`, `liquidaciones`, `documentos_soporte`, `facturas`, `pagos_anunciante`, `disputas`, `disputa_mensajes`; helpers de visibilidad y `consume_cupo`; SRF `ofertas_para_medio`, `mis_asignaciones_medio`; `validar_actor`, `verificar_propiedad`, `aplicar_transicion`, `fn_validar_transicion`, `transicionar_srv`, `activar_perfil_srv`; `calcular_precio`, `cotizar_oferta`, `estimar_oferta`, `reservar_cupo` (+`_srv`), `liberar_cupo_efecto`, `reconsumir_cupo`, `rechazar_oferta_srv`, `registrar_vista_oferta`, `registrar_descarga_srv`, `registrar_evidencia_srv`, `evaluar_metricas_cargadas`, `abrir_disputa_srv`, `generar_liquidacion_srv`, `emitir_factura_srv`, `emitir_documento_soporte_srv`, `registrar_pago_anunciante_srv`, `registrar_pago_liquidacion_srv`, `preparar_dispersion_srv` |
+| 7 | `negocio_transacciones` | enums; `private.transiciones_estado` (con `columna_at`/`modo_at`) + semilla completa (§4.1–§4.2) y triggers `a_validar_transicion` en todas las entidades (incluidas M3/M6); `campanas`, `ofertas`, `oferta_cupos`, `oferta_vistas`, `creativos`, `creativo_archivos`, `comisiones_excepcion`, `asignaciones`, `asignacion_montos`, `descargas_contenido`, `publicaciones`, `metricas`, `dispersiones`, `liquidaciones`, `documentos_soporte`, `facturas`, `pagos_anunciante`, `disputas`, `disputa_mensajes`; helpers de visibilidad y `consume_cupo`; SRF `ofertas_para_medio`, `mis_asignaciones_medio`; `validar_actor`, `verificar_propiedad`, `aplicar_transicion`, `fn_validar_transicion`, `transicionar_srv`, `activar_perfil_srv`; `calcular_precio`, `cotizar_oferta`, `estimar_oferta`, `reservar_cupo` (+`_srv`), `liberar_cupo_efecto`, `reconsumir_cupo`, `rechazar_oferta_srv`, `registrar_vista_oferta`, `registrar_descarga_srv`, `registrar_evidencia_srv`, `evaluar_metricas_cargadas`, `abrir_disputa_srv`, `generar_liquidacion_srv`, `emitir_factura_srv`, `emitir_documento_soporte_srv`, `registrar_pago_anunciante_srv`, `registrar_pago_liquidacion_srv`, `preparar_dispersion_srv`. Aplicada como `20260930232342_negocio_transacciones_tablas`, `20260930234051_negocio_transacciones_funciones`, `20260930234802_negocio_transacciones_transiciones`, `20260930235300_negocio_transacciones_procedimientos`, `20260930235615_negocio_transacciones_seguridad`, `20261001001638_negocio_transacciones_ajustes` y `20261001002838_negocio_transacciones_politicas` (§11.2) |
 | 8 | `notificaciones` | `notificaciones`; `private.notificar`, `private.notificar_transicion` + triggers de asignaciones/ofertas; (COULD) `fn_notificacion_realtime` + política en `realtime.messages` |
 | 9 | `analitica` | tipo `public.kpi_fila`; RPC de §5.9 (incluidas `desempeno_anunciante` y `serie_ganancias_medio`); índices de soporte; `EXPLAIN ANALYZE` documentado en el PR |
 | 10 | `storage` | buckets (§8), helpers `private.seg`/`seg_uuid`, políticas por bucket/carpeta y restrictiva global |
@@ -2294,10 +2375,10 @@ Después de la 11: `get_advisors` (security + performance) → 0 ERROR; WARN ace
 | D32 | N1 acepta certificado bancario **o** de billetera según el medio de pago; N3 exige además `RUT_SOCIEDAD` | §3.4 |
 | D33 | Riesgo del plan free: 50 MB máximo por archivo en Storage limita reels/videos largos en calidad original; 1 GB total obliga a capturas compartidas en la demo | §3.6, §8, §10 |
 
-### 11.2 Desviaciones de la implementación (M1–M6)
-Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores cuando difieran; los detalles de M5/M6 están anotados en §3.4 y §3.5 como «Real».
+### 11.2 Desviaciones de la implementación (M1–M7)
+Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores cuando difieran. Los detalles de M5, M6 y M7 están anotados como «Real» en §3.4, §3.5, §3.6, §4.1, §5.2 y §5.7.
 
-**Migraciones aplicadas:** `20260930175547_extensiones_y_esquemas`; geo en 7 archivos (`20260930175839_geo`, `…180049/180222_geo_semilla_paises_1/2`, `…180426–181414_geo_semilla_municipios_1..5`); `20260930182318_identidad_rbac`; `20260930182513_corregir_execute_interruptores`; `20260930183050_bitacora_accesos`; `20260930183850_perfiles_select_unificada`; `20260930185657_sesion_vigencia_y_activacion`; `20260930195743_usuarios_gestion`; `20260930203229_usuarios_roles_asignables`; `20260930221629_configuracion`; `20260930221740_configuracion_semillas`; `20260930222842_negocio_actores`. Pruebas de humo (siempre `begin … rollback`) en `supabase/tests/`: `humo_m1_m4.sql`, `auditoria_seguridad.sql`, `humo_configuracion.sql`, `humo_negocio_actores.sql`.
+**Migraciones aplicadas:** `20260930175547_extensiones_y_esquemas`; geo en 7 archivos (`20260930175839_geo`, `…180049/180222_geo_semilla_paises_1/2`, `…180426–181414_geo_semilla_municipios_1..5`); `20260930182318_identidad_rbac`; `20260930182513_corregir_execute_interruptores`; `20260930183050_bitacora_accesos`; `20260930183850_perfiles_select_unificada`; `20260930185657_sesion_vigencia_y_activacion`; `20260930195743_usuarios_gestion`; `20260930203229_usuarios_roles_asignables`; `20260930221629_configuracion`; `20260930221740_configuracion_semillas`; `20260930222842_negocio_actores`; M7 en `20260930232342_negocio_transacciones_tablas`, `20260930234051_…_funciones`, `20260930234802_…_transiciones`, `20260930235300_…_procedimientos`, `20260930235615_…_seguridad`, `20261001001638_…_ajustes` y `20261001002838_…_politicas`. Pruebas de humo (siempre `begin … rollback`) en `supabase/tests/`: `humo_m1_m4.sql`, `auditoria_seguridad.sql`, `humo_configuracion.sql`, `humo_negocio_actores.sql` y `humo_negocio_transacciones.sql`.
 
 **M1–M4 e integración de usuarios:**
 1. `modo_carga()` y `purga_habilitada()` tienen EXECUTE para authenticated y service_role (§1.5): un trigger invoker solo puede llamar funciones con EXECUTE para los roles de la API.
@@ -2314,4 +2395,22 @@ Lo aplicado en `supabase/migrations/` prevalece sobre las secciones anteriores c
 
 **M6 `negocio_actores`:** anunciante E2E sembrado antes de las FK; `a_validar_transicion` llega en M7; `anunciante_ve_medio`/`medio_ve_anunciante` provisionales (`false`); trigger de municipio activo en anunciantes y medios; permisivas «propio» exigen `deleted_at is null`; rutas de documentos con el tipo en el prefijo y sin `..`; checks de formato y rango adicionales; indicadores de cron `OMITIR` en la bitácora.
 
-**Pendientes registrados:** endurecer `perfiles.avatar_path` contra `..` (M10); registrar en `accesos` solo el primer intento bloqueado por ventana; purgar las cuentas y la organización E2E antes de producción.
+**M7 `negocio_transacciones`** (detalle en §3.6, §4.1, §5.2 y §5.7 «Real»):
+- **Despliegue:** siete migraciones, de 7a a 7g. Las dos últimas son correcciones nuevas, porque una migración aplicada no se edita:
+  - 7f: el cast `::text` de los fragmentos SET en `aplicar_transicion` y la condición de `metricas PENDIENTE → APROBADA`.
+  - 7g: la fusión de las permisivas UPDATE que marcaba el advisor.
+- **Modelo:** `metricas.id` es uuid. Documentos soporte y facturas: un solo documento no anulado por liquidación, y numeración coherente que un borrador anulado no consume.
+- **Triggers:** `a_estado_inicial` en las entidades con máquina; guardas invoker basadas en `current_user = 'postgres'`.
+- **Notificaciones:** `private.notificar` es un stub provisional para M8.
+- **`transicionar_srv`:** rechaza las transiciones que solo hace un procedimiento.
+- **Visibilidad del medio:** `cotizar_oferta` y `mis_asignaciones_medio` ocultan además la tarifa base (y los multiplicadores) si la comisión no es visible para el medio.
+- **Permisos:** `medio_elegible` no tiene EXECUTE para authenticated.
+- **Pruebas:** `humo_negocio_transacciones.sql` pasa 154/154, más 15/15 del bloque de políticas 7g.
+- **Regresión:** las pruebas anteriores ya no escriben `perfiles.estado` por UPDATE directo; su preparación (owner) fija `amo.transicion_autorizada` o `modo_carga`, y la aprobación de verificaciones va por `transicionar_srv`. Resultados: `humo_m1_m4` 71/71, `auditoria_seguridad` 35/35, `humo_configuracion` 66/66 y `humo_negocio_actores` 73/73.
+
+**Pendientes registrados:**
+- Endurecer `perfiles.avatar_path` contra `..` (M10).
+- Registrar en `accesos` solo el primer intento bloqueado por ventana.
+- Purgar las cuentas y la organización E2E antes de producción.
+- Desde M7, `scripts/bootstrap/provision-e2e.ts` (`asegurarPerfil` con `estado: "ACTIVO"`) y `scripts/bootstrap/superadmin.ts` fallan con `AMO_ESTADO_SOLO_VIA_TRANSICION` cuando cambian el estado: en el primer aprovisionamiento y al restaurar una cuenta suspendida. Deben fijar rol y organización sin `estado` y llamar a `activar_perfil_srv` (correo confirmado) para `INVITADO → ACTIVO`, o a `transicionar_srv` para restaurar.
+- M8 debe redefinir `private.notificar` (misma firma) y añadir `notificar_transicion`.

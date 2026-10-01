@@ -75,6 +75,7 @@ function temaForzado({ modo, densidad }: TemaForzado): TemaGraficos {
   return {
     ...construirTemaGraficos({ modo, fuente, reducirMovimiento: true }),
     densidad,
+    captura: true,
   }
 }
 

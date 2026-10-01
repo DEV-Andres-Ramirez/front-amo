@@ -36,7 +36,8 @@ import {
   esErrorEsperado,
   interpretarErrorRol,
 } from "./errores"
-import { fueraDeAlcance, permisosClonables } from "./reglas"
+import { TIPOS_ROL_ETIQUETA } from "./presentacion"
+import { fueraDeAlcance, noAplicables, permisosClonables } from "./reglas"
 import {
   type EntradaCrearRol,
   type EntradaEditarRol,
@@ -135,9 +136,14 @@ export async function crearRol(
       .single()
     if (error) return falloBd("crear rol", error)
 
-    const { copiables, omitidos } = permisosClonables(
+    const {
+      copiables,
+      sinAlcance,
+      noAplicables: noAdmitidos,
+    } = permisosClonables(
       permisosValidos(origen?.rol_permisos.map((p) => p.permiso_clave) ?? []),
-      actor
+      actor,
+      datos.tipo
     )
     if (copiables.length > 0) {
       const { error: errorCopia } = await supabase.from("rol_permisos").insert(
@@ -160,7 +166,7 @@ export async function crearRol(
     return exito({
       id: creado.id,
       copiados: copiables.length,
-      omitidos: omitidos.length,
+      omitidos: sinAlcance.length + noAdmitidos.length,
     })
   } catch (error) {
     return falloInesperado("crearRol", error)
@@ -239,6 +245,14 @@ export async function guardarPermisosRol(
     const rol = await leerRol(supabase, rolId)
     if (!rol) return fallo(ROL_INEXISTENTE)
     if (rol.es_sistema) return fallo(ROL_SISTEMA)
+    // La BD no distingue el tipo del rol: un permiso interno en un rol externo
+    // le abriría datos de toda la plataforma (ver `esAplicable`).
+    const ajenos = noAplicables(rol.tipo, agregar)
+    if (ajenos.length > 0) {
+      return fallo(
+        `Un rol de tipo «${TIPOS_ROL_ETIQUETA[rol.tipo]}» no admite estos permisos: ${listaDeDescripciones(ajenos)}.`
+      )
+    }
 
     if (quitar.length > 0) {
       const { error } = await supabase

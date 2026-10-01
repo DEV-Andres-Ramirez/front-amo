@@ -150,7 +150,7 @@ describe("reglaVariacion — causa principal", () => {
     )
     expect(insight.accion).toEqual({
       etiqueta: "Explorar Antioquia en el mapa",
-      href: "/analitica/mapa?metrica=gmv&departamento=05&desde=2026-09-01&hasta=2026-09-30",
+      href: "/analitica/mapa?metrica=gmv&nivel=departamental&depto=05&desde=2026-09-01&hasta=2026-09-30",
     })
   })
 
@@ -177,7 +177,7 @@ describe("reglaVariacion — causa principal", () => {
     )
   })
 
-  it("solo con plataforma filtra el mapa por plataforma", () => {
+  it("solo con plataforma enlaza al mapa nacional (el mapa no filtra plataformas)", () => {
     const [insight] = reglaVariacion(
       entradaVacia({
         kpis,
@@ -187,7 +187,9 @@ describe("reglaVariacion — causa principal", () => {
       })
     )
     expect(insight.detalle).toContain("TikTok explica el 80% del cambio.")
-    expect(insight.accion?.href).toContain("plataforma=TIKTOK")
+    expect(insight.accion?.href).toBe(
+      "/analitica/mapa?metrica=gmv&desde=2026-09-01&hasta=2026-09-30"
+    )
     expect(insight.accion?.etiqueta).toBe("Explorar en el mapa")
   })
 
@@ -204,6 +206,26 @@ describe("reglaVariacion — causa principal", () => {
     expect(plano(insight.detalle)).toContain(
       "El cambio es generalizado: ninguna zona ni plataforma explica por sí sola el 30%."
     )
+  })
+})
+
+describe("reglaVariacion — enlace al mapa", () => {
+  it("solo abre un departamento si la clave es un código DANE de 2 dígitos", () => {
+    const [insight] = reglaVariacion(
+      entradaVacia({
+        kpis: [filaKpi("alcance_total", 200, 100, { unidad: "personas" })],
+        desgloses: {
+          alcance_total: {
+            departamento: [grupo("05001", "Medellín", 190, 100)],
+          },
+        },
+      })
+    )
+    expect(insight.detalle).toContain("Medellín explica el 90% del cambio.")
+    expect(insight.accion).toEqual({
+      etiqueta: "Explorar en el mapa",
+      href: "/analitica/mapa?metrica=alcance&desde=2026-09-01&hasta=2026-09-30",
+    })
   })
 })
 

@@ -46,7 +46,6 @@ export function MetricasAccesos({ resumen }: { resumen: ResumenAccesos }) {
           subirEsBueno: null,
         }}
         serie={resumen.serieExitosos}
-        etiquetaSerie="Ingresos exitosos por día del periodo"
         detalle={plural(
           resumen.usuariosUnicos,
           "persona distinta",
@@ -112,7 +111,11 @@ export function MetricasAccesos({ resumen }: { resumen: ResumenAccesos }) {
             : "Sin alertas en el periodo"
         }
         accion={
-          haySospechosos ? <BotonVerSospechosos>Ver</BotonVerSospechosos> : null
+          haySospechosos ? (
+            <BotonVerSospechosos etiqueta="Ver los accesos sospechosos en el registro">
+              Ver
+            </BotonVerSospechosos>
+          ) : null
         }
         className="col-span-2 xl:col-span-1"
       />

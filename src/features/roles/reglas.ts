@@ -3,11 +3,47 @@
  * de la BD (`fn_guardar_roles`, `fn_guardar_rol_permisos`, §5.4) para ofrecer
  * solo lo permitido y explicar por qué; la BD las garantiza igual. Módulo puro.
  */
-import type { ClavePermiso } from "@/lib/auth/permisos"
+import {
+  CLAVES_PERMISO,
+  type ClavePermiso,
+  permisosDeRol,
+} from "@/lib/auth/permisos"
 
-import type { ActorRoles, RolListado } from "./tipos"
+import type { ActorRoles, RolListado, TipoRol } from "./tipos"
 
 type ActorPermisos = Pick<ActorRoles, "permisos">
+
+// ── Permisos aplicables por tipo de rol ──────────────────────────────────────
+
+/**
+ * `private.tiene_permiso` no distingue el tipo del rol: un permiso interno
+ * ("Ver todas las campañas", "Ver el listado de usuarios"…) otorgado a un rol
+ * de anunciante o de medio le abriría datos de TODA la plataforma. Por eso un
+ * rol externo solo admite los permisos de su rol de sistema (los del portal,
+ * que la RLS acota a su organización); un rol del equipo interno, todos.
+ */
+const APLICABLES: Readonly<Record<TipoRol, ReadonlySet<ClavePermiso>>> = {
+  ADMIN: new Set(CLAVES_PERMISO),
+  ANUNCIANTE: new Set(permisosDeRol("ANUNCIANTE")),
+  MEDIO: new Set(permisosDeRol("MEDIO")),
+}
+
+export function esAplicable(tipo: TipoRol, clave: ClavePermiso): boolean {
+  return APLICABLES[tipo].has(clave)
+}
+
+/** Cuántos permisos admite un rol de ese tipo (base de su cobertura). */
+export function totalAplicables(tipo: TipoRol): number {
+  return APLICABLES[tipo].size
+}
+
+/** Permisos de la lista que un rol de ese tipo no admite. */
+export function noAplicables(
+  tipo: TipoRol,
+  claves: readonly ClavePermiso[]
+): ClavePermiso[] {
+  return claves.filter((clave) => !esAplicable(tipo, clave))
+}
 
 /** Anti-escalada: nadie otorga ni retira un permiso que no tiene. */
 export function puedeOtorgar(
@@ -25,14 +61,24 @@ export function fueraDeAlcance(
   return claves.filter((clave) => !puedeOtorgar(actor, clave))
 }
 
-/** Al duplicar o crear "desde" un rol: qué se copia y qué se omite por anti-escalada. */
+/**
+ * Al duplicar o crear "desde" un rol: qué se copia y qué se omite, porque el
+ * actor no lo tiene (anti-escalada) o porque el tipo del rol nuevo no lo admite.
+ */
 export function permisosClonables(
   origen: readonly ClavePermiso[],
-  actor: ActorPermisos
-): { copiables: ClavePermiso[]; omitidos: ClavePermiso[] } {
+  actor: ActorPermisos,
+  tipo: TipoRol
+): {
+  copiables: ClavePermiso[]
+  sinAlcance: ClavePermiso[]
+  noAplicables: ClavePermiso[]
+} {
+  const aplicables = origen.filter((clave) => esAplicable(tipo, clave))
   return {
-    copiables: origen.filter((clave) => puedeOtorgar(actor, clave)),
-    omitidos: fueraDeAlcance(actor, origen),
+    copiables: aplicables.filter((clave) => puedeOtorgar(actor, clave)),
+    sinAlcance: fueraDeAlcance(actor, aplicables),
+    noAplicables: noAplicables(tipo, origen),
   }
 }
 

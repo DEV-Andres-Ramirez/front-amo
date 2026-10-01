@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { aplicarAConteo, aplicarALista } from "./lecturas"
+import { aplicarAConteo, aplicarALista, leidaEnBandeja } from "./lecturas"
 import type { Notificacion } from "./tipos"
 
 const base: Notificacion = {
@@ -57,5 +57,27 @@ describe("aplicarAConteo", () => {
         { ids: [4, 5], leida: true }
       ).total
     ).toBe(0)
+  })
+})
+
+describe("leidaEnBandeja", () => {
+  const sinMarcas = new Map<number, boolean>()
+  const instante = Date.parse(base.creadaAt)
+
+  it("sin marcas ni «todas», manda el servidor", () => {
+    expect(leidaEnBandeja(base, sinMarcas, null)).toBe(false)
+    expect(leidaEnBandeja({ ...base, leida: true }, sinMarcas, null)).toBe(true)
+  })
+
+  it("«Marcar todas» alcanza solo a las creadas hasta ese instante", () => {
+    expect(leidaEnBandeja(base, sinMarcas, instante)).toBe(true)
+    expect(leidaEnBandeja(base, sinMarcas, instante - 1)).toBe(false)
+  })
+
+  it("la marca de esta visita se impone a todo lo demás", () => {
+    const marcas = new Map([[base.id, false]])
+    expect(leidaEnBandeja({ ...base, leida: true }, marcas, instante)).toBe(
+      false
+    )
   })
 })

@@ -5,6 +5,8 @@ import {
   describirNavegador,
   describirUbicacion,
   enmascararIp,
+  nombreVisibleFactor,
+  PREFIJO_FACTOR_AUTOMATICO,
 } from "./presentacion"
 
 describe("enmascararIp", () => {
@@ -80,5 +82,18 @@ describe("describirActividad", () => {
         yo
       )
     ).toEqual({ titulo: "Otra acción en la plataforma", tono: "neutro" })
+  })
+})
+
+describe("nombreVisibleFactor", () => {
+  it("oculta la fecha de los nombres automáticos", () => {
+    const automatico = `${PREFIJO_FACTOR_AUTOMATICO}30 sept 2026, 6:44 p. m.`
+    expect(nombreVisibleFactor(automatico, 0)).toBe("App autenticadora")
+    expect(nombreVisibleFactor(automatico, 1)).toBe("App autenticadora 2")
+    expect(nombreVisibleFactor("  ", 0)).toBe("App autenticadora")
+  })
+
+  it("respeta un nombre propio", () => {
+    expect(nombreVisibleFactor(" iPhone de Ana ", 0)).toBe("iPhone de Ana")
   })
 })

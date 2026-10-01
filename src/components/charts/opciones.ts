@@ -124,3 +124,21 @@ export function rangoConHolgura(
     suggestedMax: medio + semi,
   }
 }
+
+/**
+ * Tope de una escala que parte de cero con aire sobre el valor más alto
+ * (`fraccion` del máximo). `undefined` si no hay valores positivos: Chart.js
+ * calcula entonces su propio rango.
+ */
+export function maximoConMargen(
+  valores: readonly (number | null)[],
+  fraccion = 0.12
+): number | undefined {
+  const maximo = Math.max(
+    0,
+    ...valores.filter(
+      (valor): valor is number => valor !== null && Number.isFinite(valor)
+    )
+  )
+  return maximo > 0 ? maximo * (1 + fraccion) : undefined
+}

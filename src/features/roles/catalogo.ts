@@ -11,8 +11,6 @@ import {
 } from "@/lib/auth/permisos"
 import { MODULOS_PERMISO } from "@/features/usuarios/presentacion"
 
-export const TOTAL_PERMISOS = CLAVES_PERMISO.length
-
 const ORDEN = new Map<string, number>(
   CLAVES_PERMISO.map((clave, indice) => [clave, indice])
 )

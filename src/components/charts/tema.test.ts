@@ -1,9 +1,10 @@
 import { act, renderHook } from "@testing-library/react"
+import { createElement, type ReactNode } from "react"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { CATEGORICA, ORDINAL, SECUENCIAL } from "./paleta"
 import { construirTemaGraficos, FUENTE_RESPALDO } from "./tema"
-import { useTemaGraficos } from "./use-tema-graficos"
+import { ContextoTemaForzado, useTemaGraficos } from "./use-tema-graficos"
 
 describe("construirTemaGraficos", () => {
   it("sin lector usa las constantes del tema pedido", () => {
@@ -76,5 +77,31 @@ describe("useTemaGraficos", () => {
     const primero = result.current
     rerender()
     expect(result.current).toBe(primero)
+  })
+})
+
+describe("ContextoTemaForzado", () => {
+  afterEach(() => {
+    document.documentElement.classList.remove("dark")
+  })
+
+  it("impone el tema pedido aunque el documento esté en otro", () => {
+    document.documentElement.classList.add("dark")
+    const envoltorio = ({ children }: { children: ReactNode }) =>
+      createElement(
+        ContextoTemaForzado,
+        { value: { modo: "claro", densidad: 2 } },
+        children
+      )
+    const { result } = renderHook(() => useTemaGraficos(), {
+      wrapper: envoltorio,
+    })
+    expect(result.current).toMatchObject({
+      modo: "claro",
+      superficie: "#ffffff",
+      reducirMovimiento: true,
+      densidad: 2,
+      captura: true,
+    })
   })
 })

@@ -3,7 +3,7 @@
 import "mapbox-gl/dist/mapbox-gl.css"
 
 import type { Feature, FeatureCollection, Geometry, Point } from "geojson"
-import type { Map as MapaMapbox } from "mapbox-gl"
+import type { MapSourceDataEvent, Map as MapaMapbox } from "mapbox-gl"
 import { useReducedMotion } from "motion/react"
 import {
   type Ref,
@@ -16,6 +16,7 @@ import {
   useState,
 } from "react"
 import MapGL, {
+  type FogSpecification,
   Layer,
   type MapMouseEvent,
   type MapRef,
@@ -27,6 +28,7 @@ import { COLOR_SIN_DATOS, type TemaMapa } from "@/lib/geo/escalas"
 import type { Posicion } from "@/lib/geo/tipos"
 
 import { animarColores } from "./animacion-colores"
+import { esErrorFatalMapa, mensajeErrorMapa } from "./error-mapa"
 import {
   COLORES_MAPA,
   type FocoMapa,
@@ -85,7 +87,6 @@ export interface MapaCoropleticoProps {
   readonly onPuntero?: (x: number, y: number) => void
   readonly onZonaClic: (codigo: string | null, puntero: TipoPuntero) => void
   readonly onZonaDobleClic: (codigo: string, puntero: TipoPuntero) => void
-  readonly onCapaCargando?: (cargando: boolean) => void
   readonly onListo?: () => void
   readonly onError?: (mensaje: string) => void
   readonly refApi?: Ref<ApiMapa>
@@ -108,6 +109,40 @@ const ZOOM_MAXIMO = 11
 const DURACION_CAMARA_MS = 1400
 const DURACION_COLOR_MS = 480
 const DURACION_MARGEN_MS = 520
+
+/**
+ * El tema monocromo del mapa base (tabla de color de Standard) también
+ * desatura la atmósfera: sin esto el espacio se ve gris medio, no el fondo
+ * de la marca.
+ */
+const ATMOSFERA_SIN_TEMA = {
+  "color-use-theme": "none",
+  "high-color-use-theme": "none",
+  "space-color-use-theme": "none",
+} as const
+
+/**
+ * Atmósfera del globo con los fondos de la marca: el espacio se funde con la
+ * interfaz (casi negro lila de noche, lila muy claro de día).
+ */
+const ATMOSFERA: Readonly<Record<TemaMapa, FogSpecification>> = {
+  oscuro: {
+    ...ATMOSFERA_SIN_TEMA,
+    color: "#1C1729",
+    "high-color": "#261848",
+    "horizon-blend": 0.05,
+    "space-color": "#0E0B16",
+    "star-intensity": 0.28,
+  },
+  claro: {
+    ...ATMOSFERA_SIN_TEMA,
+    color: "#FFFFFF",
+    "high-color": "#DCD0FD",
+    "horizon-blend": 0.06,
+    "space-color": "#F1EEF8",
+    "star-intensity": 0,
+  },
+}
 
 /** Límites administrativos en gris lila, discretos bajo el coroplético. */
 const COLOR_LIMITES: Readonly<Record<TemaMapa, string>> = {
@@ -279,7 +314,6 @@ export default function MapaCoropletico({
   onPuntero,
   onZonaClic,
   onZonaDobleClic,
-  onCapaCargando,
   onListo,
   onError,
   refApi,
@@ -302,9 +336,19 @@ export default function MapaCoropletico({
     () => (circulos?.length ? [fuenteZonas, fuenteCirculos] : [fuenteZonas]),
     [circulos, fuenteZonas, fuenteCirculos]
   )
+  const capaLista = capaCargada === fuenteZonas
+
+  // Copia de todo el estado escrito por zona: si Mapbox recarga una fuente
+  // (cambio de tema del mapa base, fuente que se vuelve a agregar) se
+  // reaplica tal cual en lugar de esperar al siguiente cambio de datos.
+  const estadoEscrito = useRef(new Map<string, Record<string, unknown>>())
 
   const escribirEstado = useCallback(
     (codigo: string, estado: Record<string, unknown>) => {
+      estadoEscrito.current.set(codigo, {
+        ...estadoEscrito.current.get(codigo),
+        ...estado,
+      })
       const mapa = refMapa.current?.getMap()
       if (!mapa) return
       for (const fuente of fuentes) {
@@ -316,6 +360,31 @@ export default function MapaCoropletico({
     [fuentes]
   )
 
+  useEffect(() => {
+    const mapa = refMapa.current?.getMap()
+    if (!capaLista || !mapa) return
+    let pendiente = 0
+    const reaplicar = () => {
+      pendiente = 0
+      for (const fuente of fuentes) {
+        if (!mapa.getSource(fuente)) continue
+        for (const [codigo, estado] of estadoEscrito.current) {
+          mapa.setFeatureState({ source: fuente, id: codigo }, estado)
+        }
+      }
+    }
+    const programar = (evento: MapSourceDataEvent) => {
+      const propia = evento.sourceId && fuentes.includes(evento.sourceId)
+      if (!propia || !evento.isSourceLoaded) return
+      if (!pendiente) pendiente = requestAnimationFrame(reaplicar)
+    }
+    mapa.on("sourcedata", programar)
+    return () => {
+      mapa.off("sourcedata", programar)
+      cancelAnimationFrame(pendiente)
+    }
+  }, [capaLista, fuentes])
+
   // ── Carga del estilo ──────────────────────────────────────────────────────
   // Los patrones se registran en cada `styledata`: las capas que los usan se
   // agregan antes del evento `load`.
@@ -323,15 +392,8 @@ export default function MapaCoropletico({
     const mapa = refMapa.current?.getMap()
     if (mapa) registrarPatrones(mapa)
   }, [])
-  const alCargar = useCallback(() => {
-    // DEPURACION-TEMPORAL
-    ;(window as unknown as { __amoMapa?: unknown }).__amoMapa = refMapa.current?.getMap()
-    setListo(true)
-  }, [])
+  const alCargar = useCallback(() => setListo(true), [])
   const avisarListo = useEffectEvent(() => onListo?.())
-  const avisarCarga = useEffectEvent((cargando: boolean) =>
-    onCapaCargando?.(cargando)
-  )
 
   useEffect(() => {
     if (listo) avisarListo()
@@ -369,29 +431,20 @@ export default function MapaCoropletico({
     if (listo && mapa) aplicarConfiguracion(mapa, tema)
   }, [listo, tema])
 
-  // ── Capa de zonas: carga del GeoJSON ─────────────────────────────────────
-  useEffect(() => {
-    const mapa = refMapa.current?.getMap()
-    if (!listo || !mapa) return
-    avisarCarga(true)
-    const revisar = () => {
-      if (!mapa.getSource(fuenteZonas) || !mapa.isSourceLoaded(fuenteZonas)) {
-        return
-      }
-      mapa.off("sourcedata", revisar)
+  // ── Capa de zonas ─────────────────────────────────────────────────────────
+  // El estado por zona se puede escribir en cuanto la fuente existe (Mapbox lo
+  // aplica a cada tesela al cargarla), sin esperar al evento `load` del mapa
+  // base, que con el estilo Standard puede tardar segundos más.
+  // Que la fuente propia ya reporte datos implica un estilo cargado: el mapa
+  // se puede mostrar y usar aunque el mapa base siga descargando teselas.
+  const alDatosFuente = useCallback(
+    (evento: MapSourceDataEvent) => {
+      if (evento.sourceId !== fuenteZonas) return
       setCapaCargada(fuenteZonas)
-      avisarCarga(false)
-    }
-    mapa.on("sourcedata", revisar)
-    // Si el GeoJSON ya estaba en caché no llega otro `sourcedata`.
-    const inicial = requestAnimationFrame(revisar)
-    return () => {
-      cancelAnimationFrame(inicial)
-      mapa.off("sourcedata", revisar)
-    }
-  }, [listo, fuenteZonas])
-
-  const capaLista = listo && capaCargada === fuenteZonas
+      setListo(true)
+    },
+    [fuenteZonas]
+  )
 
   // ── Colores (animados) ────────────────────────────────────────────────────
   const colorBase = useEffectEvent(() => COLOR_SIN_DATOS[tema])
@@ -399,6 +452,7 @@ export default function MapaCoropletico({
     if (!capaLista) return
     if (capaAnimada.current !== fuenteZonas) {
       coloresActuales.current = new Map()
+      estadoEscrito.current = new Map()
       capaAnimada.current = fuenteZonas
     }
     return animarColores({
@@ -574,7 +628,8 @@ export default function MapaCoropletico({
     [onZonaDobleClic]
   )
 
-  const opcionesPintura = { calor, foco, rayar: rayarSinDatos }
+  // El rayado espera a los colores: antes, todas las zonas parecerían "sin datos".
+  const opcionesPintura = { calor, foco, rayar: rayarSinDatos && capaLista }
   const datosPuntos = useMemo(
     () => (puntos?.length ? coleccionPuntos(puntos) : null),
     [puntos]
@@ -597,6 +652,7 @@ export default function MapaCoropletico({
       initialViewState={vistaDeInicio}
       projection="globe"
       config={{ basemap: configuracionBase(tema) }}
+      fog={ATMOSFERA[tema]}
       language="es"
       doubleClickZoom={false}
       dragRotate={false}
@@ -612,10 +668,13 @@ export default function MapaCoropletico({
       cursor={sobreZona ? "pointer" : undefined}
       onLoad={alCargar}
       onStyleData={alCambiarEstilo}
+      onSourceData={alDatosFuente}
       onError={(evento) => {
-        // Solo es fatal si el estilo nunca cargó (token, red o WebGL).
-        console.warn("DEPURACION-TEMPORAL mapa", evento.error?.message)
-        if (!listo) onError?.(evento.error?.message ?? "Error del mapa")
+        // Solo es fatal si el estilo nunca cargó (token, red o WebGL); una
+        // fuente o tesela del mapa base que falla deja el coroplético en pie.
+        if (!listo && esErrorFatalMapa(evento)) {
+          onError?.(mensajeErrorMapa(evento.error))
+        }
       }}
       onMouseMove={alMover}
       onMouseLeave={alSalir}

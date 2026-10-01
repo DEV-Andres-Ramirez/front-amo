@@ -78,8 +78,11 @@ export interface ContextoEventos extends ContextoValores {
   ipCompleta: boolean
 }
 
+/** Eventos `OTRO` que registra la app (`metadatos.evento`) y su título. */
 const EVENTOS_OTRO: Readonly<Record<string, string>> = {
   MFA_ACTIVADA: "Activó la verificación en dos pasos",
+  MFA_RECONFIGURADA: "Reconfiguró la verificación en dos pasos",
+  MFA_DESACTIVADA: "Desactivó la verificación en dos pasos",
   MFA_RESTABLECIDA: "Restableció la verificación en dos pasos",
   CUENTA_NO_INVITADA_DESCARTADA: "Descartó una cuenta no invitada",
 }
@@ -254,6 +257,14 @@ function rutaDelEvento(fila: FilaBitacora) {
   return rutaEntidad(fila.entidad, fila.entidad_id)
 }
 
+/** Pares de metadatos para el panel; en un `OTRO` el nombre del evento ya es el título. */
+function metadatosVisibles(fila: FilaBitacora, contexto: ContextoValores) {
+  const pares = presentarMetadatos(fila.metadatos, contexto)
+  return fila.accion === "OTRO"
+    ? pares.filter((par) => par.clave !== "evento")
+    : pares
+}
+
 /** Evento listo para la tabla, la línea de tiempo y el panel de detalle. */
 export function describirEvento(
   fila: FilaBitacora,
@@ -294,7 +305,7 @@ export function describirEvento(
       dispositivo: fila.user_agent ? agente.dispositivo : null,
     },
     cambios,
-    metadatos: presentarMetadatos(fila.metadatos, contexto),
+    metadatos: metadatosVisibles(fila, contexto),
     redactados: tieneRedactados(cambios),
   }
 }

@@ -26,6 +26,7 @@ import {
   paisesDelPeriodo,
   rankingsAccesos,
   resumenAccesos,
+  totalSospechosos,
 } from "../queries"
 import type { RankingsAccesos } from "../tipos"
 import { ActividadAccesos } from "./actividad-accesos"
@@ -60,8 +61,8 @@ export async function SeccionSeguridadAccesos({
   usuario: UsuarioSesion
 }) {
   const { rango } = await cargarPeriodo(searchParams)
-  const [resumen, alertas, actividad, sesion] = await Promise.all([
-    resumenAccesos(rango),
+  const [sospechosos, alertas, actividad, sesion] = await Promise.all([
+    totalSospechosos(rango),
     alertasSospechosas(rango, usuario),
     actividadAccesos(rango),
     eventosDeSesion(rango),
@@ -70,7 +71,7 @@ export async function SeccionSeguridadAccesos({
     <div className="grid gap-4 lg:grid-cols-3">
       <PanelSeguridad
         alertas={alertas}
-        total={resumen.sospechosos.valor}
+        total={sospechosos}
         conteos={sesion.conteos}
         enlazarUsuarios={tieneAlgunPermiso(usuario, ["usuarios.ver"])}
       />

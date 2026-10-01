@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it } from "vitest"
 
 import type { Insight } from "../tipos"
+import { EsqueletoPanelInsights } from "./esqueleto-panel-insights"
 import { PanelInsights } from "./panel-insights"
 
 const SEVERIDADES = [
@@ -60,5 +61,13 @@ describe("PanelInsights", () => {
     render(<PanelInsights insights={[]} />)
     expect(screen.getByText("Todo en orden")).toBeInTheDocument()
     expect(screen.queryByRole("list")).not.toBeInTheDocument()
+  })
+})
+
+describe("EsqueletoPanelInsights", () => {
+  it("anuncia la carga una sola vez para todo el panel", () => {
+    render(<EsqueletoPanelInsights cantidad={4} />)
+    expect(screen.getAllByRole("status")).toHaveLength(1)
+    expect(screen.getByRole("status")).toHaveTextContent("Cargando hallazgos…")
   })
 })

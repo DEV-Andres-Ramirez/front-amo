@@ -37,10 +37,13 @@ begin
     (u_adm, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'humo5.admin@amo.test', now(), now(), now()),
     (u_anu, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'Humo5.Anunciante@amo.test', now(), now(), now()),
     (u_tmp, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'humo5.tmp@amo.test', now(), now(), now());
+  -- Desde M7 el estado de un perfil solo cambia por aplicar_transicion: la preparación (owner) lo simula.
+  perform set_config('amo.transicion_autorizada', 'on', true);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'ADMIN'), estado = 'ACTIVO',
          debe_cambiar_password = false where id in (u_adm, u_tmp);
   update public.perfiles set rol_id = (select id from public.roles where clave = 'ANUNCIANTE'), estado = 'ACTIVO',
          anunciante_id = v_anunciante, debe_cambiar_password = false where id = u_anu;
+  perform set_config('amo.transicion_autorizada', '', true);
   insert into auth.sessions (id, user_id, created_at, updated_at, aal) values
     (s_adm1, u_adm, now(), now(), 'aal1'), (s_adm2, u_adm, now(), now(), 'aal2'),
     (s_anu, u_anu, now(), now(), 'aal1'), (s_tmp, u_tmp, now(), now(), 'aal2');

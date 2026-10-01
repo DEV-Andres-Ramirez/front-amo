@@ -20,6 +20,7 @@ import {
   describirNavegador,
   describirUbicacion,
   enmascararIp,
+  nombreVisibleFactor,
 } from "./presentacion"
 import type {
   ActividadPropia,
@@ -35,13 +36,13 @@ import type {
  * Consultas de «Mi cuenta» con la sesión del USUARIO (JWT + RLS): cada una
  * devuelve solo datos propios. Los errores de consulta se lanzan (los recoge
  * el límite de error de la sección); los recursos que aún no existen en la BD
- * (bucket, tablas de organizaciones, SRF de sesiones) degradan con elegancia.
+ * (bucket `avatares`, SRF de sesiones propias) degradan con elegancia.
  */
 
 type ClienteServidor = Awaited<ReturnType<typeof crearClienteServidor>>
 
-/** PostgREST/Postgres: la tabla o la función aún no existe. */
-const RECURSO_INEXISTENTE = new Set(["PGRST205", "42P01", "PGRST202", "42883"])
+/** PostgREST/Postgres: la función aún no existe (`mis_sesiones`). */
+const FUNCION_INEXISTENTE = new Set(["PGRST202", "42883"])
 
 /** Vigencia de las URL firmadas (`archivos.vigencia_url_firmada_segundos`). */
 const VIGENCIA_URL_SEGUNDOS = 300
@@ -68,29 +69,34 @@ async function firmarAvatar(
   return error ? null : data.signedUrl
 }
 
-const esquemaNombre = z.object({ nombre: z.string().nullable() })
-
 /**
- * Nombre de la organización propia. `anunciantes` y `medios` llegan con la
- * migración `negocio_actores` y aún no están en `database.types.ts`: consulta
- * sin tipos + zod; sin la tabla, el nombre queda pendiente.
+ * Nombre de la organización propia (la RLS de `anunciantes`/`medios` deja ver
+ * la fila propia). `null` si no es visible (p. ej. borrada).
  */
-async function nombreOrganizacion(
+async function nombreAnunciante(
   supabase: ClienteServidor,
-  tabla: "anunciantes" | "medios",
   id: string
 ): Promise<string | null> {
-  const columna = tabla === "anunciantes" ? "nombre_comercial" : "nombre"
-  const { data, error } = await (supabase as unknown as SupabaseClient)
-    .from(tabla)
-    .select(`nombre:${columna}`)
+  const { data, error } = await supabase
+    .from("anunciantes")
+    .select("nombre_comercial")
     .eq("id", id)
     .maybeSingle()
-  if (error) {
-    if (RECURSO_INEXISTENTE.has(error.code)) return null
-    fallar(`leer tu organización`, error)
-  }
-  return data ? esquemaNombre.parse(data).nombre : null
+  if (error) fallar("leer tu organización", error)
+  return data?.nombre_comercial ?? null
+}
+
+async function nombreMedio(
+  supabase: ClienteServidor,
+  id: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("medios")
+    .select("nombre")
+    .eq("id", id)
+    .maybeSingle()
+  if (error) fallar("leer tu organización", error)
+  return data?.nombre ?? null
 }
 
 async function organizacionDe(
@@ -100,17 +106,13 @@ async function organizacionDe(
   if (fila.anunciante_id) {
     return {
       tipo: "ANUNCIANTE",
-      nombre: await nombreOrganizacion(
-        supabase,
-        "anunciantes",
-        fila.anunciante_id
-      ),
+      nombre: await nombreAnunciante(supabase, fila.anunciante_id),
     }
   }
   if (fila.medio_id) {
     return {
       tipo: "MEDIO",
-      nombre: await nombreOrganizacion(supabase, "medios", fila.medio_id),
+      nombre: await nombreMedio(supabase, fila.medio_id),
     }
   }
   return null
@@ -180,7 +182,7 @@ export const preferenciasPropias = cache(
 function aFactor(factor: Factor, indice: number): FactorPropio {
   return {
     id: factor.id,
-    nombre: factor.friendly_name?.trim() || `Autenticador ${indice + 1}`,
+    nombre: nombreVisibleFactor(factor.friendly_name, indice),
     creadoAt: factor.created_at,
     ultimoUsoAt: factor.last_challenged_at ?? null,
   }
@@ -241,7 +243,7 @@ async function leerSesiones(
     "mis_sesiones"
   )
   if (!propias.error) return z.array(esquemaSesion).parse(propias.data)
-  if (!RECURSO_INEXISTENTE.has(propias.error.code)) {
+  if (!FUNCION_INEXISTENTE.has(propias.error.code)) {
     fallar("leer tus sesiones", propias.error)
   }
   if (!tieneAlgunPermiso(usuario, ["usuarios.ver"])) return null

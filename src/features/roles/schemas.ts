@@ -19,6 +19,7 @@ const id = z.uuid({ error: "Identificador inválido." })
 const nombre = z
   .string({ error: "Escribe el nombre del rol." })
   .trim()
+  .min(1, "Escribe el nombre del rol.")
   .min(2, "Escribe al menos 2 caracteres.")
   .max(60, "Máximo 60 caracteres.")
 
@@ -40,6 +41,7 @@ const clave = z
   .string({ error: "Escribe la clave." })
   .trim()
   .toUpperCase()
+  .min(1, "Escribe la clave del rol.")
   .regex(
     PATRON_CLAVE_ROL,
     "Usa MAYÚSCULAS, números y guion bajo, empezando por una letra (2 a 40)."

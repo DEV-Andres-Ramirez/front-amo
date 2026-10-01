@@ -399,6 +399,8 @@ export function rutaEntidad(
 }
 
 const TEXTOS_ENLACE: Readonly<Record<string, string>> = {
+  // Roles es configuración, pero su enlace lleva a la ficha del rol.
+  roles: "Ver el rol",
   rol_permisos: "Ver el rol",
   usuarios: "Ver usuarios",
   bitacora: "Ver la bitácora",

@@ -1,5 +1,5 @@
 import type { FilaRanking } from "../agregacion"
-import { formatearValorGeo, unidadGeo } from "../formato"
+import { formatearParticipacion, formatearValorGeo, unidadGeo } from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 
 interface ContenidoTooltipProps {
@@ -61,7 +61,7 @@ export function ContenidoTooltip({
         <p className="cifras text-[0.6875rem] text-muted-foreground">
           Puesto {fila.posicion} de {totalConDatos}
           {fila.participacion !== null
-            ? ` · ${formatearValorGeo(fila.participacion, "cumplimiento")} del total`
+            ? ` · ${formatearParticipacion(fila.participacion)} del total`
             : ""}
         </p>
       ) : null}

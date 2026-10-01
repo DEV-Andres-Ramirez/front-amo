@@ -142,6 +142,38 @@ describe("construirPdf", () => {
     ).toBe(paginas.length)
   })
 
+  it("el título de una sección nunca queda solo al final de la página", async () => {
+    const filas = Array.from({ length: 26 }, (_, i) => [
+      `Fila ${i + 1}`,
+      `${i}`,
+    ])
+    const doc = await construirPdf(
+      {
+        titulo: "Informe",
+        fecha: FECHA,
+        secciones: [
+          {
+            tipo: "tabla",
+            columnas: [{ titulo: "A" }, { titulo: "B" }],
+            filas,
+          },
+          {
+            tipo: "imagen",
+            titulo: "Gráfico final",
+            imagen: { dataUrl: PNG, ancho: 1000, alto: 500 },
+          },
+        ],
+      },
+      null
+    )
+    const paginas = textosPorPagina(doc)
+    const conTitulo = paginas.findIndex((textos) =>
+      textos.includes("Gráfico final")
+    )
+    expect(conTitulo).toBeGreaterThan(0)
+    expect(imagenesPorPagina(doc)[conTitulo]).toBe(1)
+  })
+
   it("una imagen más alta que la página se reduce para caber", async () => {
     const doc = await construirPdf(
       {

@@ -33,6 +33,7 @@ export type TipoValor =
   | "booleano"
   | "estado"
   | "referencia"
+  | "color"
   | "enmascarado"
   | "hash"
   | "json"
@@ -75,7 +76,7 @@ export interface ParMetadato {
 }
 
 export interface ContextoValores {
-  /** Nombres legibles de ids referenciados (roles, perfiles…). */
+  /** Nombres legibles de ids referenciados (roles, perfiles…) y de claves de rol. */
   nombres: ReadonlyMap<string, string>
 }
 
@@ -140,6 +141,7 @@ const DIA = /^\d{4}-\d{2}-\d{2}$/
 const HASH_REDACTADO = /^sha256:[0-9a-f]{6,64}$/i
 const HASH_COMPLETO = /^[0-9a-f]{64}$/i
 const ENMASCARADO = /^••••|^[^@\s]\*{3}@/
+const COLOR_HEX = /^#[0-9a-f]{6}$/i
 
 /** Columnas de dinero COP (numeric(14,2)) por nombre. */
 const CAMPO_MONEDA =
@@ -194,6 +196,9 @@ function presentarTexto(
       texto: nombre ?? `${valor.slice(0, 8)}…`,
       detalle: valor,
     }
+  }
+  if (COLOR_HEX.test(valor)) {
+    return { tipo: "color", texto: valor.toUpperCase() }
   }
   if (CAMPO_ESTADO.test(campo) && /^[A-Z][A-Z0-9_]*$/.test(valor)) {
     return { tipo: "estado", texto: etiquetaEstado(valor), detalle: valor }
@@ -393,6 +398,10 @@ const ETIQUETAS_METADATO: Readonly<Record<string, string>> = {
   rol: "Rol",
   tipo: "Tipo",
   sesiones_cerradas: "Sesiones cerradas",
+  alcance: "Alcance",
+  motivo: "Motivo",
+  factor: "Factor",
+  factores: "Factores retirados",
   conserva_sesion: "Conservó la sesión actual",
   evento: "Evento",
   campos: "Campos",
@@ -408,6 +417,24 @@ const VALORES_METADATO: Readonly<
   formato: { xlsx: "Excel (.xlsx)", csv: "CSV (.csv)", pdf: "PDF" },
   metodo: { ENLACE: "Enlace de invitación", CONTRASENA: "Contraseña temporal" },
   tipo: { recovery: "Recuperación de contraseña", invite: "Invitación" },
+  alcance: { otras: "Las demás sesiones", todas: "Todas las sesiones" },
+  motivo: {
+    manual: "Cierre manual",
+    cambio_contrasena: "Cambio de contraseña",
+    restablecer_contrasena: "Restablecimiento de contraseña",
+  },
+  factor: { totp: "App de autenticación (TOTP)" },
+}
+
+/** Valor conocido de un metadato: vocabulario fijo o nombre del rol por su clave. */
+function metadatoConocido(
+  clave: string,
+  valor: unknown,
+  contexto: ContextoValores
+): string | undefined {
+  if (typeof valor !== "string") return undefined
+  if (clave === "rol") return contexto.nombres.get(valor)
+  return VALORES_METADATO[clave]?.[valor]
 }
 
 /** Pares etiqueta/valor de `bitacora.metadatos` (filtros, formato, filas…). */
@@ -417,8 +444,7 @@ export function presentarMetadatos(
 ): ParMetadato[] {
   if (!esObjeto(metadatos)) return []
   return Object.entries(metadatos).map(([clave, valor]) => {
-    const conocido =
-      typeof valor === "string" ? VALORES_METADATO[clave]?.[valor] : undefined
+    const conocido = metadatoConocido(clave, valor, contexto)
     return {
       clave,
       etiqueta: ETIQUETAS_METADATO[clave] ?? humanizar(clave),

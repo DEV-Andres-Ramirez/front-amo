@@ -30,7 +30,9 @@ export interface DatosExplorador {
   readonly capa: CapaGeometria | undefined
   /** La capa ya es la del nivel actual. */
   readonly capaVigente: boolean
+  /** Los polígonos del nivel no se pudieron descargar (sin ellos no hay mapa ni ranking). */
   readonly errorCapa: Error | null
+  readonly reintentarCapa: () => void
   readonly respuesta: RespuestaMapaGeo | undefined
   readonly vista: VistaMapa | null
   /** Métrica de los datos visibles (puede ir un paso atrás mientras carga la nueva). */
@@ -120,11 +122,12 @@ export function useDatosExplorador(
     capa: geometria.data,
     capaVigente,
     errorCapa: geometria.error,
+    reintentarCapa: () => void geometria.refetch(),
     respuesta,
     vista,
     metricaVista,
     circulos,
-    cargando: metricas.isFetching || !capaVigente,
+    cargando: metricas.isFetching || (!capaVigente && !geometria.error),
     error: metricas.error,
     reintentar: () => void metricas.refetch(),
     nombreZona: (codigo) =>

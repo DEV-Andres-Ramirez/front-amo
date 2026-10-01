@@ -52,7 +52,11 @@ export function reglaAccesosInusuales(
       etiqueta: "Revisar el registro de accesos",
       href: construirHref(
         RUTAS_INSIGHTS.accesos,
-        { motivo: MOTIVO_PAIS_INUSUAL },
+        {
+          motivo: MOTIVO_PAIS_INUSUAL,
+          // El registro de accesos lee un rango propio solo con este preset.
+          periodo: entrada.periodo ? "personalizado" : undefined,
+        },
         entrada.periodo
       ),
     },

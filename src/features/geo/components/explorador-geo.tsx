@@ -14,9 +14,8 @@ import { toast } from "sonner"
 
 import {
   componerImagenMapa,
-  descargarLienzo,
+  descargarMapaPng,
   type ElementoLeyendaExportacion,
-  nombreArchivoMapa,
 } from "@/components/maps/exportar-mapa"
 import type { FocoMapa } from "@/components/maps/expresiones"
 import { MapaDinamico } from "@/components/maps/mapa-dinamico"
@@ -29,7 +28,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from "@/components/ui/drawer"
-import { rangoDesdePreset, serializarFecha } from "@/lib/fechas"
+import { rangoDesdePreset } from "@/lib/fechas"
 import { cn } from "@/lib/utils"
 
 import { crearDiscriminadorClic, type DiscriminadorClic } from "../clic"
@@ -56,6 +55,7 @@ import {
   TIPO_ZONA,
 } from "../niveles"
 import { useEstadoExplorador } from "../use-estado-explorador"
+import type { FilaRanking } from "../agregacion"
 import { codigosDeClase, type VistaMapa } from "../vista-mapa"
 import {
   AvisoErrorDatos,
@@ -75,9 +75,10 @@ import { PanelRanking } from "./panel-ranking"
 import { useDatosExplorador } from "./use-datos-explorador"
 import {
   disposicionPara,
-  useTamanoElemento,
+  useFocoTrasCambioDeNivel,
   usePantallaCompleta,
   usePunteroFino,
+  useTamanoElemento,
   useTeclaEscape,
 } from "./use-interfaz-mapa"
 
@@ -168,6 +169,7 @@ export function ExploradorGeo({
   const explorador = useEstadoExplorador(metricasPermitidas)
   const { nivel: estado, rango } = explorador
   const ambito = claveAmbito(estado)
+  useFocoTrasCambioDeNivel(raiz, ambito)
   const datos = useDatosExplorador(explorador, tema)
   const { vista, metricaVista, respuesta } = datos
 
@@ -224,9 +226,15 @@ export function ExploradorGeo({
     }
   }, [ambito])
 
+  // Esc deshace de adentro hacia afuera: detalle, pantalla completa (si el
+  // navegador no la tomó para sí) y, por último, el nivel.
   useTeclaEscape(true, () => {
     if (seleccionado) {
       seleccionar(null)
+      return
+    }
+    if (pantalla.activa) {
+      pantalla.alternar()
       return
     }
     const superior = subirNivel(estado)
@@ -302,10 +310,7 @@ export function ExploradorGeo({
         tema,
         escala: window.devicePixelRatio || 1,
       })
-      await descargarLienzo(
-        imagen,
-        nombreArchivoMapa([definicion.tituloCorto, lugar, serializarFecha(rango.hasta)])
-      )
+      await descargarMapaPng(imagen, [definicion.tituloCorto, lugar])
       toast.success("Imagen del mapa descargada")
     } catch {
       toast.error("No pudimos exportar el mapa. Intenta de nuevo.")
@@ -351,8 +356,16 @@ export function ExploradorGeo({
     onReintentar: () => void detalle.refetch(),
   }
 
+  const enFocoLeyenda =
+    foco === null
+      ? null
+      : foco === "sin-datos"
+        ? (fila: FilaRanking) => fila.valor === null
+        : (fila: FilaRanking) => destacados?.has(fila.codigo) ?? false
+
   const propsRanking = {
     vista,
+    enFoco: enFocoLeyenda,
     cargando: datos.cargando,
     estado,
     metrica: metricaVista ?? "medios",
@@ -407,7 +420,41 @@ export function ExploradorGeo({
     ) : null
 
   const filaHover = zonaHover ? (vista?.porCodigo.get(zonaHover) ?? null) : null
+  const mapaUsable = !errorMapa && !datos.errorCapa
 
+  const aviso = errorMapa ? (
+    <AvisoErrorMapa
+      mensaje={errorMapa}
+      onReintentar={() => {
+        setErrorMapa(null)
+        setMapaListo(false)
+        setIntentoMapa((intento) => intento + 1)
+      }}
+    />
+  ) : datos.errorCapa ? (
+    <AvisoErrorDatos
+      mensaje={datos.errorCapa.message}
+      onReintentar={datos.reintentarCapa}
+    />
+  ) : errorDatos ? (
+    <AvisoErrorDatos
+      mensaje={errorDatos.message}
+      pista={errorDatos instanceof ErrorConsultaGeo ? errorDatos.pista : undefined}
+      onReintentar={datos.reintentar}
+    />
+  ) : sinDatos ? (
+    <AvisoSinDatos
+      zonaSingular={tipoZona.singular}
+      onAmpliar={
+        rango.preset === "esteAno"
+          ? null
+          : () => explorador.cambiarRango(rangoDesdePreset("esteAno"))
+      }
+    />
+  ) : null
+
+  // Orden del DOM = orden del tabulador: avisos y paneles antes que el lienzo
+  // (que Mapbox hace enfocable); el apilado lo deciden los `z-index`.
   return (
     <div
       ref={raiz}
@@ -417,6 +464,103 @@ export function ExploradorGeo({
         pantalla.activa ? "fixed inset-0 z-40 h-dvh" : CLASE_LIENZO
       )}
     >
+      {/* ── Avisos centrados ──────────────────────────────────────────── */}
+      {aviso}
+
+      {/* ── Paneles ───────────────────────────────────────────────────── */}
+      {amplia ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col gap-3 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <EncabezadoMapa
+              estado={estado}
+              onIr={irA}
+              simulado={propsBarra.simulado}
+              cargando={propsBarra.cargando}
+              className="w-[21rem] shrink-0"
+            />
+            <HerramientasMapa {...propsBarra} />
+          </div>
+          <div className="flex min-h-0 flex-1 items-start gap-3">
+            <div className={cn(CLASE_PANEL, "flex h-full w-[21rem] shrink-0 flex-col")}>
+              <PanelRanking {...propsRanking} className="flex-1" />
+            </div>
+            <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-3">
+              <CoachmarkMapa
+                habilitado={mapaListo && mapaUsable}
+                tactil={!punteroFino}
+              />
+              <div className="flex w-full items-end justify-between gap-3">
+                <div className="pointer-events-auto">{leyenda}</div>
+              </div>
+            </div>
+            <div className="flex h-full max-h-[calc(100%-1.75rem)] shrink-0 flex-col items-end">
+              <PanelDetalleLateral datos={datosDetalle} {...accionesDetalle} />
+            </div>
+          </div>
+          {mapaUsable ? (
+            <ControlesZoom
+              onAcercar={() => apiMapa.current?.acercar()}
+              onAlejar={() => apiMapa.current?.alejar()}
+              onRecentrar={() => apiMapa.current?.recentrar()}
+              className={cn(
+                "absolute bottom-11 transition-[right] duration-300 ease-out",
+                datosDetalle ? "right-[24.5rem]" : "right-4"
+              )}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between gap-3 p-3">
+          <div className="flex flex-col items-center gap-3">
+            <BarraCompacta {...propsBarra} className="w-full max-w-xl" />
+            <CoachmarkMapa habilitado={mapaListo && mapaUsable} tactil={!punteroFino} />
+          </div>
+          <div
+            className={cn(
+              "flex items-end justify-between gap-2 transition-opacity duration-200",
+              datosDetalle && "pointer-events-none opacity-0"
+            )}
+          >
+            <div className="pointer-events-auto mb-1 min-w-0">{leyenda}</div>
+            {/* Por encima del logotipo y la atribución de Mapbox (obligatorios). */}
+            <div className="pointer-events-auto mb-[4.25rem] flex shrink-0 flex-col items-end gap-2">
+              {mapaUsable ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => apiMapa.current?.recentrar()}
+                  aria-label="Volver al encuadre"
+                  className={cn(CLASE_PANEL, "size-10 rounded-xl text-muted-foreground")}
+                >
+                  <LocateFixed aria-hidden />
+                </Button>
+              ) : null}
+              <Button
+                variant="ghost"
+                onClick={() => setRankingAbierto(true)}
+                className={cn(CLASE_PANEL, "h-10 gap-2 rounded-xl px-3.5 font-medium")}
+              >
+                <ListOrdered data-icon="inline-start" aria-hidden className="text-primary" />
+                Ranking
+              </Button>
+            </div>
+          </div>
+          <Drawer open={rankingAbierto} onOpenChange={setRankingAbierto}>
+            <DrawerContent className="mx-auto max-w-xl data-[swipe-axis=y]:[--drawer-content-max-height:min(80dvh,44rem)] sm:rounded-t-2xl">
+              <span
+                aria-hidden
+                className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-foreground/20"
+              />
+              <DrawerTitle className="sr-only">
+                Ranking de {tipoZona.plural}
+              </DrawerTitle>
+              <PanelRanking {...propsRanking} className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom)]" />
+            </DrawerContent>
+          </Drawer>
+          <HojaDetalle datos={datosDetalle} {...accionesDetalle} />
+        </div>
+      )}
+
       {/* ── Lienzo ─────────────────────────────────────────────────────── */}
       {ancho > 0 && datos.capa && metricaVista ? (
         <MapaDinamico
@@ -454,7 +598,7 @@ export function ExploradorGeo({
           refApi={apiMapa}
         />
       ) : null}
-      <CargaLienzo visible={!mapaListo && !errorMapa} />
+      <CargaLienzo visible={!mapaListo && mapaUsable} />
 
       {punteroFino && metricaVista ? (
         <TooltipFlotante ref={refTooltip} visible={zonaHover !== null}>
@@ -471,122 +615,6 @@ export function ExploradorGeo({
           ) : null}
         </TooltipFlotante>
       ) : null}
-
-      {/* ── Avisos centrados ──────────────────────────────────────────── */}
-      {errorMapa ? (
-        <AvisoErrorMapa
-          mensaje={errorMapa}
-          onReintentar={() => {
-            setErrorMapa(null)
-            setMapaListo(false)
-            setIntentoMapa((intento) => intento + 1)
-          }}
-        />
-      ) : errorDatos ? (
-        <AvisoErrorDatos
-          mensaje={errorDatos.message}
-          pista={errorDatos instanceof ErrorConsultaGeo ? errorDatos.pista : undefined}
-          onReintentar={datos.reintentar}
-        />
-      ) : sinDatos ? (
-        <AvisoSinDatos
-          zonaSingular={tipoZona.singular}
-          onAmpliar={
-            rango.preset === "esteAno"
-              ? null
-              : () => explorador.cambiarRango(rangoDesdePreset("esteAno"))
-          }
-        />
-      ) : null}
-
-      {/* ── Paneles ───────────────────────────────────────────────────── */}
-      {amplia ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col gap-3 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <EncabezadoMapa
-              estado={estado}
-              onIr={irA}
-              simulado={propsBarra.simulado}
-              cargando={propsBarra.cargando}
-              className="w-[21rem] shrink-0"
-            />
-            <HerramientasMapa {...propsBarra} />
-          </div>
-          <div className="flex min-h-0 flex-1 items-start gap-3">
-            <div className={cn(CLASE_PANEL, "flex h-full w-[21rem] shrink-0 flex-col")}>
-              <PanelRanking {...propsRanking} className="flex-1" />
-            </div>
-            <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-3">
-              <CoachmarkMapa
-                habilitado={mapaListo && !errorMapa}
-                tactil={!punteroFino}
-              />
-              <div className="flex w-full items-end justify-between gap-3">
-                <div className="pointer-events-auto">{leyenda}</div>
-              </div>
-            </div>
-            <div className="flex h-full max-h-[calc(100%-1.75rem)] shrink-0 flex-col items-end">
-              <PanelDetalleLateral datos={datosDetalle} {...accionesDetalle} />
-            </div>
-          </div>
-          <ControlesZoom
-            onAcercar={() => apiMapa.current?.acercar()}
-            onAlejar={() => apiMapa.current?.alejar()}
-            onRecentrar={() => apiMapa.current?.recentrar()}
-            className={cn(
-              "absolute bottom-11 transition-[right] duration-300 ease-out",
-              datosDetalle ? "right-[24.5rem]" : "right-4"
-            )}
-          />
-        </div>
-      ) : (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between gap-3 p-3">
-          <div className="flex flex-col items-center gap-3">
-            <BarraCompacta {...propsBarra} className="w-full max-w-xl" />
-            <CoachmarkMapa habilitado={mapaListo && !errorMapa} tactil={!punteroFino} />
-          </div>
-          <div
-            className={cn(
-              "flex items-end justify-between gap-2 transition-opacity duration-200",
-              datosDetalle && "pointer-events-none opacity-0"
-            )}
-          >
-            <div className="pointer-events-auto mb-1 min-w-0">{leyenda}</div>
-            <div className="pointer-events-auto mb-10 flex shrink-0 flex-col items-end gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => apiMapa.current?.recentrar()}
-                aria-label="Volver al encuadre"
-                className={cn(CLASE_PANEL, "size-10 rounded-xl text-muted-foreground")}
-              >
-                <LocateFixed aria-hidden />
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setRankingAbierto(true)}
-                className={cn(CLASE_PANEL, "h-10 gap-2 rounded-xl px-3.5 font-medium")}
-              >
-                <ListOrdered data-icon="inline-start" aria-hidden className="text-primary" />
-                Ranking
-              </Button>
-            </div>
-          </div>
-          <Drawer open={rankingAbierto} onOpenChange={setRankingAbierto}>
-            <DrawerContent className="mx-auto max-w-xl data-[swipe-axis=y]:[--drawer-content-max-height:min(80dvh,44rem)] sm:rounded-t-2xl">
-              <span
-                aria-hidden
-                className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-foreground/20"
-              />
-              <DrawerTitle className="sr-only">
-                Ranking de {tipoZona.plural}
-              </DrawerTitle>
-              <PanelRanking {...propsRanking} className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom)]" />
-            </DrawerContent>
-          </Drawer>
-          <HojaDetalle datos={datosDetalle} {...accionesDetalle} />
-        </div>
-      )}
 
       <p role="status" aria-live="polite" className="sr-only">
         {datos.cargando

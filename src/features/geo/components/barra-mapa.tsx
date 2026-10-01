@@ -42,14 +42,17 @@ function BarraProgreso({ activa }: { activa: boolean }) {
   )
 }
 
-function InsigniaSimulado() {
+function InsigniaSimulado({ compacta = false }: { compacta?: boolean }) {
   return (
     <span
       title="AMO_GEO_MOCK=1: cifras deterministas para desarrollo"
-      className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2 py-0.5 text-[0.625rem] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-300"
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/12 text-[0.625rem] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-300",
+        compacta ? "p-1.5" : "px-2 py-0.5"
+      )}
     >
       <FlaskConical aria-hidden className="size-3" />
-      Simulado
+      <span className={cn(compacta && "sr-only")}>Simulado</span>
     </span>
   )
 }
@@ -99,7 +102,7 @@ export function HerramientasMapa({
 > & { className?: string }) {
   return (
     <div
-      role="toolbar"
+      role="group"
       aria-label="Opciones del mapa"
       className={cn(CLASE_PANEL, "flex items-center gap-1.5 p-1.5", className)}
     >
@@ -135,7 +138,7 @@ export function BarraCompacta({
       <h1 className="sr-only">Explorador geográfico</h1>
       <div className="flex items-center gap-1">
         <MigasMapa estado={estado} onIr={onIr} compacto className="min-w-0 flex-1 pl-0.5" />
-        {simulado ? <InsigniaSimulado /> : null}
+        {simulado ? <InsigniaSimulado compacta /> : null}
         <MenuAccionesMapa opciones={opciones} />
       </div>
       <div className="flex items-center gap-1.5">

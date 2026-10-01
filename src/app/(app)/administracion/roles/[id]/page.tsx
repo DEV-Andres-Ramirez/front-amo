@@ -81,9 +81,13 @@ export default async function PaginaRol({
   const actor = actorParaRoles(usuario)
   const rol = await obtenerRol(id, actor.puedeVerUsuarios)
   if (!rol) notFound()
+  // Los roles de "copiar de" solo hacen falta si puede abrir la hoja.
+  const rolesHoja = actor.puedeGestionar
+    ? listarRoles(actor.puedeVerUsuarios)
+    : Promise.resolve([])
 
   return (
-    <ProveedorHojaRol actor={actor} roles={listarRoles(actor.puedeVerUsuarios)}>
+    <ProveedorHojaRol actor={actor} roles={rolesHoja}>
       <ContenedorPagina>
         <CabeceraRol
           rol={rol}

@@ -180,7 +180,7 @@ export function BandejaNotificaciones({
             )}
           >
             {grupo.titulo}
-            <span className="font-medium cifras tracking-normal normal-case opacity-70">
+            <span className="font-normal cifras tracking-normal normal-case">
               · {grupo.notificaciones.length}
             </span>
           </h2>

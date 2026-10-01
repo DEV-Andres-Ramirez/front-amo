@@ -210,6 +210,14 @@ export async function resumenAccesos(
   }
 }
 
+/** Accesos sospechosos del periodo (cabecera del panel de alertas; un solo conteo). */
+export function totalSospechosos(rango: RangoFechas): Promise<number> {
+  return contar("contar los sospechosos", [
+    ...filtrosVentana(ventanasComparadas(rango).actual),
+    SOSPECHOSOS,
+  ])
+}
+
 /** Países y ciudades de origen de los ingresos exitosos. */
 export async function rankingsAccesos(
   rango: RangoFechas

@@ -28,7 +28,8 @@ import {
 } from "./leyenda-grafico"
 import { LienzoGrafico } from "./lienzo-grafico"
 import { densidad, opcionesTooltip } from "./opciones"
-import { colorCategorico } from "./paleta"
+import { colorCategorico, conAlfa } from "./paleta"
+import { pluginCentro } from "./plugins"
 import type { ContenidoTooltip } from "./tooltip-vidrio"
 import { useTooltipGrafico } from "./tooltip-vidrio"
 import { useTemaGraficos } from "./use-tema-graficos"
@@ -45,6 +46,18 @@ export interface GraficoDonaProps {
 }
 
 /** El centro usa la variante compacta: cabe en el hueco de la dona. */
+const PLUGINS = [pluginCentro]
+
+/** Formato del total pintado en el lienzo (capturas): el mismo, compacto. */
+const FORMATO_TEXTO_CENTRO: Readonly<Record<FormatoValor, FormatoValor>> = {
+  cop: "copCompacto",
+  copCompacto: "copCompacto",
+  numero: "compacto",
+  compacto: "compacto",
+  porcentaje: "porcentaje",
+  decimal: "decimal",
+}
+
 const FORMATO_CENTRO: Readonly<Record<FormatoValor, FormatoNumero>> = {
   cop: "copCompacto",
   copCompacto: "copCompacto",
@@ -53,6 +66,9 @@ const FORMATO_CENTRO: Readonly<Record<FormatoValor, FormatoNumero>> = {
   porcentaje: "porcentaje",
   decimal: "numero",
 }
+
+/** Opacidad de los segmentos que no están enfocados. */
+const ALFA_ATENUADO = 0.28
 
 /** Lado de la dona: todo el alto, hasta el 44 % del ancho y 15 rem. */
 const LADO_DONA = "min(100cqh, 44cqw, 15rem)"
@@ -122,14 +138,27 @@ export function GraficoDona({
   )
   const { tooltip, externo } = useTooltipGrafico(construirTooltip)
 
-  const datos = useMemo<ChartData<"doughnut", number[], string>>(
-    () => ({
+  const enfocado =
+    visibles.find((s) => s.id === resaltado) ??
+    visibles.find((s) => s.id === tooltip?.filas[0]?.id)
+  const idEnfocado =
+    enfocado && !ocultas.has(enfocado.id) ? enfocado.id : null
+
+  const datos = useMemo<ChartData<"doughnut", number[], string>>(() => {
+    // Énfasis: con un segmento enfocado, el resto se atenúa (la identidad
+    // sigue en la leyenda, que no cambia).
+    const relleno = visibles.map((s, i) =>
+      idEnfocado && s.id !== idEnfocado
+        ? conAlfa(colores[i], ALFA_ATENUADO)
+        : colores[i]
+    )
+    return {
       labels: visibles.map((s) => s.nombre),
       datasets: [
         {
           data: visibles.map((s) => (ocultas.has(s.id) ? 0 : s.valor)),
-          backgroundColor: colores,
-          hoverBackgroundColor: colores,
+          backgroundColor: relleno,
+          hoverBackgroundColor: relleno,
           borderColor: tema.superficie,
           hoverBorderColor: tema.superficie,
           borderWidth: 2,
@@ -137,9 +166,8 @@ export function GraficoDona({
           hoverOffset: 6,
         },
       ],
-    }),
-    [visibles, colores, ocultas, tema.superficie]
-  )
+    }
+  }, [visibles, colores, ocultas, tema.superficie, idEnfocado])
 
   const opciones = useMemo<ChartOptions<"doughnut">>(
     () => ({
@@ -155,9 +183,19 @@ export function GraficoDona({
             animateScale: false,
           },
       interaction: { mode: "nearest", intersect: true },
-      plugins: { tooltip: opcionesTooltip(externo) },
+      plugins: {
+        tooltip: opcionesTooltip(externo),
+        amoCentro: {
+          mostrar: tema.captura,
+          etiqueta: etiquetaTotal,
+          valor: formatearValor(total, FORMATO_TEXTO_CENTRO[formato]),
+          color: tema.texto,
+          colorSecundario: tema.textoSecundario,
+          fuente: tema.fuente,
+        },
+      },
     }),
-    [tema, externo]
+    [tema, externo, etiquetaTotal, total, formato]
   )
 
   const resaltar = useCallback(
@@ -176,17 +214,12 @@ export function GraficoDona({
     [visibles, ocultas]
   )
 
-  const enfocado =
-    visibles.find((s) => s.id === resaltado) ??
-    visibles.find((s) => s.id === tooltip?.filas[0]?.id)
-  const valorCentro =
-    enfocado && !ocultas.has(enfocado.id) ? enfocado.valor : total
-  const etiquetaCentro =
-    enfocado && !ocultas.has(enfocado.id) ? enfocado.nombre : etiquetaTotal
+  // El centro muestra el segmento enfocado (si sigue visible) o el total.
+  const centro = idEnfocado ? enfocado : undefined
+  const valorCentro = centro?.valor ?? total
+  const etiquetaCentro = centro?.nombre ?? etiquetaTotal
   const participacionCentro =
-    enfocado && !ocultas.has(enfocado.id) && total > 0
-      ? enfocado.valor / total
-      : null
+    centro && total > 0 ? centro.valor / total : null
 
   const accesibles = useMemo(
     () => datosDona({ titulo, segmentos: visibles, formato, nombreCategoria }),
@@ -212,7 +245,9 @@ export function GraficoDona({
     // Contenedor de tamaño: la dona se ajusta al alto y al ancho disponibles
     // y la leyenda siempre queda al lado, sin desbordar la tarjeta.
     <div className={cn("[container-type:size] size-full min-h-0", className)}>
-      <div className="flex size-full items-center gap-4 sm:gap-6">
+      {/* Grupo centrado y leyenda acotada: en tarjetas anchas la cifra no
+          se aleja de su nombre. */}
+      <div className="flex size-full items-center justify-center gap-4 sm:gap-6">
         <div
           className="relative aspect-square shrink-0"
           style={{ width: LADO_DONA }}
@@ -220,6 +255,7 @@ export function GraficoDona({
           <LienzoGrafico
             instancia={instancia}
             leyenda={leyenda}
+            leyendaAlLado
             tooltip={tooltip}
             mostrarTooltip={false}
             posiciones={visibles.length}
@@ -233,6 +269,7 @@ export function GraficoDona({
               type="doughnut"
               data={datos}
               options={opciones}
+              plugins={PLUGINS}
               aria-hidden
             />
           </LienzoGrafico>
@@ -265,7 +302,7 @@ export function GraficoDona({
           onAlternar={alternar}
           onResaltar={resaltar}
           orientacion="vertical"
-          className="max-h-full min-w-0 flex-1 overflow-y-auto"
+          className="max-h-full max-w-72 min-w-0 flex-1 overflow-y-auto"
         />
       </div>
     </div>

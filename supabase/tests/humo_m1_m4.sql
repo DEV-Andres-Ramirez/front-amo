@@ -39,8 +39,11 @@ begin
   r := r || jsonb_build_object('00_handle_new_user_crea_perfiles_invitados', v_n = 3);
 
   update public.perfiles set rol_id = v_rol_admin where id = u_inv;
+  -- Desde M7 el estado de un perfil solo cambia por aplicar_transicion: la preparación (owner) lo simula.
+  perform set_config('amo.transicion_autorizada', 'on', true);
   update public.perfiles set rol_id = v_rol_admin, estado = 'ACTIVO', debe_cambiar_password = false where id = u_adm;
   update public.perfiles set rol_id = v_rol_super, estado = 'ACTIVO', debe_cambiar_password = false where id = u_sup;
+  perform set_config('amo.transicion_autorizada', '', true);
 
   insert into auth.sessions (id, user_id, created_at, updated_at, aal)
   values (s_inv, u_inv, now(), now(), 'aal1'), (s_adm1, u_adm, now(), now(), 'aal1'),
@@ -153,7 +156,10 @@ begin
   execute 'reset role';
   r := r || jsonb_build_object('a6b_activar_perfil_invitado',
     (select estado = 'ACTIVO' and activado_at is not null from public.perfiles where id = u_inv));
+  -- ACTIVO → INVITADO no es una transición: se deshace con modo_carga (owner) para las pruebas siguientes.
+  perform set_config('amo.modo_carga', 'on', true);
   update public.perfiles set estado = 'INVITADO', activado_at = null where id = u_inv;
+  perform set_config('amo.modo_carga', '', true);
 
   -- a7. anon no ve nada.
   execute 'set local role anon';

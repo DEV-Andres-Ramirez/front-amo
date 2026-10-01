@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 
 import type { FilaRanking } from "../agregacion"
 import { departamentoPorCodigo } from "../departamentos"
-import { formatearValorGeo, unidadGeo } from "../formato"
+import { formatearParticipacion, formatearValorGeo, unidadGeo } from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 import {
   DEPARTAMENTOS_SIN_DESCENSO,
@@ -128,7 +128,7 @@ function ValorPrincipal({
           ? `Puesto ${fila.posicion} de ${totalZonas} ${zonaPlural}`
           : `Sin puesto en el ranking`}
         {fila?.participacion !== null && fila?.participacion !== undefined
-          ? ` · ${formatearValorGeo(fila.participacion, "cumplimiento")} del total`
+          ? ` · ${formatearParticipacion(fila.participacion)} del total`
           : ""}
         {!definicion.aditiva && fila?.n ? ` · n = ${fila.n}` : ""}
       </p>
@@ -242,7 +242,7 @@ function Top({ detalle }: { detalle: RespuestaDetalleGeo }) {
               <span
                 className="block h-full rounded-full bg-primary/70"
                 style={{
-                  width: `${maximo > 0 ? Math.max(4, ((fila.valor ?? 0) / maximo) * 100) : 0}%`,
+                  width: `${fila.valor && fila.valor > 0 && maximo > 0 ? Math.max(4, (fila.valor / maximo) * 100) : 0}%`,
                 }}
               />
             </span>

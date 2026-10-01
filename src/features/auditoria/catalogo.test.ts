@@ -98,6 +98,7 @@ describe("rutaEntidad", () => {
 describe("textoEnlaceEntidad", () => {
   it("texto del botón según la entidad", () => {
     expect(textoEnlaceEntidad("perfiles")).toBe("Ver usuario")
+    expect(textoEnlaceEntidad("roles")).toBe("Ver el rol")
     expect(textoEnlaceEntidad("rol_permisos")).toBe("Ver el rol")
     expect(textoEnlaceEntidad("tarifas")).toBe("Ver configuración")
   })

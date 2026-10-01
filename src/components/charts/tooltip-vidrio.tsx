@@ -1,7 +1,13 @@
 "use client"
 
 import type { Chart, ChartType, TooltipModel } from "chart.js"
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -128,31 +134,86 @@ export function textoTooltip(contenido: ContenidoTooltip): string {
   return [contenido.titulo, ...filas, contenido.pie].filter(Boolean).join(". ")
 }
 
+const SEPARACION_TOOLTIP = 14
+/** Pasado este punto del ancho, el tooltip prefiere el lado izquierdo. */
+const UMBRAL_IZQUIERDA = 0.58
+
+type Ancla = Pick<EstadoTooltip, "x" | "y" | "anchoLienzo" | "altoLienzo">
+
+function acotar(valor: number, maximo: number): number {
+  return Math.min(Math.max(valor, 0), Math.max(0, maximo))
+}
+
+/**
+ * Esquina superior izquierda del tooltip dentro del lienzo: a un lado del
+ * punto (el derecho salvo cerca del borde derecho) y centrado en su altura;
+ * si no cabe a ningún lado (móvil), encima o debajo del punto. Nunca se sale
+ * del ancho del lienzo, así no provoca desplazamiento horizontal.
+ */
+export function posicionTooltip(
+  { x, y, anchoLienzo, altoLienzo }: Ancla,
+  caja: { ancho: number; alto: number }
+): { left: number; top: number } {
+  const derecha = x + SEPARACION_TOOLTIP
+  const izquierda = x - SEPARACION_TOOLTIP - caja.ancho
+  const cabeDerecha = derecha + caja.ancho <= anchoLienzo
+  const cabeIzquierda = izquierda >= 0
+  const centrado = acotar(y - caja.alto / 2, altoLienzo - caja.alto)
+  const prefiereIzquierda = x > anchoLienzo * UMBRAL_IZQUIERDA
+
+  if (cabeIzquierda && (prefiereIzquierda || !cabeDerecha)) {
+    return { left: izquierda, top: centrado }
+  }
+  if (cabeDerecha) return { left: derecha, top: centrado }
+  const encima = y - SEPARACION_TOOLTIP - caja.alto
+  return {
+    left: acotar(x - caja.ancho / 2, anchoLienzo - caja.ancho),
+    top: acotar(
+      encima >= 0 ? encima : y + SEPARACION_TOOLTIP,
+      altoLienzo - caja.alto
+    ),
+  }
+}
+
 /**
  * Tooltip de vidrio: valor en negrita primero, serie después con su trazo.
- * Se ancla al punto activo y cambia de lado cerca del borde derecho.
+ * Se ancla al punto activo; su posición se calcula con su tamaño real antes
+ * de pintarse (`useLayoutEffect`), así nunca se sale del lienzo.
  */
 export function TooltipVidrio({ estado }: { estado: EstadoTooltip | null }) {
-  if (!estado) return null
+  const nodo = useRef<HTMLDivElement>(null)
 
-  const aLaIzquierda = estado.x > estado.anchoLienzo * 0.58
-  const arriba = Math.min(Math.max(estado.y, 24), estado.altoLienzo - 24)
+  useLayoutEffect(() => {
+    const elemento = nodo.current
+    if (!elemento || !estado) return
+    const { left, top } = posicionTooltip(estado, {
+      ancho: elemento.offsetWidth,
+      alto: elemento.offsetHeight,
+    })
+    // La primera colocación no se anima (saldría deslizándose desde la
+    // esquina); las siguientes siguen al puntero con una transición corta.
+    const primera = elemento.dataset.colocado !== "si"
+    if (primera) elemento.style.transitionProperty = "none"
+    elemento.style.left = `${left}px`
+    elemento.style.top = `${top}px`
+    if (primera) {
+      void elemento.offsetWidth
+      elemento.style.transitionProperty = ""
+      elemento.dataset.colocado = "si"
+    }
+  }, [estado])
+
+  if (!estado) return null
 
   return (
     <div
+      ref={nodo}
       aria-hidden
       data-slot="tooltip-grafico"
       className={cn(
-        "pointer-events-none absolute z-20 flex max-w-64 min-w-36 flex-col gap-1.5 rounded-xl vidrio px-3 py-2.5 text-xs shadow-lg shadow-black/10",
+        "pointer-events-none absolute top-0 left-0 z-20 flex max-w-64 min-w-36 flex-col gap-1.5 rounded-xl vidrio px-3 py-2.5 text-xs shadow-lg shadow-black/10",
         "animate-in transition-[left,top] duration-100 ease-out fade-in-0 zoom-in-95 motion-reduce:animate-none motion-reduce:transition-none"
       )}
-      style={{
-        left: estado.x,
-        top: arriba,
-        transform: aLaIzquierda
-          ? "translate(calc(-100% - 14px), -50%)"
-          : "translate(14px, -50%)",
-      }}
     >
       <p className="font-medium text-muted-foreground">{estado.titulo}</p>
       <ul className="flex flex-col gap-1">

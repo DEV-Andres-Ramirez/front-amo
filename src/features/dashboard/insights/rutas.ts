@@ -1,12 +1,13 @@
 /**
  * Enlaces de las acciones sugeridas. Conservan el periodo consultado
- * (`desde`/`hasta`, el formato que lee `parsearRango`) y el filtro del grupo.
+ * (`desde`/`hasta`) y el filtro del grupo.
  *
- * Supuestos de parámetros a confirmar con las pistas dueñas de cada pantalla:
- * mapa (`metrica`, `departamento`, `plataforma`), reportes
- * (`cumplimiento-medios`, `desempeno-campanas` con `departamento`/`plataforma`),
- * medios (`segmento=en_riesgo`), asignaciones (`alerta=metricas`) y accesos
- * (`motivo=PAIS_INUSUAL`).
+ * Verificados con sus pantallas: mapa (`metrica`, `nivel`, `depto`,
+ * `desde`/`hasta`, features/geo/estado-url.ts) y accesos (`motivo`,
+ * `periodo=personalizado` + `desde`/`hasta`, features/accesos). Supuestos a
+ * confirmar cuando existan: reportes (`cumplimiento-medios`,
+ * `desempeno-campanas` con `departamento`/`plataforma`), medios
+ * (`segmento=en_riesgo`) y asignaciones (`alerta=metricas`).
  */
 import type { Route } from "next"
 

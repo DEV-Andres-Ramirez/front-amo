@@ -45,7 +45,6 @@ export function MetricasBitacora({ resumen }: { resumen: ResumenBitacora }) {
           subirEsBueno: null,
         }}
         serie={resumen.serieDiaria}
-        etiquetaSerie="Eventos por día del periodo"
         detalle={
           promedioDiario(resumen.serieDiaria, resumen.eventos.valor) ??
           "Todos los orígenes"

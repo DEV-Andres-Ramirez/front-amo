@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { Sparkline } from "@/components/charts/sparkline"
 import { NumeroAnimado } from "@/components/motion/numero-animado"
 import {
   calcularDelta,
@@ -12,7 +13,6 @@ import { cn } from "@/lib/utils"
 
 import type { TonoEvento } from "../catalogo"
 import { CLASES_TONO } from "./distintivos"
-import { Minigrafico } from "./minigrafico"
 
 export interface ComparacionIndicador {
   anterior: number
@@ -91,8 +91,8 @@ interface TarjetaIndicadorProps {
   /** Posición en la fila (retraso de la animación de entrada). */
   indice: number
   comparacion?: ComparacionIndicador
+  /** Tendencia del periodo (decorativa: la cifra y su variación van en texto). */
   serie?: readonly number[]
-  etiquetaSerie?: string
   detalle?: ReactNode
   /** Acción discreta al pie (p. ej. "Ver eventos"). */
   accion?: ReactNode
@@ -115,7 +115,6 @@ export function TarjetaIndicador({
   indice,
   comparacion,
   serie,
-  etiquetaSerie,
   detalle,
   accion,
   alerta = false,
@@ -159,10 +158,11 @@ export function TarjetaIndicador({
             decimales={formato === "porcentaje" ? 1 : 0}
           />
         </p>
-        {serie && serie.length > 1 ? (
-          <Minigrafico
+        {serie && serie.length > 1 && serie.some((valor) => valor > 0) ? (
+          <Sparkline
             valores={serie}
-            etiqueta={etiquetaSerie ?? `Tendencia de ${titulo.toLowerCase()}`}
+            ancho={96}
+            alto={32}
             className="max-sm:hidden"
           />
         ) : null}
@@ -173,7 +173,7 @@ export function TarjetaIndicador({
       {detalle || accion ? (
         <div className="mt-auto flex min-w-0 items-center justify-between gap-2 pt-0.5">
           {detalle ? (
-            <p className="min-w-0 truncate text-xs text-muted-foreground">
+            <p className="line-clamp-2 min-w-0 text-xs text-pretty text-muted-foreground">
               {detalle}
             </p>
           ) : null}

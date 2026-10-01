@@ -10,6 +10,7 @@ import { departamentoPorCodigo } from "../departamentos"
 import { formatearValorGeo, unidadGeo } from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 import { type EstadoNivel, TIPO_ZONA } from "../niveles"
+import type { FilaRanking } from "../agregacion"
 import type { VistaMapa } from "../vista-mapa"
 import { RankingZonas } from "./ranking-zonas"
 
@@ -25,6 +26,7 @@ export interface PropsPanelRanking {
   onResaltar: (codigo: string | null) => void
   onSeleccionar: (codigo: string) => void
   onExplorar: (codigo: string) => void
+  enFoco?: ((fila: FilaRanking) => boolean) | null
   className?: string
 }
 
@@ -78,6 +80,7 @@ export function PanelRanking({
   onResaltar,
   onSeleccionar,
   onExplorar,
+  enFoco = null,
   className,
 }: PropsPanelRanking) {
   const tipo = TIPO_ZONA[estado.nivel]
@@ -140,6 +143,7 @@ export function PanelRanking({
               onSeleccionar={onSeleccionar}
               onExplorar={onExplorar}
               zonaSingular={tipo.singular}
+              enFoco={enFoco}
             />
           ) : (
             <EsqueletoRanking />

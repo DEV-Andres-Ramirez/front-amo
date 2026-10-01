@@ -71,7 +71,11 @@ export function LeyendaGrafico({
 
   return (
     <ul
-      aria-label="Leyenda"
+      aria-label={
+        interactiva
+          ? "Leyenda: activa una serie para mostrarla u ocultarla"
+          : "Leyenda"
+      }
       className={cn(
         "flex text-xs",
         orientacion === "horizontal"

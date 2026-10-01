@@ -4,10 +4,13 @@ import { CLAVES_PERMISO, permisosDeRol } from "@/lib/auth/permisos"
 
 import {
   accionesDisponibles,
+  esAplicable,
   fueraDeAlcance,
   motivoSoloLectura,
+  noAplicables,
   permisosClonables,
   puedeOtorgar,
+  totalAplicables,
 } from "./reglas"
 import type { ActorRoles, RolListado } from "./tipos"
 
@@ -66,17 +69,69 @@ describe("anti-escalada", () => {
     expect(puedeOtorgar(GESTOR, "pagos.registrar")).toBe(false)
     expect(puedeOtorgar(SUPER, "pagos.registrar")).toBe(true)
     expect(
-      fueraDeAlcance(GESTOR, ["usuarios.ver", "pagos.registrar", "usuarios.eliminar"])
+      fueraDeAlcance(GESTOR, [
+        "usuarios.ver",
+        "pagos.registrar",
+        "usuarios.eliminar",
+      ])
     ).toEqual(["pagos.registrar", "usuarios.eliminar"])
   })
 
   it("al clonar copia lo permitido y cuenta lo omitido", () => {
     expect(
-      permisosClonables(["inicio.admin", "facturas.gestionar"], GESTOR)
-    ).toEqual({ copiables: ["inicio.admin"], omitidos: ["facturas.gestionar"] })
-    expect(permisosClonables(permisosDeRol("FINANZAS"), SUPER).omitidos).toEqual(
-      []
+      permisosClonables(["inicio.admin", "facturas.gestionar"], GESTOR, "ADMIN")
+    ).toEqual({
+      copiables: ["inicio.admin"],
+      sinAlcance: ["facturas.gestionar"],
+      noAplicables: [],
+    })
+    expect(
+      permisosClonables(permisosDeRol("FINANZAS"), SUPER, "ADMIN").sinAlcance
+    ).toEqual([])
+  })
+
+  it("al clonar hacia un rol externo descarta los permisos internos", () => {
+    const resultado = permisosClonables(
+      ["inicio.admin", "campanas.ver", "reportes.ver", "facturas.ver_propias"],
+      SUPER,
+      "ANUNCIANTE"
     )
+    expect(resultado).toEqual({
+      copiables: ["reportes.ver", "facturas.ver_propias"],
+      sinAlcance: [],
+      noAplicables: ["inicio.admin", "campanas.ver"],
+    })
+  })
+})
+
+describe("permisos aplicables por tipo de rol", () => {
+  it("un rol del equipo interno admite todo el catálogo", () => {
+    expect(totalAplicables("ADMIN")).toBe(CLAVES_PERMISO.length)
+    expect(noAplicables("ADMIN", CLAVES_PERMISO)).toEqual([])
+  })
+
+  it("un rol externo solo admite los permisos de su rol de sistema", () => {
+    for (const tipo of ["ANUNCIANTE", "MEDIO"] as const) {
+      const propios = permisosDeRol(tipo)
+      expect(totalAplicables(tipo)).toBe(propios.length)
+      expect(propios.every((clave) => esAplicable(tipo, clave))).toBe(true)
+    }
+  })
+
+  it("ningún permiso interno de lectura global aplica a un rol externo", () => {
+    const globales = [
+      "usuarios.ver",
+      "roles.gestionar",
+      "campanas.ver",
+      "ofertas.ver",
+      "liquidaciones.ver",
+      "datos_sensibles.ver",
+      "auditoria.ver",
+    ] as const
+    expect(noAplicables("ANUNCIANTE", globales)).toEqual(globales)
+    expect(noAplicables("MEDIO", globales)).toEqual(globales)
+    expect(esAplicable("MEDIO", "ofertas.marketplace")).toBe(true)
+    expect(esAplicable("ANUNCIANTE", "ofertas.marketplace")).toBe(false)
   })
 })
 
@@ -89,7 +144,10 @@ describe("motivoSoloLectura", () => {
       )
     ).toBe("superadmin")
     expect(
-      motivoSoloLectura({ id: ROL_ADMIN, clave: "ADMIN", esSistema: true }, SUPER)
+      motivoSoloLectura(
+        { id: ROL_ADMIN, clave: "ADMIN", esSistema: true },
+        SUPER
+      )
     ).toBe("sistema")
   })
 
@@ -128,7 +186,9 @@ describe("accionesDisponibles", () => {
   it("explica por qué no se puede eliminar", () => {
     expect(
       accionesDisponibles(rol({ asignados: 1 }), GESTOR).motivoNoEliminar
-    ).toBe("Tiene 1 usuario asignado: reasígnalo a otro rol antes de eliminarlo.")
+    ).toBe(
+      "Tiene 1 usuario asignado: reasígnalo a otro rol antes de eliminarlo."
+    )
     expect(
       accionesDisponibles(rol({ asignados: 3, usuarios: 2 }), GESTOR)
         .motivoNoEliminar

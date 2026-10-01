@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { rangoConHolgura, retardoEscalonado } from "./opciones"
+import {
+  maximoConMargen,
+  rangoConHolgura,
+  retardoEscalonado,
+} from "./opciones"
 
 describe("rangoConHolgura", () => {
   it("abarca al menos ±10 % del valor medio (no exagera variaciones mínimas)", () => {
@@ -33,5 +37,17 @@ describe("retardoEscalonado", () => {
     expect(retardo({ type: "data", mode: "default", dataIndex: 3 })).toBe(60)
     expect(retardo({ type: "data", mode: "resize", dataIndex: 3 })).toBe(0)
     expect(retardo({ type: "dataset", mode: "default", dataIndex: 3 })).toBe(0)
+  })
+})
+
+describe("maximoConMargen", () => {
+  it("deja aire sobre el valor más alto", () => {
+    expect(maximoConMargen([100, 250, null, 180])).toBeCloseTo(280)
+    expect(maximoConMargen([100], 0.5)).toBe(150)
+  })
+
+  it("sin valores positivos deja que Chart.js decida", () => {
+    expect(maximoConMargen([])).toBeUndefined()
+    expect(maximoConMargen([null, 0])).toBeUndefined()
   })
 })

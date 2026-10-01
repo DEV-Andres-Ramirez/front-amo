@@ -1,4 +1,4 @@
-import { KeyRound, Lock, Shapes, UserRound } from "lucide-react"
+import { KeyRound, Lock, Shapes, TriangleAlert, UserRound } from "lucide-react"
 import type { CSSProperties } from "react"
 
 import { cn } from "@/lib/utils"
@@ -99,7 +99,11 @@ export function InsigniaOrigen({
 export function InsigniaPropio({ className }: { className?: string }) {
   return (
     <span
-      className={cn(PILDORA, "bg-secondary text-secondary-foreground", className)}
+      className={cn(
+        PILDORA,
+        "bg-secondary text-secondary-foreground",
+        className
+      )}
       title="Es tu rol: sus permisos solo los puede cambiar otra persona"
     >
       <UserRound className="size-3.5" aria-hidden />
@@ -120,6 +124,25 @@ export function InsigniaMfa({ className }: { className?: string }) {
   )
 }
 
+/** Rol externo con permisos del equipo interno (le abren datos de toda la plataforma). */
+export function InsigniaRevisar({
+  cantidad,
+  className,
+}: {
+  cantidad: number
+  className?: string
+}) {
+  return (
+    <span
+      className={cn(PILDORA, "bg-destructive/10 text-destructive", className)}
+      title={`${cantidad} ${cantidad === 1 ? "permiso no corresponde" : "permisos no corresponden"} a su tipo de rol`}
+    >
+      <TriangleAlert className="size-3.5" aria-hidden />
+      Revisar permisos
+    </span>
+  )
+}
+
 /** Proporción del catálogo que tiene el rol, en su color. */
 export function BarraCobertura({
   cantidad,
@@ -132,7 +155,8 @@ export function BarraCobertura({
   color: string
   className?: string
 }) {
-  const porcentaje = total > 0 ? Math.round((cantidad / total) * 100) : 0
+  const porcentaje =
+    total > 0 ? Math.min(100, Math.round((cantidad / total) * 100)) : 0
   return (
     <div
       role="presentation"

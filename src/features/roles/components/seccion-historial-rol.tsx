@@ -151,10 +151,13 @@ function ListaPermisos({
       <span>
         {PERMISOS[clave].descripcion}
         {PERMISOS[clave].esSensible ? (
-          <Star
-            className="ml-1 inline size-3 fill-current align-[-1px] text-warning"
-            aria-label="sensible"
-          />
+          <>
+            <Star
+              className="ml-1 inline size-3 fill-current align-[-1px] text-warning"
+              aria-hidden
+            />
+            <span className="sr-only">(sensible)</span>
+          </>
         ) : null}
       </span>
     </li>

@@ -67,7 +67,7 @@ export const ORDINAL: PorTema<readonly string[]> = {
 }
 
 export const SECUENCIAL: PorTema<readonly string[]> = {
-  claro: ["#e7dffe", "#c1abfb", "#9a78f2", "#7246d9", "#4d2e93"],
+  claro: ["#dcd0fd", "#b9a2fa", "#9a78f2", "#7246d9", "#4d2e93"],
   oscuro: ["#3b276f", "#6138bd", "#8760eb", "#af94f8", "#d6c7fd"],
 }
 

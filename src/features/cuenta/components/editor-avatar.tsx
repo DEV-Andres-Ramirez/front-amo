@@ -18,11 +18,6 @@ import {
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { obtenerClienteNavegador } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -262,50 +257,37 @@ export function EditorAvatar({
     return resultado
   }
 
-  const disparadorFoto = (
+  // Sin bucket la foto no es un control: solo las iniciales (el aviso va aparte).
+  const foto = disponible ? (
     <button
       type="button"
       onClick={() => setAbierto(true)}
-      disabled={!disponible}
       aria-label={
         tieneAvatar ? "Cambiar tu foto de perfil" : "Agregar una foto de perfil"
       }
-      className="group relative shrink-0 rounded-full outline-none focus-visible:anillo-foco disabled:cursor-default"
+      className="group relative w-fit shrink-0 rounded-full outline-none focus-visible:anillo-foco"
     >
       <AvatarCuenta nombre={nombre} url={avatarUrl} color={color} />
-      {disponible ? (
-        <>
-          <span
-            aria-hidden
-            className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-          >
-            <Camera className="size-6" />
-          </span>
-          <span
-            aria-hidden
-            className="absolute -right-0.5 -bottom-0.5 grid size-8 place-items-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-105"
-          >
-            <Camera className="size-4" />
-          </span>
-        </>
-      ) : null}
+      <span
+        aria-hidden
+        className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      >
+        <Camera className="size-6" />
+      </span>
+      <span
+        aria-hidden
+        className="absolute -right-0.5 -bottom-0.5 grid size-8 place-items-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-105"
+      >
+        <Camera className="size-4" />
+      </span>
     </button>
+  ) : (
+    <AvatarCuenta nombre={nombre} url={avatarUrl} color={color} />
   )
 
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-      {disponible ? (
-        disparadorFoto
-      ) : (
-        <Tooltip>
-          <TooltipTrigger render={<span className="w-fit rounded-full" />}>
-            {disparadorFoto}
-          </TooltipTrigger>
-          <TooltipContent>
-            Las fotos de perfil estarán disponibles pronto
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {foto}
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">{children}</div>
 
