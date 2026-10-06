@@ -313,3 +313,6 @@ export default async function Pagina({
   `fetch` redirigido por el proxy (prefetch de `/ingresar` con sesión) y la solicitud fallaba.
 - PostgREST, inserción en bloque (`insert([...])`): las columnas que una fila omite llegan como `NULL`, no con su valor
   por defecto. Da a todas las filas las mismas claves.
+- Un BRIN sobre la fecha no sirve un `order by fecha desc limit n` (ni filtra nada si las filas no están físicamente
+  en orden, como tras la carga demo): la línea de tiempo de la bitácora leía la tabla entera (4,7 s). La paginación por
+  conjunto necesita un B-tree en su mismo orden (`bitacora_created_at_id_idx`, migración 14).

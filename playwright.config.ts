@@ -7,7 +7,14 @@ import {
   PROYECTO_TABLET,
 } from "./e2e/utilidades/proyectos"
 
-const URL_BASE = "http://localhost:3000"
+/**
+ * Puerto del servidor de pruebas. Con `AMO_E2E_PUERTO` la suite levanta su
+ * build de producción en otro puerto y no toca lo que ya escuche en el 3000:
+ * Playwright reutilizaría un `next dev` en uso, que no es lo que se prueba.
+ * Las pruebas del mapa necesitan que el token de Mapbox admita ese origen.
+ */
+const PUERTO = Number(process.env.AMO_E2E_PUERTO ?? 3000)
+const URL_BASE = `http://localhost:${PUERTO}`
 
 // SwiftShader permite renderizar WebGL (Mapbox) en navegadores headless sin GPU.
 const OPCIONES_LANZAMIENTO = {
@@ -83,7 +90,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm build && pnpm start",
+    command: `pnpm build && pnpm start -p ${PUERTO}`,
     // robots.txt siempre responde 200; "/" redirige y depende de la sesión.
     url: `${URL_BASE}/robots.txt`,
     reuseExistingServer: !process.env.CI,

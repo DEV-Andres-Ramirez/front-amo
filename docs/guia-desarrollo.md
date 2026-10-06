@@ -125,5 +125,9 @@ Geist (UI), Geist Mono / `tabular-nums` (cifras). Detalle completo en `docs/marc
   las demás sesiones del mismo usuario: cada proceso necesita su propia cuenta.
 - `pnpm build` y `pnpm test:e2e` usan `.next/`: solo un proceso a la vez.
 - `pnpm test:e2e` levanta `pnpm build && pnpm start` en el puerto 3000 (o reutiliza lo que ya escuche ahí: que no
-  sea un `next dev`). Antes de la primera vez: `pnpm bootstrap:e2e` y los datos demo (`pnpm demo:generar`). El
-  proyecto `preparacion` guarda las sesiones compartidas en `playwright/.auth/` (ignorado por git).
+  sea un `next dev`). Con un `next dev` en uso en el 3000, `AMO_E2E_PUERTO=3100 pnpm test:e2e` prueba el build de
+  producción en otro puerto (`next dev` y `next build` no comparten carpeta: `.next/dev` y `.next/`); el token de
+  Mapbox está restringido por URL a `localhost:3000`, así que en otro puerto las pruebas del mapa fallan (403 de
+  las teselas) mientras no se añada ese origen al token. Antes de la primera vez: `pnpm bootstrap:e2e` y los datos
+  demo (`pnpm demo:generar`). El proyecto `preparacion` guarda las sesiones compartidas en `playwright/.auth/`
+  (ignorado por git).
