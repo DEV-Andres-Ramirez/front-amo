@@ -98,9 +98,42 @@ describe("migas", () => {
     ])
   })
 
+  it("una subpágina registrada usa su título, no el slug sin tildes", () => {
+    expect(migas("/reportes/desempeno-campanas")).toEqual([
+      { titulo: "Reportes", href: "/reportes" },
+      { titulo: "Desempeño de campañas" },
+    ])
+    expect(migas("/reportes/usuarios-accesos").at(-1)).toEqual({
+      titulo: "Usuarios y accesos",
+    })
+    // Fuera del registro el segmento se humaniza como antes.
+    expect(migas("/reportes/otro-reporte").at(-1)).toEqual({
+      titulo: "Otro reporte",
+    })
+  })
+
+  it("la página puede nombrar la última miga (el registro de una ficha)", () => {
+    const ficha = "/operacion/medios/0192f3a4-5b6c-7d8e-9f01-23456789abcd"
+    expect(migas(ficha, "  Radio Pasto  ")).toEqual([
+      { titulo: "Operación" },
+      { titulo: "Medios", href: "/operacion/medios" },
+      { titulo: "Radio Pasto" },
+    ])
+    expect(migas(ficha, "   ").at(-1)).toEqual({ titulo: "Detalle" })
+    expect(migas(ficha, null).at(-1)).toEqual({ titulo: "Detalle" })
+  })
+
+  it("el título propio nunca reemplaza a la sección", () => {
+    expect(migas("/operacion/medios", "Radio Pasto")).toEqual([
+      { titulo: "Operación" },
+      { titulo: "Medios" },
+    ])
+  })
+
   it("devuelve una lista vacía fuera del registro", () => {
     expect(migas("/desconocida")).toEqual([])
     expect(migas("/inicios")).toEqual([])
+    expect(migas("/desconocida", "Algo")).toEqual([])
   })
 })
 

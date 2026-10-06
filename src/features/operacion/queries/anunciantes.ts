@@ -5,11 +5,11 @@ import { cache } from "react"
 import { serializarFecha } from "@/lib/fechas"
 import type { Database, Json } from "@/types/database.types"
 
-import { resumirCartera } from "../calculos"
+import { type FacturaParaCartera, resumirCartera } from "../calculos"
 import { TIPOS_DOCUMENTO_ANUNCIANTE } from "../estados"
 import type { EstadoTablaAnunciantes } from "../estado-tablas"
 import {
-  enmascararNit,
+  DIGITOS_MINIMOS_NIT,
   formatearNit,
   normalizarBusqueda,
   patronContiene,
@@ -27,11 +27,12 @@ import type {
 import {
   catalogos,
   clienteSolicitud,
+  configuracionOperacion,
+  departamentoJuntoAMunicipio,
   enLotes,
   fallar,
   leerPagina,
   leerTodo,
-  nombreDepartamento,
   nombreMunicipio,
   nombrePais,
 } from "./comun"
@@ -50,12 +51,11 @@ type FilaAnuncianteBd = Pick<
   | "ciudad_extranjera"
   | "estado_verificacion"
   | "created_at"
-  | "es_demo"
 >
 
 const SELECCION_LISTADO = `
   id, nombre_comercial, razon_social, nit, digito_verificacion, identificacion_extranjera, sector_id,
-  pais_iso2, municipio_codigo, ciudad_extranjera, estado_verificacion, created_at, es_demo
+  pais_iso2, municipio_codigo, ciudad_extranjera, estado_verificacion, created_at
 ` as const
 
 const COLUMNAS_ORDEN: Readonly<
@@ -72,32 +72,25 @@ const COLUMNAS_ORDEN: Readonly<
 const FACTURAS_CON_SALDO = ["EMITIDA", "PAGADA_PARCIAL", "VENCIDA"] as const
 
 export interface PermisosAnunciantes {
-  /** `datos_sensibles.ver`: NIT completo y búsqueda por NIT. */
-  verSensibles: boolean
   /** `facturas.ver`: cartera. */
   verCartera: boolean
 }
 
 /**
- * NIT (o identificación extranjera) tal como puede verlo quien consulta. Se
- * enmascara AQUÍ, en el servidor: el valor completo no viaja al navegador.
+ * NIT con su dígito o, para una empresa de otro país, su identificación
+ * tributaria. Es un dato público de la empresa (RUES, facturas): se muestra
+ * completo a quien puede ver al anunciante, igual que lo entrega la BD.
  */
-function identificacionVisible(
+function identificacionDe(
   fila: Pick<
     FilaAnuncianteBd,
     "nit" | "digito_verificacion" | "identificacion_extranjera"
-  >,
-  verSensibles: boolean
+  >
 ): string | null {
-  if (fila.nit) {
-    return verSensibles
-      ? formatearNit(fila.nit, fila.digito_verificacion)
-      : enmascararNit(fila.nit, fila.digito_verificacion)
-  }
-  if (!fila.identificacion_extranjera) return null
-  return verSensibles
-    ? fila.identificacion_extranjera
-    : enmascararNit(fila.identificacion_extranjera, null)
+  return (
+    formatearNit(fila.nit, fila.digito_verificacion) ??
+    fila.identificacion_extranjera
+  )
 }
 
 function ciudadDe(
@@ -143,28 +136,47 @@ async function campanasPorAnunciante(
   return agregados
 }
 
-/** Saldo por cobrar (Σ total − pagado de facturas con saldo) por anunciante. */
+interface CarteraResumida {
+  saldo: number
+  facturasVencidas: number
+}
+
+/**
+ * Saldo por cobrar y facturas vencidas por anunciante, con la misma regla de
+ * mora que la ficha (`resumirCartera`): así el listado y la ficha coinciden.
+ */
 async function carteraPorAnunciante(
   ids: readonly string[]
-): Promise<Map<string, number>> {
+): Promise<Map<string, CarteraResumida>> {
   const supabase = await clienteSolicitud()
-  const saldos = new Map<string, number>()
+  const facturas = new Map<string, FacturaParaCartera[]>()
   for (const lote of enLotes(ids)) {
     const filas = await leerTodo("calcular la cartera", (desde, hasta) =>
       supabase
         .from("facturas")
-        .select("id, anunciante_id, total, pagado")
+        .select("id, anunciante_id, estado, total, pagado, fecha_vencimiento")
         .in("anunciante_id", lote)
         .in("estado", [...FACTURAS_CON_SALDO])
         .order("id")
         .range(desde, hasta)
     )
     for (const fila of filas) {
-      const saldo = Math.max(0, (fila.total ?? 0) - fila.pagado)
-      saldos.set(fila.anunciante_id, (saldos.get(fila.anunciante_id) ?? 0) + saldo)
+      const lista = facturas.get(fila.anunciante_id) ?? []
+      lista.push({
+        estado: fila.estado,
+        total: fila.total,
+        pagado: fila.pagado,
+        fechaVencimiento: fila.fecha_vencimiento,
+      })
+      facturas.set(fila.anunciante_id, lista)
     }
   }
-  return saldos
+  return new Map(
+    [...facturas].map(([anuncianteId, lista]) => {
+      const { saldo, facturasVencidas } = resumirCartera(lista)
+      return [anuncianteId, { saldo, facturasVencidas }]
+    })
+  )
 }
 
 export async function listarAnunciantes(
@@ -175,8 +187,7 @@ export async function listarAnunciantes(
   const { sectores } = await catalogos()
   const patron = patronContiene(normalizarBusqueda(estado.q))
   const digitos = estado.q.replace(/\D/g, "")
-  // Buscar por NIT solo con permiso: si no, la búsqueda revelaría el número.
-  const porNit = permisos.verSensibles && digitos.length >= 4
+  const porNit = digitos.length >= DIGITOS_MINIMOS_NIT
 
   const pagina = await leerPagina(
     "listar los anunciantes",
@@ -197,8 +208,10 @@ export async function listarAnunciantes(
       if (estado.estado.length > 0) {
         consulta = consulta.in("estado_verificacion", estado.estado)
       }
-      if (estado.sector.length > 0) consulta = consulta.in("sector_id", estado.sector)
-      if (estado.pais.length > 0) consulta = consulta.in("pais_iso2", estado.pais)
+      if (estado.sector.length > 0)
+        consulta = consulta.in("sector_id", estado.sector)
+      if (estado.pais.length > 0)
+        consulta = consulta.in("pais_iso2", estado.pais)
       return consulta
         .order(COLUMNAS_ORDEN[estado.orden.campo], {
           ascending: !estado.orden.descendente,
@@ -222,7 +235,7 @@ export async function listarAnunciantes(
         id: fila.id,
         nombreComercial: fila.nombre_comercial,
         razonSocial: fila.razon_social,
-        identificacion: identificacionVisible(fila, permisos.verSensibles),
+        identificacion: identificacionDe(fila),
         sector: sectores.get(fila.sector_id) ?? null,
         paisIso2: fila.pais_iso2,
         pais: nombrePais(fila.pais_iso2) ?? fila.pais_iso2,
@@ -231,9 +244,11 @@ export async function listarAnunciantes(
         campanas: agregados?.campanas ?? 0,
         campanasActivas: agregados?.activas ?? 0,
         inversion: agregados?.inversion ?? 0,
-        cartera: cartera ? (cartera.get(fila.id) ?? 0) : null,
+        cartera: cartera ? (cartera.get(fila.id)?.saldo ?? 0) : null,
+        facturasVencidas: cartera
+          ? (cartera.get(fila.id)?.facturasVencidas ?? 0)
+          : null,
         creadoAt: fila.created_at,
-        esDemo: fila.es_demo,
       }
     }),
   }
@@ -281,16 +296,15 @@ export async function opcionesAnunciantes(): Promise<OpcionCatalogo[]> {
 export async function paisesDeAnunciantes(): Promise<
   { iso2: string; nombre: string }[]
 > {
-  const iso2 = [...new Set((await anunciantesVisibles()).map((f) => f.pais_iso2))]
+  const iso2 = [
+    ...new Set((await anunciantesVisibles()).map((f) => f.pais_iso2)),
+  ]
   return iso2
     .map((codigo) => ({ iso2: codigo, nombre: nombrePais(codigo) ?? codigo }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
 }
 
 // ── Ficha ────────────────────────────────────────────────────────────────────
-
-/** Vigencia de las URL firmadas (`archivos.vigencia_url_firmada_segundos`). */
-const VIGENCIA_URL_SEGUNDOS = 300
 
 function textoDe(valor: Json | undefined): string | null {
   return typeof valor === "string" && valor.trim() ? valor : null
@@ -312,24 +326,23 @@ function facturacionDe(valor: Json): AnuncianteDetalle["facturacion"] {
 }
 
 export const obtenerAnunciante = cache(
-  async (
-    id: string,
-    verSensibles: boolean
-  ): Promise<AnuncianteDetalle | null> => {
+  async (id: string): Promise<AnuncianteDetalle | null> => {
     const supabase = await clienteSolicitud()
-    const [{ data: fila, error }, { sectores }] = await Promise.all([
-      supabase
-        .from("anunciantes")
-        .select(
-          `id, nombre_comercial, razon_social, nit, digito_verificacion, identificacion_extranjera, sector_id,
+    const [{ data: fila, error }, { sectores }, configuracion] =
+      await Promise.all([
+        supabase
+          .from("anunciantes")
+          .select(
+            `id, nombre_comercial, razon_social, nit, digito_verificacion, identificacion_extranjera, sector_id,
            pais_iso2, municipio_codigo, ciudad_extranjera, estado_verificacion, motivo_estado, verificado_at,
            suspendido_at, rechazado_at, created_at, es_demo, logo_path, datos_facturacion, deleted_at,
            verificador:perfiles!anunciantes_verificado_por_fkey ( nombre, email )`
-        )
-        .eq("id", id)
-        .maybeSingle(),
-      catalogos(),
-    ])
+          )
+          .eq("id", id)
+          .maybeSingle(),
+        catalogos(),
+        configuracionOperacion(),
+      ])
     if (error) fallar("leer el anunciante", error)
     if (!fila || fila.deleted_at) return null
 
@@ -337,25 +350,30 @@ export const obtenerAnunciante = cache(
     const logo = fila.logo_path
       ? await supabase.storage
           .from("avatares")
-          .createSignedUrl(fila.logo_path, VIGENCIA_URL_SEGUNDOS)
+          .createSignedUrl(
+            fila.logo_path,
+            configuracion.vigenciaUrlFirmadaSegundos
+          )
       : null
 
     return {
       id: fila.id,
       nombreComercial: fila.nombre_comercial,
       razonSocial: fila.razon_social,
-      identificacion: identificacionVisible(fila, verSensibles),
-      identificacionVisible: verSensibles,
+      identificacion: identificacionDe(fila),
       tipoIdentificacion: fila.nit ? "NIT" : "Identificación tributaria",
       sector: sectores.get(fila.sector_id) ?? null,
       paisIso2: fila.pais_iso2,
       pais: nombrePais(fila.pais_iso2) ?? fila.pais_iso2,
       ciudad: ciudadDe(fila),
-      departamento: nombreDepartamento(fila.municipio_codigo?.slice(0, 2) ?? null),
+      departamento: departamentoJuntoAMunicipio(
+        fila.municipio_codigo?.slice(0, 2) ?? null
+      ),
       estado: fila.estado_verificacion,
       motivoEstado: fila.motivo_estado,
       verificadoAt: fila.verificado_at,
-      verificadoPor: fila.verificador?.nombre ?? fila.verificador?.email ?? null,
+      verificadoPor:
+        fila.verificador?.nombre ?? fila.verificador?.email ?? null,
       suspendidoAt: fila.suspendido_at,
       rechazadoAt: fila.rechazado_at,
       creadoAt: fila.created_at,
@@ -414,41 +432,41 @@ export const desempenoDeCampanas = cache(
 )
 
 /** Facturas y cartera del anunciante (RLS: `facturas.ver`). */
-export async function carteraDelAnunciante(
-  anuncianteId: string
-): Promise<CarteraAnunciante> {
-  const supabase = await clienteSolicitud()
-  const { data, error } = await supabase
-    .from("facturas")
-    .select(
-      "id, numero, estado, fecha_emision, fecha_vencimiento, total, pagado, saldo, campana:campanas ( nombre )"
-    )
-    .eq("anunciante_id", anuncianteId)
-    .order("fecha_emision", { ascending: false, nullsFirst: true })
-    .limit(500)
-  if (error) fallar("leer las facturas", error)
-  return {
-    resumen: resumirCartera(
-      data.map((fila) => ({
+export const carteraDelAnunciante = cache(
+  async (anuncianteId: string): Promise<CarteraAnunciante> => {
+    const supabase = await clienteSolicitud()
+    const { data, error } = await supabase
+      .from("facturas")
+      .select(
+        "id, numero, estado, fecha_emision, fecha_vencimiento, total, pagado, saldo, campana:campanas ( nombre )"
+      )
+      .eq("anunciante_id", anuncianteId)
+      .order("fecha_emision", { ascending: false, nullsFirst: true })
+      .limit(500)
+    if (error) fallar("leer las facturas", error)
+    return {
+      resumen: resumirCartera(
+        data.map((fila) => ({
+          estado: fila.estado,
+          total: fila.total,
+          pagado: fila.pagado,
+          fechaVencimiento: fila.fecha_vencimiento,
+        }))
+      ),
+      facturas: data.map((fila) => ({
+        id: fila.id,
+        numero: fila.numero,
         estado: fila.estado,
+        fechaEmision: fila.fecha_emision,
+        fechaVencimiento: fila.fecha_vencimiento,
         total: fila.total,
         pagado: fila.pagado,
-        fechaVencimiento: fila.fecha_vencimiento,
-      }))
-    ),
-    facturas: data.map((fila) => ({
-      id: fila.id,
-      numero: fila.numero,
-      estado: fila.estado,
-      fechaEmision: fila.fecha_emision,
-      fechaVencimiento: fila.fecha_vencimiento,
-      total: fila.total,
-      pagado: fila.pagado,
-      saldo: fila.saldo,
-      campana: fila.campana?.nombre ?? null,
-    })),
+        saldo: fila.saldo,
+        campana: fila.campana?.nombre ?? null,
+      })),
+    }
   }
-}
+)
 
 /** Metadatos de los documentos del anunciante (RLS: `anunciantes.verificar`). */
 export async function documentosDelAnunciante(

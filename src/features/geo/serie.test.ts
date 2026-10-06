@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { cubetasSerie, granularidadSerie } from "./serie"
+import {
+  CUBETAS_MAXIMAS_SERIE_FINA,
+  cubetasSerie,
+  DIAS_MAXIMOS_SERIE_SEMANAL,
+  granularidadSerie,
+} from "./serie"
 
 describe("cubetas de la serie de una zona", () => {
   it("elige la granularidad por la duración del periodo", () => {
@@ -15,7 +20,9 @@ describe("cubetas de la serie de una zona", () => {
     const serie = cubetasSerie("2026-09-24", "2026-09-30")
     expect(serie?.granularidad).toBe("dia")
     expect(serie?.cubetas).toHaveLength(7)
-    expect(serie?.cubetas.every((c) => !c.parcial && c.desde === c.hasta)).toBe(true)
+    expect(serie?.cubetas.every((c) => !c.parcial && c.desde === c.hasta)).toBe(
+      true
+    )
   })
 
   it("30 días: semanas ISO (lunes a domingo) recortadas al periodo", () => {
@@ -35,9 +42,21 @@ describe("cubetas de la serie de una zona", () => {
     const serie = cubetasSerie("2025-07-01", "2026-10-01")
     expect(serie?.granularidad).toBe("mes")
     expect(serie?.cubetas).toHaveLength(16)
-    expect(serie?.cubetas[0]).toEqual({ desde: "2025-07-01", hasta: "2025-07-31", parcial: false })
-    expect(serie?.cubetas[7]).toEqual({ desde: "2026-02-01", hasta: "2026-02-28", parcial: false })
-    expect(serie?.cubetas.at(-1)).toEqual({ desde: "2026-10-01", hasta: "2026-10-01", parcial: true })
+    expect(serie?.cubetas[0]).toEqual({
+      desde: "2025-07-01",
+      hasta: "2025-07-31",
+      parcial: false,
+    })
+    expect(serie?.cubetas[7]).toEqual({
+      desde: "2026-02-01",
+      hasta: "2026-02-28",
+      parcial: false,
+    })
+    expect(serie?.cubetas.at(-1)).toEqual({
+      desde: "2026-10-01",
+      hasta: "2026-10-01",
+      parcial: true,
+    })
   })
 
   it("las cubetas son contiguas y cubren el periodo completo", () => {
@@ -52,6 +71,25 @@ describe("cubetas de la serie de una zona", () => {
       const actual = new Date(`${cubetas[i].desde}T12:00:00Z`)
       expect(actual.getTime() - anterior.getTime()).toBe(86_400_000)
     }
+  })
+
+  it("la serie diaria o semanal nunca pasa del tope de lecturas a la BD", () => {
+    const DIA_MS = 86_400_000
+    const dia = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+    const base = Date.UTC(2026, 0, 1)
+    let maximo = 0
+    // Cualquier día de la semana como inicio y cualquier duración "fina".
+    for (let inicio = 0; inicio < 7; inicio++) {
+      for (let dias = 1; dias <= DIAS_MAXIMOS_SERIE_SEMANAL; dias++) {
+        const desde = base + inicio * DIA_MS
+        const plan = cubetasSerie(dia(desde), dia(desde + (dias - 1) * DIA_MS))
+        expect(plan?.granularidad).not.toBe("mes")
+        maximo = Math.max(maximo, plan?.cubetas.length ?? 0)
+      }
+    }
+    // 98 días que no empiezan en lunes tocan 15 semanas ISO.
+    expect(maximo).toBe(CUBETAS_MAXIMAS_SERIE_FINA)
+    expect(CUBETAS_MAXIMAS_SERIE_FINA).toBe(15)
   })
 
   it("fechas inválidas o invertidas: sin cubetas", () => {

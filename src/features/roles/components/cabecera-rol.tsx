@@ -1,14 +1,13 @@
 import { ArrowLeft, ListChecks, Star, Users } from "lucide-react"
-import Link from "next/link"
 import type { ReactNode } from "react"
 
-import { buttonVariants } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
+import { TituloMiga } from "@/components/layout/titulo-miga"
 import {
   formatearFecha,
   formatearFechaHora,
   formatearRelativo,
 } from "@/lib/format"
-import { cn } from "@/lib/utils"
 
 import { contarSensibles } from "../catalogo"
 import { pluralizar, TIPOS_ROL_ETIQUETA } from "../presentacion"
@@ -58,13 +57,12 @@ export function CabeceraRol({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Enlace con aspecto de botón: conserva la semántica de navegación. */}
-      <Link
+      <TituloMiga titulo={rol.nombre} />
+      <EnlaceBoton
         href={RUTA_ROLES}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "group/volver -ml-2 w-fit text-muted-foreground"
-        )}
+        variant="ghost"
+        size="sm"
+        className="group/volver -ml-2 w-fit text-muted-foreground"
       >
         <ArrowLeft
           data-icon="inline-start"
@@ -72,7 +70,7 @@ export function CabeceraRol({
           className="transition-transform duration-200 group-hover/volver:-translate-x-0.5"
         />
         Roles y permisos
-      </Link>
+      </EnlaceBoton>
       <header
         style={estiloColorRol(rol.color)}
         className="relative isolate overflow-hidden rounded-2xl border bg-card"

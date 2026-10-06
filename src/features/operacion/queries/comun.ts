@@ -2,8 +2,16 @@ import "server-only"
 
 import { cache } from "react"
 
-import { obtenerDepartamento, obtenerMunicipio, obtenerPais } from "@/lib/geo/catalogo"
+import {
+  obtenerDepartamento,
+  obtenerMunicipio,
+  obtenerPais,
+} from "@/lib/geo/catalogo"
 import { crearClienteServidor } from "@/lib/supabase/server"
+import {
+  CLAVE_VIGENCIA_URL_FIRMADA,
+  VIGENCIA_URL_FIRMADA_POR_DEFECTO_S,
+} from "@/lib/supabase/vigencia-url-firmada"
 import type { Json } from "@/types/database.types"
 
 import type { Plataforma } from "../estados"
@@ -114,6 +122,24 @@ export function nombreDepartamento(codigo: string | null): string | null {
   return codigo ? (obtenerDepartamento(codigo)?.nombre ?? codigo) : null
 }
 
+/** Bogotá, D.C. es municipio y departamento a la vez. */
+const DISTRITO_CAPITAL = "11"
+
+/**
+ * Departamento que acompaña al municipio en pantalla ("Pasto, Nariño"). En
+ * Bogotá no se repite el nombre; `corto` usa "San Andrés" o "Valle del Cauca"
+ * para los listados.
+ */
+export function departamentoJuntoAMunicipio(
+  codigo: string | null,
+  { corto = false }: { corto?: boolean } = {}
+): string | null {
+  if (!codigo || codigo === DISTRITO_CAPITAL) return null
+  const departamento = obtenerDepartamento(codigo)
+  if (!departamento) return codigo
+  return corto ? departamento.nombreCorto : departamento.nombre
+}
+
 export function nombrePais(iso2: string | null): string | null {
   return iso2 ? (obtenerPais(iso2.toUpperCase())?.nombre ?? iso2) : null
 }
@@ -161,7 +187,11 @@ export const catalogos = cache(async (): Promise<Catalogos> => {
     formatos: new Map(
       formatos.data.map((formato) => [
         formato.id,
-        { id: formato.id, nombre: formato.nombre, plataforma: formato.plataforma },
+        {
+          id: formato.id,
+          nombre: formato.nombre,
+          plataforma: formato.plataforma,
+        },
       ])
     ),
     categorias: new Map(categorias.data.map((c) => [c.id, c.nombre])),
@@ -175,6 +205,8 @@ export interface ConfiguracionOperacion {
   diasVigenciaVerificacion: number
   diasGraciaVerificacion: number
   nMinimoCumplimiento: number
+  /** Segundos que vive una URL firmada de Storage (§8). */
+  vigenciaUrlFirmadaSegundos: number
 }
 
 /** Valores por defecto de docs/modelo-datos.md §7 si la clave no es visible. */
@@ -182,6 +214,7 @@ const POR_DEFECTO: ConfiguracionOperacion = {
   diasVigenciaVerificacion: 30,
   diasGraciaVerificacion: 7,
   nMinimoCumplimiento: 3,
+  vigenciaUrlFirmadaSegundos: VIGENCIA_URL_FIRMADA_POR_DEFECTO_S,
 }
 
 const CLAVES_CONFIGURACION: Readonly<
@@ -190,11 +223,14 @@ const CLAVES_CONFIGURACION: Readonly<
   diasVigenciaVerificacion: "medios.reverificacion_dias",
   diasGraciaVerificacion: "medios.reverificacion_gracia_dias",
   nMinimoCumplimiento: "medios.n_minimo_cumplimiento",
+  vigenciaUrlFirmadaSegundos: CLAVE_VIGENCIA_URL_FIRMADA,
 }
 
 function comoNumero(valor: Json | undefined, respaldo: number): number {
   const numero = typeof valor === "string" ? Number(valor) : valor
-  return typeof numero === "number" && Number.isFinite(numero) ? numero : respaldo
+  return typeof numero === "number" && Number.isFinite(numero)
+    ? numero
+    : respaldo
 }
 
 export const configuracionOperacion = cache(

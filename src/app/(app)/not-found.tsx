@@ -1,10 +1,9 @@
 import { House } from "lucide-react"
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { IlustracionNoEncontrado } from "@/components/feedback/ilustraciones"
 import { ContenedorPagina } from "@/components/layout/contenedor-pagina"
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { RUTA_INICIO } from "@/lib/auth/navegacion"
 
 export const metadata: Metadata = { title: "No encontrado" }
@@ -28,14 +27,10 @@ export default function NoEncontradoAplicacion() {
             que no esté disponible para tu cuenta.
           </p>
         </div>
-        <Button
-          size="lg"
-          nativeButton={false}
-          render={<Link href={RUTA_INICIO} />}
-        >
+        <EnlaceBoton size="lg" href={RUTA_INICIO}>
           <House data-icon="inline-start" aria-hidden />
           Ir al inicio
-        </Button>
+        </EnlaceBoton>
       </div>
     </ContenedorPagina>
   )

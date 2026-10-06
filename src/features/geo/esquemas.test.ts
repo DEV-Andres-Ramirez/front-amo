@@ -40,22 +40,45 @@ describe("parámetros de GET /api/geo/metricas", () => {
   })
 
   it("el modo calor solo existe para métricas con puntos reales", () => {
-    expect(leer({ vista: "puntos", nivel: "nacional", metrica: "accesos", ...PERIODO })).toMatchObject({
+    expect(
+      leer({
+        vista: "puntos",
+        nivel: "nacional",
+        metrica: "accesos",
+        ...PERIODO,
+      })
+    ).toMatchObject({
       ok: true,
       datos: { vista: "puntos", consulta: { metrica: "accesos" } },
     })
-    expect(leer({ vista: "puntos", nivel: "nacional", metrica: "gmv", ...PERIODO }).ok).toBe(false)
+    expect(
+      leer({ vista: "puntos", nivel: "nacional", metrica: "gmv", ...PERIODO })
+        .ok
+    ).toBe(false)
   })
 
   it("el detalle no incluye los medios destacados por omisión (lo decide la ruta)", () => {
-    const resultado = leer({ vista: "detalle", nivel: "nacional", metrica: "gmv", zona: "05", ...PERIODO })
-    expect(resultado.ok && resultado.datos.vista === "detalle" && resultado.datos.consulta.conMedios).toBe(false)
+    const resultado = leer({
+      vista: "detalle",
+      nivel: "nacional",
+      metrica: "gmv",
+      zona: "05",
+      ...PERIODO,
+    })
+    expect(
+      resultado.ok &&
+        resultado.datos.vista === "detalle" &&
+        resultado.datos.consulta.conMedios
+    ).toBe(false)
   })
 
   it.each([
     ["métrica fuera de la matriz", { nivel: "internacional", metrica: "gmv" }],
     ["nivel desconocido", { nivel: "galaxia", metrica: "medios" }],
-    ["departamental sin departamento", { nivel: "departamental", metrica: "medios" }],
+    [
+      "departamental sin departamento",
+      { nivel: "departamental", metrica: "medios" },
+    ],
     [
       "municipio de otro departamento",
       {
@@ -70,10 +93,44 @@ describe("parámetros de GET /api/geo/metricas", () => {
     expect(leer({ ...PERIODO, ...parametros }).ok).toBe(false)
   })
 
+  it("los mensajes de validación llegan en español, también si falta un parámetro", () => {
+    const mensajes = (parametros: Record<string, string>) => {
+      const resultado = leer(parametros)
+      return resultado.ok
+        ? []
+        : resultado.error.issues.map((issue) => issue.message)
+    }
+    const todos = [
+      ...mensajes({ nivel: "galaxia", metrica: "medios", ...PERIODO }),
+      ...mensajes({ nivel: "nacional", metrica: "ventas", ...PERIODO }),
+      ...mensajes({
+        vista: "tabla",
+        nivel: "nacional",
+        metrica: "medios",
+        ...PERIODO,
+      }),
+      ...mensajes({ nivel: "nacional", metrica: "medios" }),
+      ...mensajes({}),
+    ]
+    expect(todos.length).toBeGreaterThanOrEqual(8)
+    for (const mensaje of todos) {
+      expect(mensaje).not.toMatch(/invalid|expected|received|required/i)
+    }
+    expect(mensajes({ nivel: "nacional", metrica: "medios" })).toContain(
+      "Usa una fecha válida con formato AAAA-MM-DD."
+    )
+  })
+
   it("rechaza fechas inválidas, invertidas o rangos de más de dos años", () => {
     const base = { nivel: "nacional", metrica: "medios" }
-    expect(leer({ ...base, desde: "2026-13-01", hasta: "2026-09-30" }).ok).toBe(false)
-    expect(leer({ ...base, desde: "2026-09-30", hasta: "2026-09-01" }).ok).toBe(false)
-    expect(leer({ ...base, desde: "2020-01-01", hasta: "2026-09-30" }).ok).toBe(false)
+    expect(leer({ ...base, desde: "2026-13-01", hasta: "2026-09-30" }).ok).toBe(
+      false
+    )
+    expect(leer({ ...base, desde: "2026-09-30", hasta: "2026-09-01" }).ok).toBe(
+      false
+    )
+    expect(leer({ ...base, desde: "2020-01-01", hasta: "2026-09-30" }).ok).toBe(
+      false
+    )
   })
 })

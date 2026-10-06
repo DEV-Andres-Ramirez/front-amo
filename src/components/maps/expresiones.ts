@@ -126,14 +126,7 @@ export function pinturaRelleno(
     ],
     "fill-opacity": calor
       ? 0.16
-      : [
-          "case",
-          estado("seleccionado"),
-          0.96,
-          estado("hover"),
-          0.92,
-          base,
-        ],
+      : ["case", estado("seleccionado"), 0.96, estado("hover"), 0.92, base],
   }
 }
 
@@ -248,10 +241,7 @@ export function pinturaCirculos(
 }
 
 /** Mapa de calor sobre puntos reales; `pesoMaximo` normaliza el peso de cada punto. */
-export function pinturaCalor(
-  tema: TemaMapa,
-  pesoMaximo: number
-): PinturaCalor {
+export function pinturaCalor(tema: TemaMapa, pesoMaximo: number): PinturaCalor {
   const rampa = COLORES_MAPA[tema].calor
   return {
     "heatmap-color-use-theme": "none",
@@ -326,7 +316,11 @@ const aHex = (canal: number) =>
     .padStart(2, "0")
 
 /** Interpola dos colores HEX (t ∈ [0, 1]) para animar el cambio de clase. */
-export function interpolarColor(desde: string, hasta: string, t: number): string {
+export function interpolarColor(
+  desde: string,
+  hasta: string,
+  t: number
+): string {
   const a = aRgb(desde)
   const b = aRgb(hasta)
   const f = Math.min(1, Math.max(0, t))

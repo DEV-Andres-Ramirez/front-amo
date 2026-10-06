@@ -34,7 +34,9 @@ export function useTamanoElemento(ref: RefObject<HTMLElement | null>): Tamano {
       const ancho = Math.round(entrada.contentRect.width)
       const alto = Math.round(entrada.contentRect.height)
       setTamano((previo) =>
-        previo.ancho === ancho && previo.alto === alto ? previo : { ancho, alto }
+        previo.ancho === ancho && previo.alto === alto
+          ? previo
+          : { ancho, alto }
       )
     })
     observador.observe(elemento)

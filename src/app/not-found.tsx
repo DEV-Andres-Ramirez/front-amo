@@ -1,10 +1,9 @@
 import { House } from "lucide-react"
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { IlustracionNoEncontrado } from "@/components/feedback/ilustraciones"
 import { PantallaEstado } from "@/components/feedback/pantalla-estado"
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 
 export const metadata: Metadata = {
   title: "Página no encontrada",
@@ -26,10 +25,10 @@ export default function NoEncontrado() {
           Revisa la dirección o vuelve al inicio para seguir navegando.
         </p>
       </div>
-      <Button size="lg" render={<Link href="/" />} nativeButton={false}>
+      <EnlaceBoton size="lg" href="/">
         <House data-icon="inline-start" aria-hidden />
         Ir al inicio
-      </Button>
+      </EnlaceBoton>
     </PantallaEstado>
   )
 }

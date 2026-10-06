@@ -4,6 +4,8 @@ import { useTheme } from "next-themes"
 import { useCallback } from "react"
 import { flushSync } from "react-dom"
 
+import { ignorarAbortoDeTransicion } from "@/components/motion/abortos-transicion"
+
 export type Tema = "light" | "dark" | "system"
 
 interface Origen {
@@ -39,7 +41,8 @@ function origenDelEvento(evento?: {
 /**
  * Cambia el tema con un revelado circular (View Transition API) que nace en el
  * punto del clic. Sin soporte del navegador o con movimiento reducido, cambia
- * al instante. El CSS vive en globals.css (`:root[data-transicion="tema"]`).
+ * al instante; si el navegador descarta la transición, el tema cambia igual,
+ * sin animación. El CSS vive en globals.css (`:root[data-transicion="tema"]`).
  */
 export function useTransicionTema() {
   const { setTheme, theme, resolvedTheme } = useTheme()
@@ -64,7 +67,15 @@ export function useTransicionTema() {
 
       // flushSync: el DOM debe reflejar el nuevo tema dentro del callback.
       const transicion = document.startViewTransition(() => flushSync(aplicar))
-      transicion.finished.finally(() => raiz.removeAttribute(ATRIBUTO))
+      const limpiar = () => raiz.removeAttribute(ATRIBUTO)
+      // El navegador puede descartar el revelado (la ventana cambió de tamaño,
+      // otra transición lo interrumpió) y rechaza estas promesas: el tema ya
+      // quedó aplicado, así que ese aborto no es un error que reportar.
+      transicion.ready.catch(ignorarAbortoDeTransicion)
+      transicion.finished.then(limpiar, (error: unknown) => {
+        limpiar()
+        ignorarAbortoDeTransicion(error)
+      })
     },
     [setTheme]
   )

@@ -25,9 +25,21 @@ import { definicionPropia, NOTA_ZONA_HORARIA, tablaExportable } from "./comun"
 
 export const TRAMOS = [
   { id: "0-30", nombre: "0 a 30 días", valor: (f: FilaCartera) => f.saldo0a30 },
-  { id: "31-60", nombre: "31 a 60 días", valor: (f: FilaCartera) => f.saldo31a60 },
-  { id: "61-90", nombre: "61 a 90 días", valor: (f: FilaCartera) => f.saldo61a90 },
-  { id: "90+", nombre: "Más de 90 días", valor: (f: FilaCartera) => f.saldoMas90 },
+  {
+    id: "31-60",
+    nombre: "31 a 60 días",
+    valor: (f: FilaCartera) => f.saldo31a60,
+  },
+  {
+    id: "61-90",
+    nombre: "61 a 90 días",
+    valor: (f: FilaCartera) => f.saldo61a90,
+  },
+  {
+    id: "90+",
+    nombre: "Más de 90 días",
+    valor: (f: FilaCartera) => f.saldoMas90,
+  },
 ] as const
 
 export const MORAS = ["al-dia", "vencida", "critica"] as const
@@ -82,21 +94,21 @@ export const columnasCartera: readonly ColumnaReporte<FilaCartera>[] = [
   },
   {
     id: "facturado",
+    ocultaPorDefecto: true,
     titulo: "Facturado",
     tipo: "cop",
     valor: (f) => f.facturado,
     ordenable: true,
     totalizar: true,
-    ocultarBajo: "xl",
   },
   {
     id: "pagado",
+    ocultaPorDefecto: true,
     titulo: "Pagado",
     tipo: "cop",
     valor: (f) => f.pagado,
     ordenable: true,
     totalizar: true,
-    ocultarBajo: "xl",
   },
   {
     id: "saldo",
@@ -135,6 +147,7 @@ export const columnasCartera: readonly ColumnaReporte<FilaCartera>[] = [
   },
   {
     id: "saldoMas90",
+    tituloCorto: "+90 días",
     titulo: "Más de 90 días",
     tipo: "cop",
     valor: (f) => f.saldoMas90,
@@ -143,11 +156,11 @@ export const columnasCartera: readonly ColumnaReporte<FilaCartera>[] = [
   },
   {
     id: "porcentajeVencido",
+    ocultarBajo: "xl",
     titulo: "% vencido",
     tipo: "porcentaje",
     valor: (f) => razon(saldoVencido(f), f.saldo),
     ordenable: true,
-    ocultarBajo: "lg",
   },
   {
     id: "facturasVencidas",
@@ -210,7 +223,8 @@ const DEFINICION_VENCIDO = definicionPropia(
 )
 
 const DEFINICION_90 = definicionPropia("Más de 90 días", "COP", "menor", {
-  definicion: "Saldo con más de 90 días de vencido: el de mayor riesgo de no pago.",
+  definicion:
+    "Saldo con más de 90 días de vencido: el de mayor riesgo de no pago.",
   calculo: "Suma del tramo de más de 90 días.",
   ancla: ANCLA_CORTE,
 })
@@ -379,7 +393,11 @@ function hojasCartera(datos: DatosCartera): HojaExcel[] {
       columnas: [
         { titulo: "Antigüedad" },
         { titulo: "Saldo", formato: "cop", totalizar: true },
-        { titulo: "Saldo en el corte anterior", formato: "cop", totalizar: true },
+        {
+          titulo: "Saldo en el corte anterior",
+          formato: "cop",
+          totalizar: true,
+        },
       ],
       filas: TRAMOS.map((tramo, i) => [
         tramo.nombre,
@@ -409,7 +427,7 @@ export const NOTAS_CARTERA: readonly NotaDefinicion[] = [
   {
     termino: "Comparativo",
     explicacion:
-      "Cada variación compara el corte elegido con el mismo día del mes anterior.",
+      "Cada variación compara el corte elegido con el mismo día del mes anterior; un cierre de mes, con el cierre del mes anterior.",
   },
   NOTA_ZONA_HORARIA,
 ]

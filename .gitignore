@@ -16,6 +16,8 @@
 /test-results/
 /blob-report/
 /playwright/.cache/
+# sesiones guardadas por e2e/preparacion.setup.ts (cookies de cuentas de prueba)
+/playwright/.auth/
 
 # next.js
 /.next/

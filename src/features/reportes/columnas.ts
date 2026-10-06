@@ -46,6 +46,14 @@ export interface ColumnaReporte<F> {
   enPdf?: boolean
   /** Suma la columna en la fila de totales del Excel. */
   totalizar?: boolean
+  /** Texto largo (definiciones): en pantalla envuelve en varias líneas. */
+  envolver?: boolean
+  /** Texto con cifras ya formateadas ("$ 1.200", "+4,1 %"): se alinea como número. */
+  cifras?: boolean
+  /** Encabezado en pantalla cuando el título no cabe (el completo queda como ayuda). */
+  tituloCorto?: string
+  /** Segunda línea de la celda principal en pantalla (correo, anunciante, ubicación). */
+  detalle?: (fila: F) => string | null
 }
 
 const FORMATO_EXCEL: Readonly<Record<TipoColumna, FormatoCelda>> = {
@@ -59,6 +67,13 @@ const FORMATO_EXCEL: Readonly<Record<TipoColumna, FormatoCelda>> = {
   booleano: "texto",
 }
 
+/** Se alinea a la derecha con cifras tabulares (en pantalla y en el PDF). */
+export function alineaComoNumero<F>(
+  columna: Pick<ColumnaReporte<F>, "tipo" | "cifras">
+): boolean {
+  return columna.cifras === true || esNumerica(columna.tipo)
+}
+
 export function esNumerica(tipo: TipoColumna): boolean {
   return (
     tipo === "entero" ||
@@ -67,6 +82,12 @@ export function esNumerica(tipo: TipoColumna): boolean {
     tipo === "porcentaje"
   )
 }
+
+/** Dos decimales siempre: en una columna las comas quedan alineadas (0,80 · 1,27). */
+const formatoDecimal = new Intl.NumberFormat("es-CO", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 /** Texto de la celda tal como se ve en pantalla y en el PDF. */
 export function formatearCelda(valor: ValorColumna, tipo: TipoColumna): string {
@@ -85,7 +106,9 @@ export function formatearCelda(valor: ValorColumna, tipo: TipoColumna): string {
       if (!Number.isFinite(numero)) return "—"
       if (tipo === "cop") return formatearCOP(numero)
       if (tipo === "porcentaje") return formatearPorcentaje(numero, 1)
-      return formatearNumero(numero, tipo === "decimal" ? 2 : 0)
+      return tipo === "decimal"
+        ? formatoDecimal.format(numero)
+        : formatearNumero(numero)
     }
   }
 }
@@ -127,8 +150,17 @@ export function columnasPdf<F>(
     .filter((columna) => columna.enPdf !== false)
     .map((columna) => ({
       titulo: columna.titulo,
-      alinear: esNumerica(columna.tipo) ? "derecha" : "izquierda",
+      alinear: alineaComoNumero(columna) ? "derecha" : "izquierda",
     }))
+}
+
+/**
+ * En el PDF las celdas angostas parten el texto en los espacios: "$ 1.200.000"
+ * quedaría con el símbolo en un renglón y la cifra en otro. Sin ese espacio
+ * la cifra viaja entera.
+ */
+export function cifraSinCorte(texto: string): string {
+  return texto.replace(/\$\s+/g, "$")
 }
 
 export function filasPdf<F>(
@@ -137,6 +169,9 @@ export function filasPdf<F>(
 ): string[][] {
   const visibles = columnas.filter((columna) => columna.enPdf !== false)
   return filas.map((fila) =>
-    visibles.map((columna) => formatearCelda(columna.valor(fila), columna.tipo))
+    visibles.map((columna) => {
+      const texto = formatearCelda(columna.valor(fila), columna.tipo)
+      return alineaComoNumero(columna) ? cifraSinCorte(texto) : texto
+    })
   )
 }

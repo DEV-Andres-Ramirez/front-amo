@@ -34,19 +34,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    ".next-cuenta/types/**/*.ts",
-    ".next-cuenta/dev/types/**/*.ts",
-    ".next-roles/types/**/*.ts",
-    ".next-roles/dev/types/**/*.ts",
-    ".next-auditoria/types/**/*.ts",
-    ".next-auditoria/dev/types/**/*.ts",
-    ".next-graficos/types/**/*.ts",
-    ".next-graficos/dev/types/**/*.ts",
-    ".next-inicio/types/**/*.ts",
-    ".next-inicio/dev/types/**/*.ts",
-    ".next-geo-datos/types/**/*.ts",
-    ".next-geo-datos/dev/types/**/*.ts"
+    "**/*.mts"
   ],
   "exclude": [
     "node_modules"

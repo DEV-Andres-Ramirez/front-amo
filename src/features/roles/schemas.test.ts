@@ -66,9 +66,9 @@ describe("esquemaCrearRol", () => {
   })
 
   it("conserva el rol de origen al clonar", () => {
-    expect(esquemaCrearRol.parse({ ...BASE, clonarDesde: ORIGEN }).clonarDesde).toBe(
-      ORIGEN
-    )
+    expect(
+      esquemaCrearRol.parse({ ...BASE, clonarDesde: ORIGEN }).clonarDesde
+    ).toBe(ORIGEN)
   })
 
   it("rechaza con mensajes en español cada campo inválido", () => {

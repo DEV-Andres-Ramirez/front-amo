@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 
 import { Esqueleto } from "@/components/feedback/esqueletos"
+import { EnlaceBotonExterno } from "@/components/layout/enlace-boton"
 import { Button } from "@/components/ui/button"
 import type { ResultadoAccion } from "@/lib/result"
 
@@ -102,15 +103,14 @@ function CodigoQr({ datos }: { datos: EnrolamientoMfa }) {
             ¿No puedes usar la cámara? Escribe la clave de abajo.
           </p>
           {/* En el celular, el enlace otpauth:// abre directamente la app autenticadora. */}
-          <Button
+          <EnlaceBotonExterno
             variant="link"
             className="h-auto self-center px-0 sm:hidden"
-            nativeButton={false}
-            render={<a href={datos.uri} />}
+            href={datos.uri}
           >
             <ExternalLink aria-hidden data-icon="inline-start" />
             Abrir en la app autenticadora
-          </Button>
+          </EnlaceBotonExterno>
         </div>
       </div>
       <ClaveManual secreto={datos.secreto} />

@@ -198,7 +198,10 @@ export function decimalesPorcentaje(fraccion: number): number {
   return Number.isInteger(redondear(centesimas * 10, 4)) ? 1 : 2
 }
 
-function formatearNumeroConUnidad(valor: number, unidad: string | null): string {
+function formatearNumeroConUnidad(
+  valor: number,
+  unidad: string | null
+): string {
   if (unidad === "COP") return formatearCOP(valor)
   if (unidad === "×") return `${formatearNumero(valor, 2)}×`
   if (!unidad) return formatearNumero(valor, 2)
@@ -221,11 +224,32 @@ export interface ContextoPresentacion {
   booleano?: readonly [string, string]
 }
 
+/** Con opciones, las claves van en el orden de las opciones; sin ellas, como vienen. */
+function enOrdenDeOpciones(
+  reglas: { opciones?: readonly string[] | null },
+  claves: string[]
+): string[] {
+  return reglas.opciones
+    ? [...claves].sort(ordenSegun(reglas.opciones))
+    : claves
+}
+
+/** Lo que hace falta para presentar un valor: su tipo, su unidad y, si las hay, sus opciones. */
+export type ReglasPresentacion = Pick<ReglasParametro, "tipo"> & {
+  unidad: string | null
+  /**
+   * Con opciones, listas y mapas se muestran en ESE orden: el `jsonb` de la BD
+   * reordena las claves y el valor vigente no coincidiría con el predeterminado.
+   */
+  opciones?: readonly string[] | null
+}
+
 export function presentarValor(
-  reglas: Pick<ReglasParametro, "tipo"> & { unidad: string | null },
+  reglas: ReglasPresentacion,
   valor: ValorParametro | null,
   contexto: ContextoPresentacion = {}
 ): ValorPresentado {
+  const enOrden = (claves: string[]) => enOrdenDeOpciones(reglas, claves)
   const sin = { texto: "Valor no válido", equivalencia: null }
   if (valor === null) return sin
   switch (reglas.tipo) {
@@ -253,7 +277,10 @@ export function presentarValor(
     }
     case "TEXTO":
       return typeof valor === "string"
-        ? { texto: etiquetaOpcion(valor, contexto.etiquetas), equivalencia: null }
+        ? {
+            texto: etiquetaOpcion(valor, contexto.etiquetas),
+            equivalencia: null,
+          }
         : sin
     case "LISTA_TEXTO":
       if (!Array.isArray(valor)) return sin
@@ -262,17 +289,19 @@ export function presentarValor(
           valor.length === 0
             ? "Ninguno"
             : listaY.format(
-                valor.map((opcion) => etiquetaOpcion(opcion, contexto.etiquetas))
+                enOrden(valor).map((opcion) =>
+                  etiquetaOpcion(opcion, contexto.etiquetas)
+                )
               ),
         equivalencia: null,
       }
     case "MAPA_DECIMAL":
       if (!esObjeto(valor)) return sin
       return {
-        texto: Object.entries(valor)
+        texto: enOrden(Object.keys(valor))
           .map(
-            ([clave, numero]) =>
-              `${etiquetaOpcion(clave, contexto.etiquetas)} ${formatearNumeroConUnidad(numero, reglas.unidad)}`
+            (clave) =>
+              `${etiquetaOpcion(clave, contexto.etiquetas)} ${formatearNumeroConUnidad((valor as Record<string, number>)[clave], reglas.unidad)}`
           )
           .join(" · "),
         equivalencia: null,
@@ -285,7 +314,12 @@ export function presentarValor(
 export type Direccion = "sube" | "baja"
 
 export type Diferencia =
-  | { tipo: "numero"; direccion: Direccion; delta: string; relativa: string | null }
+  | {
+      tipo: "numero"
+      direccion: Direccion
+      delta: string
+      relativa: string | null
+    }
   | { tipo: "lista"; agregados: string[]; quitados: string[] }
   | {
       tipo: "mapa"
@@ -298,7 +332,7 @@ function signo(valor: number): string {
 }
 
 function deltaNumerico(
-  reglas: Pick<ReglasParametro, "tipo"> & { unidad: string | null },
+  reglas: ReglasPresentacion,
   antes: number,
   despues: number
 ): Diferencia {
@@ -321,12 +355,17 @@ function deltaNumerico(
     antes !== 0
       ? `${signo(cambio)}${formatearPorcentaje(Math.abs(cambio / antes), 1)}`
       : null
-  return { tipo: "numero", direccion, delta: `${signo(cambio)}${absoluto}`, relativa }
+  return {
+    tipo: "numero",
+    direccion,
+    delta: `${signo(cambio)}${absoluto}`,
+    relativa,
+  }
 }
 
 /** Qué cambia entre dos valores (para el diálogo de confirmación y el historial). */
 export function describirDiferencia(
-  reglas: Pick<ReglasParametro, "tipo"> & { unidad: string | null },
+  reglas: ReglasPresentacion,
   antes: ValorParametro | null,
   despues: ValorParametro | null,
   contexto: ContextoPresentacion = {}
@@ -345,7 +384,9 @@ export function describirDiferencia(
     }
   }
   if (esObjeto(antes) && esObjeto(despues)) {
-    const claves = [...new Set([...Object.keys(antes), ...Object.keys(despues)])]
+    const claves = enOrdenDeOpciones(reglas, [
+      ...new Set([...Object.keys(antes), ...Object.keys(despues)]),
+    ])
     const texto = (v: unknown) =>
       esNumero(v) ? formatearNumeroConUnidad(v, reglas.unidad) : "—"
     return {

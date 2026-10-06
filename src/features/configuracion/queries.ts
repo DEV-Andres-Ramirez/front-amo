@@ -16,6 +16,9 @@ import { normalizarNombreGeo } from "@/lib/geo/normalizar"
 import { crearClienteServidor } from "@/lib/supabase/server"
 import type { Json } from "@/types/database.types"
 
+import { detalleAnunciante, filtroAnunciantes } from "./busqueda"
+import { LIMITE_BUSQUEDA_OBJETIVOS } from "./schemas"
+
 import type {
   DatosCatalogos,
   DatosPrecios,
@@ -59,6 +62,13 @@ function textos(valor: unknown): string[] {
 function enteroONulo(valor: unknown): number | null {
   return typeof valor === "number" && Number.isFinite(valor) ? valor : null
 }
+
+/**
+ * Tope de filas por respuesta de la API (`max_rows` de PostgREST): pedir más
+ * con `.limit()` no trae más. Lo que puede superarlo se ordena para que el
+ * recorte caiga en lo menos importante o se pide por páginas.
+ */
+const FILAS_POR_RESPUESTA = 1000
 
 // ── Parámetros ──────────────────────────────────────────────────────────────
 
@@ -126,15 +136,22 @@ export const datosPrecios = cache(async (): Promise<DatosPrecios> => {
       .order("orden"),
     supabase
       .from("formatos")
-      .select("id, plataforma, clave, nombre, requisitos, activo, orden, updated_at")
+      .select(
+        "id, plataforma, clave, nombre, requisitos, activo, orden, updated_at"
+      )
       .order("orden"),
     supabase
       .from("tarifas")
       .select(
         "id, formato_id, plataforma, franja_id, valor_base, vigente_desde, vigente_hasta, pendiente_validacion, creada_por, created_at"
       )
+      // Primero las abiertas (sin fin: vigentes y programadas), luego las que
+      // terminan más tarde: si el historial supera el tope de la API, lo que
+      // se recorta son las versiones finalizadas más antiguas, nunca la
+      // tarifa vigente de una celda (la matriz diría «Sin tarifa»).
+      .order("vigente_hasta", { ascending: false, nullsFirst: true })
       .order("vigente_desde", { ascending: false })
-      .limit(5000),
+      .limit(FILAS_POR_RESPUESTA),
   ])
   if (franjas.error) fallar("leer las franjas", franjas.error)
   if (formatos.error) fallar("leer los formatos", formatos.error)
@@ -245,21 +262,23 @@ export const listarExcepciones = cache(
   }
 )
 
-const LIMITE_BUSQUEDA = 8
-
-export async function buscarAnunciantes(q: string): Promise<ObjetivoComision[]> {
+export async function buscarAnunciantes(
+  q: string
+): Promise<ObjetivoComision[]> {
   const supabase = await crearClienteServidor()
   let consulta = supabase
     .from("anunciantes")
-    .select("id, nombre_comercial, razon_social, nit")
+    .select("id, nombre_comercial, razon_social, nit, digito_verificacion")
     .is("deleted_at", null)
     .order("nombre_comercial")
-    .limit(LIMITE_BUSQUEDA)
-  const patron = patronBusqueda(q)
-  if (patron) {
+    .limit(LIMITE_BUSQUEDA_OBJETIVOS)
+  const filtro = filtroAnunciantes(q)
+  if (filtro.nombre && filtro.nit) {
     consulta = consulta.or(
-      condicionesBusqueda(["nombre_comercial", "razon_social", "nit"], patron).join(",")
+      `nombre_normalizado.ilike.${filtro.nombre},nit.ilike.%${filtro.nit}%`
     )
+  } else if (filtro.nombre) {
+    consulta = consulta.ilike("nombre_normalizado", filtro.nombre)
   }
   const { data, error } = await consulta
   if (error) fallar("buscar anunciantes", error)
@@ -267,7 +286,7 @@ export async function buscarAnunciantes(q: string): Promise<ObjetivoComision[]> 
     tipo: "anunciante",
     id: a.id,
     nombre: a.nombre_comercial,
-    detalle: a.nit ? `NIT ${a.nit}` : a.razon_social,
+    detalle: detalleAnunciante(a),
   }))
 }
 
@@ -278,7 +297,7 @@ export async function buscarCampanas(q: string): Promise<ObjetivoComision[]> {
     .select("id, nombre, marca, anunciante:anunciantes ( nombre_comercial )")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(LIMITE_BUSQUEDA)
+    .limit(LIMITE_BUSQUEDA_OBJETIVOS)
   const patron = patronBusqueda(q)
   if (patron) {
     consulta = consulta.or(
@@ -326,7 +345,9 @@ export const datosTributario = cache(async (): Promise<DatosTributario> => {
   const [anios, retenciones, reteica, resoluciones] = await Promise.all([
     supabase
       .from("parametros_tributarios")
-      .select("anio, uvt, smlmv, umbral_seg_social_smlmv, pendiente_validacion, updated_at")
+      .select(
+        "anio, uvt, smlmv, umbral_seg_social_smlmv, pendiente_validacion, updated_at"
+      )
       .order("anio", { ascending: false }),
     supabase
       .from("retenciones_config")
@@ -341,7 +362,7 @@ export const datosTributario = cache(async (): Promise<DatosTributario> => {
         "id, municipio_codigo, tarifa_por_mil, base_minima_uvt, vigente_desde, vigente_hasta, pendiente_validacion, updated_at"
       )
       .order("vigente_desde", { ascending: false })
-      .limit(2000),
+      .limit(FILAS_POR_RESPUESTA),
     supabase
       .from("resoluciones_dian")
       .select(
@@ -352,7 +373,8 @@ export const datosTributario = cache(async (): Promise<DatosTributario> => {
   if (anios.error) fallar("leer los parámetros tributarios", anios.error)
   if (retenciones.error) fallar("leer las retenciones", retenciones.error)
   if (reteica.error) fallar("leer las tarifas de ReteICA", reteica.error)
-  if (resoluciones.error) fallar("leer las resoluciones DIAN", resoluciones.error)
+  if (resoluciones.error)
+    fallar("leer las resoluciones DIAN", resoluciones.error)
 
   return {
     anios: anios.data.map((a) => ({
@@ -417,7 +439,10 @@ export interface OpcionMunicipio {
 }
 
 /** Búsqueda de municipios en el diccionario DIVIPOLA (sin acentos ni mayúsculas). */
-export function buscarMunicipiosPorTexto(q: string, limite = 12): OpcionMunicipio[] {
+export function buscarMunicipiosPorTexto(
+  q: string,
+  limite = 12
+): OpcionMunicipio[] {
   const texto = normalizarNombreGeo(q)
   if (!texto) return []
   const resultados: (OpcionMunicipio & { puntaje: number })[] = []
@@ -438,7 +463,10 @@ export function buscarMunicipiosPorTexto(q: string, limite = 12): OpcionMunicipi
     }
   }
   return resultados
-    .sort((a, b) => a.puntaje - b.puntaje || a.nombre.localeCompare(b.nombre, "es-CO"))
+    .sort(
+      (a, b) =>
+        a.puntaje - b.puntaje || a.nombre.localeCompare(b.nombre, "es-CO")
+    )
     .slice(0, limite)
     .map(({ puntaje: _puntaje, ...opcion }) => opcion)
 }
@@ -467,24 +495,43 @@ function aElemento(fila: {
 
 export const datosCatalogos = cache(async (): Promise<DatosCatalogos> => {
   const supabase = await crearClienteServidor()
-  const columnas = "id, nombre, descripcion, orden, activo, deleted_at, updated_at"
-  const [sectores, categorias, departamentos, inactivos] = await Promise.all([
-    supabase.from("sectores").select(columnas).order("orden").order("nombre"),
-    supabase.from("categorias").select(columnas).order("orden").order("nombre"),
-    supabase.from("departamentos").select("codigo, nombre, region, activo").order("nombre"),
+  const columnas =
+    "id, nombre, descripcion, orden, activo, deleted_at, updated_at"
+  // Colombia tiene 1.122 municipios: los deshabilitados pueden pasar del tope
+  // de filas por respuesta, así que se piden en dos páginas (orden estable).
+  const inactivosDesde = (desde: number) =>
     supabase
       .from("municipios")
       .select("departamento_codigo")
       .eq("activo", false)
-      .limit(2000),
-  ])
+      .order("codigo")
+      .range(desde, desde + FILAS_POR_RESPUESTA - 1)
+  const [sectores, categorias, departamentos, inactivos, masInactivos] =
+    await Promise.all([
+      supabase.from("sectores").select(columnas).order("orden").order("nombre"),
+      supabase
+        .from("categorias")
+        .select(columnas)
+        .order("orden")
+        .order("nombre"),
+      supabase
+        .from("departamentos")
+        .select("codigo, nombre, region, activo")
+        .order("nombre"),
+      inactivosDesde(0),
+      inactivosDesde(FILAS_POR_RESPUESTA),
+    ])
   if (sectores.error) fallar("leer los sectores", sectores.error)
   if (categorias.error) fallar("leer las categorías", categorias.error)
   if (departamentos.error) fallar("leer los departamentos", departamentos.error)
   if (inactivos.error) fallar("leer los municipios", inactivos.error)
+  if (masInactivos.error) fallar("leer los municipios", masInactivos.error)
 
   const inactivosPorDepartamento = new Map<string, number>()
-  for (const { departamento_codigo } of inactivos.data) {
+  for (const { departamento_codigo } of [
+    ...inactivos.data,
+    ...masInactivos.data,
+  ]) {
     inactivosPorDepartamento.set(
       departamento_codigo,
       (inactivosPorDepartamento.get(departamento_codigo) ?? 0) + 1
@@ -532,7 +579,9 @@ export async function municipiosTerritorio(
 
 // ── Legal ───────────────────────────────────────────────────────────────────
 
-async function contarAceptaciones(ids: readonly string[]): Promise<Map<string, number>> {
+async function contarAceptaciones(
+  ids: readonly string[]
+): Promise<Map<string, number>> {
   const supabase = await crearClienteServidor()
   const conteos = await Promise.all(
     ids.map(async (id) => {
@@ -574,7 +623,8 @@ export const listarVersionesTerminos = cache(
       vigenteDesde: v.vigente_desde,
       creadaAt: v.created_at,
       actualizadoAt: v.updated_at,
-      aceptaciones: contar && v.publicada ? (aceptaciones.get(v.id) ?? 0) : null,
+      aceptaciones:
+        contar && v.publicada ? (aceptaciones.get(v.id) ?? 0) : null,
     }))
   }
 )
@@ -596,7 +646,9 @@ export const listarPlantillas = cache(async (): Promise<Plantilla[]> => {
   const supabase = await crearClienteServidor()
   const { data, error } = await supabase
     .from("plantillas_notificacion")
-    .select("clave, canal, nombre, asunto, cuerpo, variables, activa, updated_at")
+    .select(
+      "clave, canal, nombre, asunto, cuerpo, variables, activa, updated_at"
+    )
     .order("clave")
   if (error) fallar("leer las plantillas", error)
   return data.map((p) => ({
@@ -622,17 +674,24 @@ export async function historialEntidad(
   const supabase = await crearClienteServidor()
   const { data, error } = await supabase
     .from("bitacora")
-    .select("id, created_at, accion, actor_email, origen, cambios")
+    .select("id, created_at, accion, actor_id, actor_email, origen, cambios")
     .eq("entidad", entidad)
     .eq("entidad_id", entidadId)
     .order("id", { ascending: false })
     .limit(LIMITE_HISTORIAL)
   if (error) fallar("leer el historial", error)
+  // El nombre de quien hizo el cambio, si la RLS deja verlo; si no, el correo
+  // enmascarado que guardó la bitácora.
+  const nombres = await nombresDePerfiles(
+    data.flatMap((fila) => (fila.actor_id ? [fila.actor_id] : []))
+  )
   return data.map((fila) => ({
     id: fila.id,
     at: fila.created_at,
     accion: fila.accion,
-    actor: fila.actor_email,
+    actor:
+      (fila.actor_id ? nombres.get(fila.actor_id) : undefined) ??
+      fila.actor_email,
     origen: fila.origen,
     cambios: fila.cambios,
   }))

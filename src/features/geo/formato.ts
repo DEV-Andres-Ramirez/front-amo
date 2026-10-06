@@ -111,6 +111,13 @@ export function describirPuntosCalor(respuesta: RespuestaPuntosGeo): string {
   return partes.join(" · ")
 }
 
+/** Por qué el modo calor no dibuja nada (el coroplético sí tiene datos). */
+export function describirCalorVacio(metrica: MetricaGeo): string {
+  return metrica === "medios"
+    ? "No hay medios verificados que ubicar al cierre del periodo: se muestra el mapa por zonas."
+    : "Ningún ingreso del periodo trae coordenadas: se muestra el mapa por zonas."
+}
+
 const formatoDiaSemana = new Intl.DateTimeFormat(LOCALE, {
   timeZone: ZONA,
   weekday: "short",

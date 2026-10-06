@@ -44,14 +44,19 @@ function etiquetaTotal(
   por100k: boolean
 ): string {
   const ambito = deAmbito(estado)
-  if (!DEFINICIONES_METRICAS[metrica].aditiva) return `Promedio ponderado ${ambito}`
+  if (!DEFINICIONES_METRICAS[metrica].aditiva)
+    return `Promedio ponderado ${ambito}`
   if (por100k) return `Tasa ${ambito} · por 100 mil hab.`
   return `Total ${ambito}`
 }
 
 function EsqueletoRanking() {
   return (
-    <div role="status" aria-busy="true" className="flex flex-col gap-3.5 px-3 py-2">
+    <div
+      role="status"
+      aria-busy="true"
+      className="flex flex-col gap-3.5 px-3 py-2"
+    >
       <span className="sr-only">Cargando el ranking…</span>
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="flex items-center gap-3">
@@ -95,11 +100,14 @@ export function PanelRanking({
       <header className="flex flex-col gap-3 px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-            <ChartNoAxesColumnDecreasing aria-hidden className="size-3.5 text-primary" />
+            <ChartNoAxesColumnDecreasing
+              aria-hidden
+              className="size-3.5 text-primary"
+            />
             Ranking de {tipo.plural}
           </h2>
           {vista ? (
-            <span className="cifras rounded-full bg-foreground/6 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
+            <span className="rounded-full bg-foreground/6 px-2 py-0.5 text-[0.6875rem] cifras text-muted-foreground">
               {vista.ranking.conDatos} con datos
             </span>
           ) : null}
@@ -109,7 +117,7 @@ export function PanelRanking({
             {etiquetaTotal(estado, metrica, por100k)}
           </p>
           {vista ? (
-            <p className="cifras font-heading text-2xl leading-tight font-bold tracking-tight">
+            <p className="font-heading text-2xl leading-tight font-bold cifras tracking-tight">
               {formatearValorGeo(total, metrica, { por100k })}
               {unidad && !por100k && total !== null ? (
                 <span className="ml-1.5 text-sm font-medium text-muted-foreground">

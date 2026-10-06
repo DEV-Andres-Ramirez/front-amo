@@ -18,7 +18,8 @@ function Encabezado() {
   )
 }
 
-function Marco({
+/** Marco común de los esqueletos de `TarjetaPanel`: borde, relleno y encabezado. */
+export function MarcoEsqueleto({
   className,
   children,
 }: {
@@ -50,7 +51,7 @@ export function EsqueletoLista({
   className?: string
 }) {
   return (
-    <Marco className={className}>
+    <MarcoEsqueleto className={className}>
       <div className="flex flex-col gap-3.5">
         {Array.from({ length: filas }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
@@ -63,16 +64,28 @@ export function EsqueletoLista({
           </div>
         ))}
       </div>
-    </Marco>
+    </MarcoEsqueleto>
   )
 }
+
+/**
+ * Mini-mapa junto a su ranking cuando la celda mide al menos 28 rem; con
+ * menos, el mapa va arriba (lado a lado, el ranking quedaría en menos de
+ * 210 px y recortaría nombres y cifras). Lo comparten los bloques y su
+ * esqueleto.
+ */
+export const REJILLA_MAPA_RANKING =
+  "grid flex-1 items-center gap-5 @md/bloque:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+export const MAPA_EN_REJILLA = "mx-auto w-full max-w-64 @md/bloque:max-w-none"
 
 /** Fallback del bloque de mapa + ranking (top departamentos, cobertura). */
 export function EsqueletoMapaRanking({ className }: { className?: string }) {
   return (
-    <Marco className={className}>
-      <div className="grid flex-1 items-center gap-5 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <Esqueleto className="mx-auto aspect-[4/5] w-full max-w-64 rounded-2xl sm:max-w-none" />
+    <MarcoEsqueleto className={className}>
+      <div className={REJILLA_MAPA_RANKING}>
+        <Esqueleto
+          className={cn("aspect-[4/5] rounded-2xl", MAPA_EN_REJILLA)}
+        />
         <div className="flex flex-col gap-3">
           {Array.from({ length: 6 }, (_, i) => (
             <div key={i} className="flex items-center gap-2.5">
@@ -88,6 +101,6 @@ export function EsqueletoMapaRanking({ className }: { className?: string }) {
           ))}
         </div>
       </div>
-    </Marco>
+    </MarcoEsqueleto>
   )
 }

@@ -208,6 +208,19 @@ describe("proxy", () => {
     )
   })
 
+  it("solo pide pasar a HTTPS cuando la solicitud llegó por HTTPS", async () => {
+    const segura = await proxy(solicitud("/ingresar"))
+    const local = await proxy(
+      new NextRequest(new URL("/ingresar", "http://localhost:3000"))
+    )
+    expect(segura.headers.get("content-security-policy")).toContain(
+      "upgrade-insecure-requests"
+    )
+    expect(local.headers.get("content-security-policy")).not.toContain(
+      "upgrade-insecure-requests"
+    )
+  })
+
   it("en modo report usa la cabecera Report-Only", async () => {
     vi.stubEnv("AMO_CSP_MODO", "report")
     const respuesta = await proxy(solicitud("/ingresar"))

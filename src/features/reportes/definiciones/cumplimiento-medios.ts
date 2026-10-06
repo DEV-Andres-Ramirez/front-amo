@@ -34,7 +34,11 @@ import {
   tablaExportable,
 } from "./comun"
 
-export const SITUACIONES = ["con-vencidas", "con-alertas", "sin-novedad"] as const
+export const SITUACIONES = [
+  "con-vencidas",
+  "con-alertas",
+  "sin-novedad",
+] as const
 export type Situacion = (typeof SITUACIONES)[number]
 
 export const ETIQUETAS_SITUACION: Readonly<Record<Situacion, string>> = {
@@ -48,6 +52,15 @@ export function situacionMedio(fila: FilaCumplimiento): Situacion {
   if (fila.vencidas > 0) return "con-vencidas"
   if (fila.alertas > 0) return "con-alertas"
   return "sin-novedad"
+}
+
+/** "Envigado, Antioquia"; sin repetir cuando municipio y departamento se llaman igual. */
+export function ubicacionMedio(fila: FilaCumplimiento): string | null {
+  const partes = [fila.municipio, fila.departamento].filter(
+    (parte, indice, todas): parte is string =>
+      Boolean(parte) && todas.indexOf(parte) === indice
+  )
+  return partes.length > 0 ? partes.join(", ") : null
 }
 
 export function totalesCumplimiento(
@@ -69,6 +82,7 @@ export const columnasCumplimiento: readonly ColumnaReporte<FilaCumplimiento>[] =
   [
     {
       id: "medio",
+      detalle: ubicacionMedio,
       titulo: "Medio",
       tipo: "texto",
       valor: (f) => f.medio,
@@ -78,21 +92,21 @@ export const columnasCumplimiento: readonly ColumnaReporte<FilaCumplimiento>[] =
     },
     {
       id: "departamento",
+      ocultaPorDefecto: true,
       titulo: "Departamento",
       tipo: "texto",
       valor: (f) => f.departamento,
       ordenable: true,
       buscable: true,
-      ocultarBajo: "lg",
     },
     {
       id: "municipio",
+      ocultaPorDefecto: true,
       titulo: "Municipio",
       tipo: "texto",
       valor: (f) => f.municipio,
       ordenable: true,
       buscable: true,
-      ocultarBajo: "xl",
     },
     {
       id: "nivel",
@@ -153,6 +167,7 @@ export const columnasCumplimiento: readonly ColumnaReporte<FilaCumplimiento>[] =
     },
     {
       id: "alertas",
+      tituloCorto: "Alertas",
       titulo: "Alertas de métricas",
       tipo: "entero",
       valor: (f) => f.alertas,
@@ -162,6 +177,7 @@ export const columnasCumplimiento: readonly ColumnaReporte<FilaCumplimiento>[] =
     },
     {
       id: "multiplicador",
+      tituloCorto: "Multiplicador",
       titulo: "Multiplicador de calidad",
       tipo: "decimal",
       valor: (f) => f.multiplicador,
@@ -227,8 +243,7 @@ const DEFINICION_VENCIDAS = definicionPropia(
   "conteo",
   "menor",
   {
-    definicion:
-      "Asignaciones cuyo plazo venció sin que el medio publicara.",
+    definicion: "Asignaciones cuyo plazo venció sin que el medio publicara.",
     calculo: "Conteo de asignaciones en estado vencida sin publicar.",
     ancla: "Fecha límite de publicación",
   }
@@ -246,16 +261,11 @@ const DEFINICION_ALERTAS = definicionPropia(
   }
 )
 
-const DEFINICION_DISPUTA = definicionPropia(
-  "En disputa",
-  "conteo",
-  "menor",
-  {
-    definicion: "Asignaciones del periodo con una disputa abierta.",
-    calculo: "Conteo de asignaciones en estado en disputa.",
-    ancla: "Fecha límite de publicación",
-  }
-)
+const DEFINICION_DISPUTA = definicionPropia("En disputa", "conteo", "menor", {
+  definicion: "Asignaciones del periodo con una disputa abierta.",
+  calculo: "Conteo de asignaciones en estado en disputa.",
+  ancla: "Fecha límite de publicación",
+})
 
 function indicadoresCumplimiento(datos: DatosCumplimiento) {
   const { totales, anterior } = datos
@@ -336,8 +346,16 @@ function graficoResultado(datos: DatosCumplimiento): EspecGrafico {
     totales.comprometidas - totales.cumplidas - totales.vencidas
   )
   const segmentos = [
-    { id: "cumplidas", nombre: "Publicadas a tiempo", valor: totales.cumplidas },
-    { id: "vencidas", nombre: "Vencidas sin publicar", valor: totales.vencidas },
+    {
+      id: "cumplidas",
+      nombre: "Publicadas a tiempo",
+      valor: totales.cumplidas,
+    },
+    {
+      id: "vencidas",
+      nombre: "Vencidas sin publicar",
+      valor: totales.vencidas,
+    },
     { id: "otras", nombre: "Otras incumplidas", valor: otras },
   ]
   return {
@@ -385,7 +403,8 @@ function graficoPorZona(datos: DatosCumplimiento): EspecGrafico {
     titulo: porMunicipio
       ? "Cumplidas e incumplidas por municipio"
       : "Cumplidas e incumplidas por departamento",
-    descripcion: "Zonas con más asignaciones evaluadas, según la ubicación del medio.",
+    descripcion:
+      "Zonas con más asignaciones evaluadas, según la ubicación del medio.",
     ancho: "mitad",
     orientacion: "horizontal",
     categorias: zonas.map(([zona]) => zona),
@@ -403,7 +422,8 @@ function graficoPorZona(datos: DatosCumplimiento): EspecGrafico {
     ],
     formato: "numero",
     nombreCategoria: porMunicipio ? "Municipio" : "Departamento",
-    vacio: zonas.length === 0 ? { titulo: "Sin asignaciones evaluadas" } : false,
+    vacio:
+      zonas.length === 0 ? { titulo: "Sin asignaciones evaluadas" } : false,
   }
 }
 
@@ -436,7 +456,9 @@ function graficoRanking(
     nombreValor,
     nombreCategoria: "Medio",
     limite: 10,
-    vacio: sinValores(elementos.map((e) => e.valor)) ? { titulo: vacio } : false,
+    vacio: sinValores(elementos.map((e) => e.valor))
+      ? { titulo: vacio }
+      : false,
   }
 }
 
@@ -483,7 +505,10 @@ function hojasCumplimiento(datos: DatosCumplimiento): HojaExcel[] {
         ["Vencidas sin publicar", totales.vencidas],
         [
           "Otras incumplidas",
-          Math.max(0, totales.comprometidas - totales.cumplidas - totales.vencidas),
+          Math.max(
+            0,
+            totales.comprometidas - totales.cumplidas - totales.vencidas
+          ),
         ],
       ],
     },
@@ -515,7 +540,7 @@ export function notasCumplimiento(nMinimo: number): NotaDefinicion[] {
     {
       termino: "Multiplicador de calidad",
       explicacion:
-        "Promedio del multiplicador de las cuentas verificadas del medio (entre 0,70 y 1,40): ajusta su precio según su desempeño histórico.",
+        "Promedio del multiplicador de las cuentas verificadas del medio. Ajusta su precio según su desempeño histórico: 1,00 es el precio base; menos de 1, un precio menor; más de 1, uno mayor.",
     },
     notaMuestra(nMinimo),
     notaComparacion(),

@@ -8,7 +8,9 @@ import type { Plantilla } from "./tipos"
 const PATRON_VARIABLE = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi
 
 /** Variables `{{x}}` que aparecen en el texto, sin repetir y en orden de aparición. */
-export function variablesUsadas(...textos: (string | null | undefined)[]): string[] {
+export function variablesUsadas(
+  ...textos: (string | null | undefined)[]
+): string[] {
   const vistas = new Set<string>()
   for (const texto of textos) {
     for (const coincidencia of (texto ?? "").matchAll(PATRON_VARIABLE)) {
@@ -43,7 +45,7 @@ export const EJEMPLOS_VARIABLE: Readonly<Record<string, string>> = {
   nombre: "Laura Gómez",
   invitador: "Andrés Ramírez",
   rol: "Operaciones",
-  enlace: "https://amo.co/auth/confirm?…",
+  enlace: "https://…/auth/confirm?token=…",
   vigencia_horas: "24",
   vigencia_minutos: "60",
   anunciante: "Alimentos del Valle",
@@ -116,6 +118,8 @@ export function agruparPlantillas(
       titulo:
         DOMINIOS_PLANTILLA[dominio] ??
         dominio.charAt(0).toUpperCase() + dominio.slice(1),
-      plantillas: lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es-CO")),
+      plantillas: lista.sort((a, b) =>
+        a.nombre.localeCompare(b.nombre, "es-CO")
+      ),
     }))
 }

@@ -6,7 +6,11 @@
  */
 import type { CeldaActividad } from "@/components/charts/datos"
 import type { FilaKpi } from "@/components/kpi/tipos"
-import type { Insight, Plataforma } from "@/features/dashboard/insights/tipos"
+import type {
+  ConfigInsights,
+  Insight,
+  Plataforma,
+} from "@/features/dashboard/insights/tipos"
 import type { ColumnaExcel, HojaExcel, ValorCelda } from "@/lib/export/excel"
 import type { FiltroDocumento } from "@/lib/export/marca"
 import type { ColumnaPdf } from "@/lib/export/pdf"
@@ -68,12 +72,18 @@ export interface FilaZona {
 
 export interface DatosResumen {
   contexto: ContextoDatos
+  /** Umbrales de analítica de la configuración (los mismos del panel de Inicio). */
+  config: ConfigInsights
   kpis: FilaKpi[]
   granularidad: "dia" | "semana" | "mes"
   serie: PuntoSerieGmv[]
   serieAnterior: PuntoSerieGmv[]
   mezcla: FilaMezcla[]
-  /** `null`: sin `analitica.global` (el ranking por departamento no se ofrece). */
+  /**
+   * GMV comprometido de cada departamento en el periodo y en el de
+   * comparación del reporte (`zonasComparadas`). `null`: sin
+   * `analitica.global` (el ranking por departamento no se ofrece).
+   */
   zonas: FilaZona[] | null
 }
 
@@ -207,6 +217,12 @@ export interface FilaPlataforma {
 
 export interface DatosDesempeno {
   contexto: ContextoDatos
+  /**
+   * Los datos son de un solo anunciante (el propio o el del filtro): sus
+   * razones son cifras exactas y se informan siempre, con su n
+   * (docs/kpis.md §0.4).
+   */
+  unAnunciante: boolean
   filas: FilaCampana[]
   totales: TotalesDesempeno
   anterior: TotalesDesempeno

@@ -35,6 +35,8 @@ import {
   CAMBIO_CONCURRENTE,
   esErrorEsperado,
   interpretarErrorConfiguracion,
+  REGISTRO_DESACTUALIZADO,
+  REGISTRO_INEXISTENTE,
   SIN_PERMISO,
 } from "./errores"
 import {
@@ -142,6 +144,17 @@ function falloInesperado(operacion: string, error: unknown): ResultadoFallo {
 }
 
 /**
+ * Lo que la persona tenía a la vista ya no es lo que hay en la BD. La página
+ * se vuelve a pintar en la misma respuesta: sin esto, «revisa el valor
+ * actual» obligaba a recargar a mano y reintentar fallaba siempre con la
+ * marca de versión vieja.
+ */
+function conflicto(mensaje: string): ResultadoFallo {
+  refresh()
+  return fallo(mensaje)
+}
+
+/**
  * Una edición con bloqueo optimista no tocó filas: el registro desapareció,
  * otra persona lo cambió o la RLS no dejó escribir (sin error explícito).
  */
@@ -150,16 +163,19 @@ async function motivoSinFilas(
     data: { updated_at: string } | null
     error: ErrorConCodigo | null
   }>,
-  actualizadoAt: string
+  actualizadoAt: string,
+  mensajeConflicto: string = REGISTRO_DESACTUALIZADO
 ): Promise<ResultadoFallo> {
   const { data, error } = await leer()
   if (error) return falloBd("releer registro", error)
-  if (!data) return fallo("El registro ya no existe. Actualiza la página.")
-  if (data.updated_at !== actualizadoAt) return fallo(CAMBIO_CONCURRENTE)
+  if (!data) return conflicto(REGISTRO_INEXISTENTE)
+  if (data.updated_at !== actualizadoAt) return conflicto(mensajeConflicto)
   return fallo(SIN_PERMISO)
 }
 
-function existenciaPara(clave: string): ((valor: string) => boolean) | undefined {
+function existenciaPara(
+  clave: string
+): ((valor: string) => boolean) | undefined {
   if (clave === CLAVE_PAISES_HABITUALES) return (iso2) => !!obtenerPais(iso2)
   if (clave === CLAVE_MUNICIPIO_PLATAFORMA) {
     return (codigo) => !!obtenerMunicipio(codigo)
@@ -202,8 +218,10 @@ export async function guardarParametro(
       .eq("clave", clave)
       .maybeSingle()
     if (error) return falloBd("leer parámetro", error)
-    if (!actual) return fallo("Este parámetro ya no existe.")
-    if (actual.updated_at !== actualizadoAt) return fallo(CAMBIO_CONCURRENTE)
+    if (!actual) return conflicto("Este parámetro ya no existe.")
+    if (actual.updated_at !== actualizadoAt) {
+      return conflicto(CAMBIO_CONCURRENTE)
+    }
 
     const reglas = {
       clave,
@@ -239,7 +257,8 @@ export async function guardarParametro(
             .select("updated_at")
             .eq("clave", clave)
             .maybeSingle(),
-        actualizadoAt
+        actualizadoAt,
+        CAMBIO_CONCURRENTE
       )
     }
     refresh()
@@ -276,7 +295,10 @@ export async function programarTarifa(
   if (!validacion.success) return desdeErrorZod(validacion.error)
   const datos = validacion.data
   const desde = inicioDeTarifa(datos)
-  if (!desde) return fallo("Elige cuándo empieza la nueva tarifa.", { dia: ["Elige el día."] })
+  if (!desde)
+    return fallo("Elige cuándo empieza la nueva tarifa.", {
+      dia: ["Elige el día."],
+    })
 
   try {
     const supabase = await crearClienteServidor()
@@ -375,7 +397,12 @@ export async function guardarFranja(
       if (error) return falloBd("editar franja", error)
       if (data.length === 0) {
         return motivoSinFilas(
-          () => supabase.from("franjas").select("updated_at").eq("id", id).maybeSingle(),
+          () =>
+            supabase
+              .from("franjas")
+              .select("updated_at")
+              .eq("id", id)
+              .maybeSingle(),
           marca
         )
       }
@@ -405,8 +432,12 @@ export async function guardarFormato(
         .eq("id", datos.id)
         .maybeSingle()
       if (error) return falloBd("leer formato", error)
-      if (!data) return fallo("El formato ya no existe. Actualiza la página.")
-      if (data.requisitos && typeof data.requisitos === "object" && !Array.isArray(data.requisitos)) {
+      if (!data) return conflicto(REGISTRO_INEXISTENTE)
+      if (
+        data.requisitos &&
+        typeof data.requisitos === "object" &&
+        !Array.isArray(data.requisitos)
+      ) {
         previos = data.requisitos
       }
     }
@@ -450,7 +481,12 @@ export async function guardarFormato(
       if (error) return falloBd("editar formato", error)
       if (data.length === 0) {
         return motivoSinFilas(
-          () => supabase.from("formatos").select("updated_at").eq("id", id).maybeSingle(),
+          () =>
+            supabase
+              .from("formatos")
+              .select("updated_at")
+              .eq("id", id)
+              .maybeSingle(),
           marca
         )
       }
@@ -484,12 +520,13 @@ export async function guardarExcepcion(
         .eq("id", datos.id)
         .maybeSingle()
       if (error) return falloBd("leer excepción", error)
-      if (!previa) return fallo("La excepción ya no existe. Actualiza la página.")
+      if (!previa) return conflicto(REGISTRO_INEXISTENTE)
       if (new Date(previa.vigente_desde).getTime() <= Date.now()) {
         desde = new Date(previa.vigente_desde)
       }
     }
-    if (!desde) return fallo("Elige desde cuándo aplica.", { desde: ["Elige el día."] })
+    if (!desde)
+      return fallo("Elige desde cuándo aplica.", { desde: ["Elige el día."] })
     if (hasta && hasta.getTime() <= desde.getTime()) {
       return fallo("El fin debe ser posterior al inicio.", {
         hasta: ["Debe ser posterior al inicio."],
@@ -505,7 +542,8 @@ export async function guardarExcepcion(
     if (datos.id === null) {
       const { error } = await supabase.from("comisiones_excepcion").insert({
         ...cambios,
-        anunciante_id: datos.objetivo === "anunciante" ? datos.objetivoId : null,
+        anunciante_id:
+          datos.objetivo === "anunciante" ? datos.objetivoId : null,
         campana_id: datos.objetivo === "campana" ? datos.objetivoId : null,
       })
       if (error) return falloBd("crear excepción", error)
@@ -561,8 +599,8 @@ export async function finalizarExcepcion(entrada: {
       .select("id")
     if (error) return falloBd("finalizar excepción", error)
     if (data.length === 0) {
-      return fallo(
-        "La excepción no está vigente o cambió mientras la mirabas. Actualiza la página."
+      return conflicto(
+        "La excepción ya no está vigente o cambió mientras la mirabas. Cierra y revisa la lista actualizada."
       )
     }
     refresh()
@@ -621,7 +659,9 @@ export async function buscarObjetivosComision(entrada: {
 
   try {
     return exito(
-      objetivo === "anunciante" ? await buscarAnunciantes(q) : await buscarCampanas(q)
+      objetivo === "anunciante"
+        ? await buscarAnunciantes(q)
+        : await buscarCampanas(q)
     )
   } catch (error) {
     return falloInesperado("buscarObjetivosComision", error)
@@ -985,7 +1025,12 @@ export async function guardarElementoCatalogo(
       if (error) return falloBd(`editar en ${catalogo}`, error)
       if (data.length === 0) {
         return motivoSinFilas(
-          () => supabase.from(catalogo).select("updated_at").eq("id", id).maybeSingle(),
+          () =>
+            supabase
+              .from(catalogo)
+              .select("updated_at")
+              .eq("id", id)
+              .maybeSingle(),
           marca
         )
       }
@@ -1020,7 +1065,12 @@ export async function archivarElementoCatalogo(entrada: {
     if (error) return falloBd(`archivar en ${catalogo}`, error)
     if (data.length === 0) {
       return motivoSinFilas(
-        () => supabase.from(catalogo).select("updated_at").eq("id", id).maybeSingle(),
+        () =>
+          supabase
+            .from(catalogo)
+            .select("updated_at")
+            .eq("id", id)
+            .maybeSingle(),
         actualizadoAt
       )
     }
@@ -1112,7 +1162,11 @@ export async function guardarVersionTerminos(
     if (datos.id === null) {
       const { data, error } = await supabase
         .from("terminos_versiones")
-        .insert({ tipo: datos.tipo, version: datos.version, contenido_md: datos.contenido })
+        .insert({
+          tipo: datos.tipo,
+          version: datos.version,
+          contenido_md: datos.contenido,
+        })
         .select("id")
         .single()
       if (error) return falloBd("crear versión", error)

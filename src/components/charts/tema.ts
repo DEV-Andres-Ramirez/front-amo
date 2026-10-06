@@ -93,7 +93,7 @@ const RESPALDO: Readonly<
     texto: "#f2effa",
     textoSecundario: "#a59eb8",
     borde: "#2a2338",
-    muted: "#1c1729",
+    muted: "#241d35",
     primario: "#a788f6",
     exito: "#34d399",
     aviso: "#fbbf24",

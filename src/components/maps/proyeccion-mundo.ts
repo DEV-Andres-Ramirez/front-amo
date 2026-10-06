@@ -16,7 +16,10 @@ const M = Math.sqrt(3) / 2
 const RADIANES = Math.PI / 180
 
 /** Coordenadas Equal Earth en unidades de la esfera unitaria (y crece hacia el norte). */
-export function equalEarth([lon, lat]: Posicion): readonly [x: number, y: number] {
+export function equalEarth([lon, lat]: Posicion): readonly [
+  x: number,
+  y: number,
+] {
   const lambda = lon * RADIANES
   const theta = Math.asin(M * Math.sin(lat * RADIANES))
   const t2 = theta * theta
@@ -42,7 +45,9 @@ export const ALTO_MUNDO = Math.round((Y_NORTE - Y_SUR) * ESCALA)
 export const VIEWBOX_MUNDO = `0 0 ${ANCHO_MUNDO} ${ALTO_MUNDO}`
 
 /** Punto del lienzo (`VIEWBOX_MUNDO`) para una posición geográfica. */
-export function proyectarEnMundo(posicion: Posicion): readonly [x: number, y: number] {
+export function proyectarEnMundo(
+  posicion: Posicion
+): readonly [x: number, y: number] {
   const [x, y] = equalEarth(posicion)
   return [
     Math.round((x + X_MAXIMO) * ESCALA * 10) / 10,
@@ -107,7 +112,9 @@ export function trazarPaises(
     ({ properties, geometry }: Feature<Geometry, PropiedadesPais>) => {
       if (EXCLUIDOS.has(properties.codigo)) return []
       const trazo = trazarGeometria(geometry)
-      return trazo ? [{ codigo: properties.codigo, nombre: properties.nombre, trazo }] : []
+      return trazo
+        ? [{ codigo: properties.codigo, nombre: properties.nombre, trazo }]
+        : []
     }
   )
   cache.set(coleccion, trazos)

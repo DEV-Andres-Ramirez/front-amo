@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test"
 
+import {
+  PROYECTO_ESCRITORIO,
+  PROYECTO_MOVIL,
+  PROYECTO_PREPARACION,
+  PROYECTO_TABLET,
+} from "./e2e/utilidades/proyectos"
+
 const URL_BASE = "http://localhost:3000"
 
 // SwiftShader permite renderizar WebGL (Mapbox) en navegadores headless sin GPU.
@@ -9,11 +16,21 @@ const OPCIONES_LANZAMIENTO = {
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // Todos los proyectos comparten un Supabase remoto pequeño con
+  // `statement_timeout` de 8 s, y un panel de Inicio lanza una docena de
+  // consultas analíticas. Con tres navegadores a la vez sobre paneles y
+  // reportes llegan a cancelarse (57014) y los bloques muestran su aviso de
+  // error: dos archivos en paralelo y, dentro de cada uno, una prueba tras otra.
+  fullyParallel: false,
+  workers: 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
+  // El backend es el proyecto Supabase real: un ingreso, un panel o un reporte
+  // encadenan varias consultas remotas y, con los proyectos en paralelo, pasan
+  // de los 5 s (expect) y 30 s (prueba) que Playwright da por defecto.
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   use: {
     baseURL: URL_BASE,
     locale: "es-CO",
@@ -24,7 +41,9 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "escritorio",
+      // Abre las sesiones compartidas una sola vez (e2e/preparacion.setup.ts).
+      name: PROYECTO_PREPARACION,
+      testMatch: /.*\.setup\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
@@ -32,7 +51,17 @@ export default defineConfig({
       },
     },
     {
-      name: "tablet",
+      name: PROYECTO_ESCRITORIO,
+      dependencies: [PROYECTO_PREPARACION],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        launchOptions: OPCIONES_LANZAMIENTO,
+      },
+    },
+    {
+      name: PROYECTO_TABLET,
+      dependencies: [PROYECTO_PREPARACION],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 834, height: 1112 },
@@ -41,7 +70,8 @@ export default defineConfig({
       },
     },
     {
-      name: "movil",
+      name: PROYECTO_MOVIL,
+      dependencies: [PROYECTO_PREPARACION],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 390, height: 844 },

@@ -16,7 +16,7 @@ import {
   EncabezadoDetalle,
   PieDetalle,
 } from "./detalle-zona"
-import { CLASE_PANEL } from "./lienzo"
+import { CLASE_ALTO_HOJA_DETALLE, CLASE_PANEL } from "./lienzo"
 
 export interface PropsPanelDetalle {
   datos: DatosDetalle | null
@@ -63,7 +63,10 @@ export function PanelDetalleLateral({
             />
           </div>
           <ScrollArea className="min-h-0 flex-1">
-            <div key={datos.codigo} className="animate-aparecer-arriba px-4 py-4">
+            <div
+              key={datos.codigo}
+              className="animate-aparecer-arriba px-4 py-4"
+            >
               <CuerpoDetalle
                 datos={datos}
                 onCambiarMetrica={onCambiarMetrica}
@@ -104,7 +107,10 @@ export function HojaDetalle({
     >
       <DrawerContent
         aria-labelledby={tituloId}
-        className="vidrio mx-auto max-w-xl border-x-0 shadow-[0_-16px_48px_-20px_rgb(0_0_0/0.5)] data-[swipe-axis=y]:[--drawer-content-max-height:min(60dvh,34rem)] sm:rounded-t-2xl"
+        className={cn(
+          "mx-auto max-w-xl vidrio border-x-0 shadow-[0_-16px_48px_-20px_rgb(0_0_0/0.5)] sm:rounded-t-2xl",
+          CLASE_ALTO_HOJA_DETALLE
+        )}
       >
         <span
           aria-hidden

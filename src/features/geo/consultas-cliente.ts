@@ -72,6 +72,38 @@ function esErrorApi(cuerpo: unknown): cuerpo is ErrorApiGeo {
   )
 }
 
+/**
+ * Error de una respuesta fallida, con el mensaje listo para la interfaz. Con
+ * la sesión vencida responde el proxy antes que la ruta, con su propio cuerpo
+ * (`{ error: "No autenticado" }`): un 401 siempre es "vuelve a ingresar".
+ */
+export function errorDeRespuesta(
+  estado: number,
+  cuerpo: unknown
+): ErrorConsultaGeo {
+  if (esErrorApi(cuerpo)) {
+    const { motivo, mensaje, pista } = cuerpo.error
+    return new ErrorConsultaGeo(estado, motivo, mensaje, pista)
+  }
+  if (estado === 401) {
+    return new ErrorConsultaGeo(
+      estado,
+      "sin-sesion",
+      "Tu sesión terminó. Vuelve a ingresar para seguir explorando el mapa."
+    )
+  }
+  return new ErrorConsultaGeo(
+    estado,
+    "fallo",
+    "No pudimos cargar el mapa. Intenta de nuevo en unos segundos."
+  )
+}
+
+/** La sesión terminó: reintentar no sirve, hay que volver a ingresar. */
+export function esSesionVencida(error: unknown): boolean {
+  return error instanceof ErrorConsultaGeo && error.motivo === "sin-sesion"
+}
+
 async function pedir<T>(
   parametros: URLSearchParams,
   signal: AbortSignal
@@ -91,26 +123,32 @@ async function pedir<T>(
     )
   }
   const cuerpo: unknown = await respuesta.json().catch(() => null)
-  if (!respuesta.ok) {
-    if (esErrorApi(cuerpo)) {
-      const { motivo, mensaje, pista } = cuerpo.error
-      throw new ErrorConsultaGeo(respuesta.status, motivo, mensaje, pista)
-    }
-    throw new ErrorConsultaGeo(
-      respuesta.status,
-      "fallo",
-      "No pudimos cargar el mapa. Intenta de nuevo en unos segundos."
-    )
-  }
+  if (!respuesta.ok) throw errorDeRespuesta(respuesta.status, cuerpo)
   return cuerpo as T
 }
 
 export const clavesGeo = {
   todo: ["geo"] as const,
   mapa: (c: ConsultaMapaGeo) =>
-    ["geo", "mapa", c.nivel, c.metrica, c.desde, c.hasta, c.departamento] as const,
+    [
+      "geo",
+      "mapa",
+      c.nivel,
+      c.metrica,
+      c.desde,
+      c.hasta,
+      c.departamento,
+    ] as const,
   puntos: (c: ConsultaMapaGeo) =>
-    ["geo", "puntos", c.nivel, c.metrica, c.desde, c.hasta, c.departamento] as const,
+    [
+      "geo",
+      "puntos",
+      c.nivel,
+      c.metrica,
+      c.desde,
+      c.hasta,
+      c.departamento,
+    ] as const,
   detalle: (c: ConsultaMapaGeo, zona: string) =>
     [
       "geo",
@@ -160,7 +198,10 @@ export function useMetricasMapa(consulta: ConsultaMapaGeo | null) {
  * Puntos del modo calor: solo se piden con el modo activo, aparte del
  * coroplético (que no espera la lectura de coordenadas).
  */
-export function usePuntosMapa(consulta: ConsultaMapaGeo | null, activo: boolean) {
+export function usePuntosMapa(
+  consulta: ConsultaMapaGeo | null,
+  activo: boolean
+) {
   return useQuery({
     queryKey: consulta ? clavesGeo.puntos(consulta) : ["geo", "puntos"],
     queryFn:
@@ -244,7 +285,8 @@ async function pedirGeometria(
 
 const opcionesGeometria = (url: string) => ({
   queryKey: ["geo", "geometria", url] as const,
-  queryFn: ({ signal }: { signal?: AbortSignal }) => pedirGeometria(url, signal),
+  queryFn: ({ signal }: { signal?: AbortSignal }) =>
+    pedirGeometria(url, signal),
   // Archivos versionados con el código: no cambian durante la sesión.
   staleTime: Infinity,
   gcTime: 30 * 60_000,
@@ -257,7 +299,10 @@ const opcionesGeometria = (url: string) => ({
  * para que el mapa no quede vacío durante el vuelo de la cámara.
  */
 export function useGeometriaNivel(url: string) {
-  return useQuery({ ...opcionesGeometria(url), placeholderData: keepPreviousData })
+  return useQuery({
+    ...opcionesGeometria(url),
+    placeholderData: keepPreviousData,
+  })
 }
 
 /** Adelanta la descarga (p. ej. los municipios del departamento seleccionado). */

@@ -1,9 +1,10 @@
 /**
- * Cubetas de la evolución de una zona (detalle del explorador). Mientras la BD
- * no tenga `detalle_zona_geo`, el servidor compone la serie con una llamada a
- * `geo_metricas` por cubeta, así que la granularidad también acota cuántas
- * llamadas cuesta: ≤ 14 días por día, ≤ 14 semanas por semana ISO y, más
- * allá, por mes calendario (≤ 25 con el rango máximo de dos años).
+ * Cubetas de la evolución de una zona (detalle del explorador): ≤ 14 días por
+ * día, ≤ 14 semanas (98 días) por semana ISO y, más allá, por mes calendario.
+ * La serie mensual llega en la RPC `detalle_zona_geo`; la diaria y la semanal
+ * cuestan una lectura de `geo_metricas` por cubeta, así que la granularidad
+ * también acota esas lecturas: como máximo `CUBETAS_MAXIMAS_SERIE_FINA` (98
+ * días que no empiezan en lunes tocan 15 semanas ISO).
  * Módulo puro: fechas de calendario de Bogotá como 'YYYY-MM-DD'.
  */
 import { tz } from "@date-fns/tz"
@@ -30,6 +31,8 @@ export interface CubetaSerie {
 
 export const DIAS_MAXIMOS_SERIE_DIARIA = 14
 export const DIAS_MAXIMOS_SERIE_SEMANAL = 98
+/** Tope de cubetas diarias o semanales (= lecturas de la BD por detalle). */
+export const CUBETAS_MAXIMAS_SERIE_FINA = DIAS_MAXIMOS_SERIE_SEMANAL / 7 + 1
 
 const enBogota = { in: tz(ZONA) }
 
@@ -51,7 +54,10 @@ function finNatural(inicio: Date, granularidad: GranularidadSerie): Date {
 }
 
 /** ¿`inicio` abre una semana (lunes) o un mes (día 1) completos? */
-function abrePeriodoNatural(inicio: Date, granularidad: GranularidadSerie): boolean {
+function abrePeriodoNatural(
+  inicio: Date,
+  granularidad: GranularidadSerie
+): boolean {
   if (granularidad === "dia") return true
   const anterior = inicioDelDia(addDays(inicio, -1, enBogota))
   return finNatural(anterior, granularidad).getTime() === anterior.getTime()

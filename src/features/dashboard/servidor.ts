@@ -32,9 +32,11 @@ function esClaveConfig(valor: string): valor is ClaveConfig {
 }
 
 /**
- * Umbrales de analítica (`configuracion`, docs/modelo-datos.md §7). Sin
- * `configuracion.ver` o ante un fallo se usan los valores por defecto: son
- * los mismos que siembra la migración y el panel no debe caer por esto.
+ * Umbrales de analítica (`configuracion`, docs/modelo-datos.md §7).
+ * `analitica.n_minimo_tasas` es pública: anunciantes y medios rotulan la
+ * «muestra insuficiente» con el mismo umbral que aplican las RPC. Las demás
+ * exigen `configuracion.ver`; sin él, o ante un fallo, rigen los valores por
+ * defecto (los que siembra la migración): el panel no debe caer por esto.
  */
 export const configAnalitica = cache(async (): Promise<ConfigInsights> => {
   const supabase = await clientePanel()

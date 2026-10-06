@@ -13,6 +13,7 @@ import { obtenerAuthServidor } from "@/lib/supabase/auth-server"
 import { obtenerContextoSolicitud } from "@/lib/supabase/contexto"
 import { argumentosRpc } from "@/lib/supabase/rpc"
 import { crearClienteServidor } from "@/lib/supabase/server"
+import { vigenciaUrlFirmada } from "@/lib/supabase/url-firmada"
 
 import { BUCKET_AVATARES } from "./avatar"
 import { leerPreferencias, type PreferenciasInterfaz } from "./preferencias"
@@ -44,9 +45,6 @@ type ClienteServidor = Awaited<ReturnType<typeof crearClienteServidor>>
 /** PostgREST/Postgres: la función aún no existe (`mis_sesiones`). */
 const FUNCION_INEXISTENTE = new Set(["PGRST202", "42883"])
 
-/** Vigencia de las URL firmadas (`archivos.vigencia_url_firmada_segundos`). */
-const VIGENCIA_URL_SEGUNDOS = 300
-
 function fallar(operacion: string, error: { code?: string | null }): never {
   throw new Error(`No se pudo ${operacion} (${error.code ?? "sin código"}).`)
 }
@@ -65,7 +63,7 @@ async function firmarAvatar(
   if (!ruta) return null
   const { data, error } = await supabase.storage
     .from(BUCKET_AVATARES)
-    .createSignedUrl(ruta, VIGENCIA_URL_SEGUNDOS)
+    .createSignedUrl(ruta, await vigenciaUrlFirmada())
   return error ? null : data.signedUrl
 }
 

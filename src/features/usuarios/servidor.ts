@@ -1,13 +1,9 @@
 import "server-only"
 
-import { obtenerClaims } from "@/lib/auth/dal"
-import type { UsuarioSesion } from "@/lib/auth/tipos"
+import type { ContextoActor } from "@/lib/auth/contexto-actor"
 import { envCliente } from "@/lib/env"
 import { fallo, type ResultadoFallo } from "@/lib/result"
-import { crearClienteAdmin } from "@/lib/supabase/admin"
-import { obtenerContextoSolicitud } from "@/lib/supabase/contexto"
 import { argumentosRpc } from "@/lib/supabase/rpc"
-import type { Json } from "@/types/database.types"
 
 import {
   codigoNegocio,
@@ -21,39 +17,13 @@ import {
 
 /**
  * Utilidades de servidor de las acciones de Usuarios (no son acciones: no
- * llevan `"use server"`). Toda escritura privilegiada va con la secret key y el
- * actor en `x-amo-actor`, y la BD revalida actor, sesión y permisos (§2.4.4).
+ * llevan `"use server"`). Toda escritura privilegiada va con el contexto del
+ * actor (`@/lib/auth/contexto-actor`: secret key + `x-amo-actor`), y la BD
+ * revalida actor, sesión y permisos (§2.4.4).
  */
 
 /** Origen público para los enlaces (nunca el `Host` de la solicitud). */
 export const SITIO = envCliente.NEXT_PUBLIC_SITE_URL
-
-export type ClienteAdmin = Awaited<ReturnType<typeof crearClienteAdmin>>
-
-export interface ContextoActor {
-  actorId: string
-  /** `session_id` del JWT: los `*_srv` validan que la sesión siga viva. */
-  sessionId: string
-  admin: ClienteAdmin
-}
-
-/**
- * Actor, sesión y cliente admin para una acción ya autorizada por el DAL.
- * Los claims vienen cacheados de la misma solicitud (`requerirPermiso`).
- */
-export async function contextoDelActor(
-  actor: UsuarioSesion
-): Promise<ContextoActor> {
-  const claims = await obtenerClaims()
-  if (!claims || claims.usuarioId !== actor.id) {
-    throw new Error("La sesión del actor no está disponible.")
-  }
-  return {
-    actorId: actor.id,
-    sessionId: claims.sessionId,
-    admin: await crearClienteAdmin({ actorId: actor.id }),
-  }
-}
 
 /** Log de servidor sin datos personales: operación y código. */
 export function informar(operacion: string, error: unknown): void {
@@ -115,45 +85,6 @@ export async function autorizarGestion(
     })
   )
   return error
-}
-
-export type AccionBitacoraUsuarios =
-  "INVITAR" | "GENERAR_ENLACE" | "EXPORTAR" | "OTRO"
-
-/**
- * Evento de aplicación en la bitácora (`registrar_evento_srv`). NUNCA lleva
- * enlaces, tokens ni contraseñas: solo el tipo de operación. Un fallo al
- * registrar no deshace la acción; queda en el log del servidor.
- */
-export async function registrarEventoUsuarios(
-  contexto: ContextoActor,
-  evento: {
-    accion: AccionBitacoraUsuarios
-    entidad: string
-    entidadId: string | null
-    metadatos: Record<string, Json>
-  }
-): Promise<void> {
-  try {
-    const solicitud = await obtenerContextoSolicitud()
-    const { error } = await contexto.admin.rpc(
-      "registrar_evento_srv",
-      argumentosRpc<"registrar_evento_srv">({
-        p_actor_id: contexto.actorId,
-        p_accion: evento.accion,
-        p_entidad: evento.entidad,
-        p_entidad_id: evento.entidadId,
-        p_metadatos: evento.metadatos,
-        p_ip: solicitud.ip,
-        p_pais: solicitud.pais,
-        p_ciudad: solicitud.ciudad,
-        p_ua: solicitud.userAgent,
-      })
-    )
-    if (error) throw error
-  } catch (error) {
-    informar(`registrar_evento_srv(${evento.accion})`, error)
-  }
 }
 
 /** Bloqueo en Auth mientras la cuenta está suspendida o desactivada (~100 años). */

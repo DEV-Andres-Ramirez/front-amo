@@ -50,7 +50,11 @@ describe("agregación en cuadrícula", () => {
   })
 
   it("aplica el factor de la muestra y redondea a la celda sin ruido binario", () => {
-    const [punto] = agregarEnCuadricula([{ lon: 0.349, lat: -0.351 }], 0.05, 2.5)
+    const [punto] = agregarEnCuadricula(
+      [{ lon: 0.349, lat: -0.351 }],
+      0.05,
+      2.5
+    )
     expect(punto).toEqual([0.35, -0.35, 2.5])
   })
 

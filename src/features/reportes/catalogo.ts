@@ -23,12 +23,17 @@ export type GrupoReporte = "negocio" | "territorio" | "seguridad"
 
 /** Filtros de la URL que entiende cada reporte (además de la tabla). */
 export type FiltroReporte =
-  | "periodo"
-  | "corte"
-  | "departamento"
-  | "anunciante"
-  | "sector"
-  | "agrupacion"
+  "periodo" | "corte" | "departamento" | "anunciante" | "sector" | "agrupacion"
+
+/** Nombre de cada filtro en las tarjetas del centro de reportes. */
+export const ETIQUETAS_FILTRO: Readonly<Record<FiltroReporte, string>> = {
+  periodo: "Periodo",
+  corte: "Fecha de corte",
+  departamento: "Departamento",
+  anunciante: "Anunciante",
+  sector: "Sector",
+  agrupacion: "Agrupación",
+}
 
 /** Ícono del reporte (mapa estático en los componentes; no se serializan componentes). */
 export type IconoReporte =
@@ -58,6 +63,8 @@ export interface ReporteCatalogo {
   comparativo: boolean
   /** Orientación del PDF: horizontal para tablas anchas. */
   orientacionPdf: "vertical" | "horizontal"
+  /** Tarjetas de cabecera (el esqueleto de carga reserva las mismas). */
+  indicadores: 6 | 8
 }
 
 export const GRUPOS_REPORTE: Readonly<
@@ -65,7 +72,8 @@ export const GRUPOS_REPORTE: Readonly<
 > = {
   negocio: {
     titulo: "Negocio y finanzas",
-    descripcion: "Cómo crece el marketplace, cuánto se factura y cuánto falta por cobrar.",
+    descripcion:
+      "Cómo crece el marketplace, cuánto se factura y cuánto falta por cobrar.",
   },
   territorio: {
     titulo: "Territorio y medios",
@@ -92,6 +100,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo"],
     comparativo: true,
     orientacionPdf: "vertical",
+    indicadores: 8,
   },
   "desempeno-campanas": {
     slug: "desempeno-campanas",
@@ -107,6 +116,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo", "anunciante"],
     comparativo: true,
     orientacionPdf: "horizontal",
+    indicadores: 6,
   },
   finanzas: {
     slug: "finanzas",
@@ -122,6 +132,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo", "agrupacion", "sector"],
     comparativo: true,
     orientacionPdf: "horizontal",
+    indicadores: 8,
   },
   cartera: {
     slug: "cartera",
@@ -137,6 +148,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["corte"],
     comparativo: true,
     orientacionPdf: "horizontal",
+    indicadores: 6,
   },
   "cobertura-territorial": {
     slug: "cobertura-territorial",
@@ -152,6 +164,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo", "departamento"],
     comparativo: true,
     orientacionPdf: "vertical",
+    indicadores: 6,
   },
   "cumplimiento-medios": {
     slug: "cumplimiento-medios",
@@ -167,6 +180,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo", "departamento"],
     comparativo: true,
     orientacionPdf: "horizontal",
+    indicadores: 6,
   },
   "usuarios-accesos": {
     slug: "usuarios-accesos",
@@ -182,6 +196,7 @@ export const REPORTES: Readonly<Record<SlugReporte, ReporteCatalogo>> = {
     filtros: ["periodo"],
     comparativo: true,
     orientacionPdf: "horizontal",
+    indicadores: 6,
   },
 }
 
@@ -207,6 +222,39 @@ export function puedeExportarReporte(
     puedeVerReporte(usuario, reporte) &&
     usuario.permisos.includes("reportes.exportar")
   )
+}
+
+/**
+ * Filtros del reporte que aplican a quien consulta. A un anunciante no se le
+ * ofrece ni se le aplica el filtro por anunciante: la base ya le limita los
+ * datos a sus campañas. La barra de filtros, la consulta, la portada de los
+ * documentos y la bitácora usan esta misma lista.
+ */
+export function filtrosPara(
+  reporte: Pick<ReporteCatalogo, "filtros">,
+  usuario: Pick<UsuarioSesion, "anuncianteId">
+): readonly FiltroReporte[] {
+  return usuario.anuncianteId
+    ? reporte.filtros.filter((filtro) => filtro !== "anunciante")
+    : reporte.filtros
+}
+
+/**
+ * Lo que dice la tarjeta del centro según quién la mira: los filtros que le
+ * aplican (`filtrosPara`) y, a un anunciante, el acceso en segunda persona.
+ */
+export function tarjetaPara(
+  reporte: Pick<ReporteCatalogo, "filtros" | "acceso">,
+  usuario: Pick<UsuarioSesion, "anuncianteId">
+): { filtros: readonly FiltroReporte[]; acceso: string } {
+  const filtros = filtrosPara(reporte, usuario)
+  return {
+    filtros,
+    acceso:
+      filtros.length === reporte.filtros.length
+        ? reporte.acceso
+        : "Solo tus campañas",
+  }
 }
 
 /** Reportes visibles, en el orden del catálogo. */

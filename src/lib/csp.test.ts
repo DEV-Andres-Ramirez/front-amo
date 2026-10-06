@@ -17,8 +17,16 @@ function directiva(csp: string, nombre: string): string | undefined {
 }
 
 describe("construirCsp", () => {
-  const produccion = construirCsp({ nonce: "abc123", desarrollo: false })
-  const desarrollo = construirCsp({ nonce: "abc123", desarrollo: true })
+  const produccion = construirCsp({
+    nonce: "abc123",
+    desarrollo: false,
+    https: true,
+  })
+  const desarrollo = construirCsp({
+    nonce: "abc123",
+    desarrollo: true,
+    https: false,
+  })
 
   it("incluye el nonce con strict-dynamic y wasm en script-src", () => {
     expect(directiva(produccion, "script-src")).toBe(
@@ -31,9 +39,19 @@ describe("construirCsp", () => {
     expect(directiva(desarrollo, "script-src")).toContain("'unsafe-eval'")
   })
 
-  it("solo fuerza HTTPS en producción", () => {
+  it("solo fuerza HTTPS cuando el sitio se sirve por HTTPS", () => {
     expect(directiva(produccion, "upgrade-insecure-requests")).toBeDefined()
     expect(directiva(desarrollo, "upgrade-insecure-requests")).toBeUndefined()
+    // `pnpm start` en http://localhost: build de producción sin HTTPS.
+    const produccionLocal = construirCsp({
+      nonce: "abc123",
+      desarrollo: false,
+      https: false,
+    })
+    expect(
+      directiva(produccionLocal, "upgrade-insecure-requests")
+    ).toBeUndefined()
+    expect(produccionLocal).not.toContain("'unsafe-eval'")
   })
 
   it("permite Supabase (REST, Realtime y Storage directo) y Mapbox", () => {

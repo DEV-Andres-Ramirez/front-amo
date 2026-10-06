@@ -27,13 +27,21 @@ export interface OpcionesCsp {
   nonce: string
   /** `next dev`: React necesita `eval` para reconstruir pilas de error. */
   desarrollo: boolean
+  /**
+   * El sitio se sirve por HTTPS. Solo entonces se emite
+   * `upgrade-insecure-requests`: en `http://localhost` (`next dev` y
+   * `pnpm start`) Chromium pasa a https el destino de las redirecciones de un
+   * `fetch` y la solicitud falla (p. ej. el prefetch de una ruta que el proxy
+   * redirige).
+   */
+  https: boolean
 }
 
 type Directivas = ReadonlyArray<
   readonly [directiva: string, ...fuentes: string[]]
 >
 
-function directivas({ nonce, desarrollo }: OpcionesCsp): Directivas {
+function directivas({ nonce, desarrollo, https }: OpcionesCsp): Directivas {
   const scripts = [
     "'self'",
     `'nonce-${nonce}'`,
@@ -74,7 +82,7 @@ function directivas({ nonce, desarrollo }: OpcionesCsp): Directivas {
     ["base-uri", "'self'"],
     ["form-action", "'self'"],
     ["object-src", "'none'"],
-    ...(desarrollo ? [] : [["upgrade-insecure-requests"] as const]),
+    ...(https ? [["upgrade-insecure-requests"] as const] : []),
     ["report-uri", RUTA_REPORTE_CSP],
     ["report-to", GRUPO_REPORTE_CSP],
   ]

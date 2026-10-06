@@ -1,5 +1,3 @@
-import { expect, test } from "@playwright/test"
-
 import { generarContrasena } from "../scripts/bootstrap/contrasena"
 import {
   codigoTotpEstable,
@@ -13,7 +11,10 @@ import {
   entorno,
   escribirCodigoMfa,
   ingresar,
+  saludoDe,
 } from "./utilidades/cuentas"
+import { expect, test } from "./utilidades/prueba"
+import { PROYECTO_CON_CUENTAS } from "./utilidades/proyectos"
 
 /** Flujos de acceso contra `pnpm build && pnpm start` y el proyecto Supabase real. */
 
@@ -23,7 +24,6 @@ import {
  * pisarían (verificar un TOTP cierra las demás sesiones de la cuenta y cada
  * preparación restablece la cuenta).
  */
-const PROYECTO_CON_CUENTAS = "escritorio"
 
 function soloEnProyectoConCuentas(
   preparar?: () => Promise<void>,
@@ -79,7 +79,7 @@ test.describe("anunciante", () => {
     await ingresar(page, credenciales("ANUNCIANTE"))
     await expect(page).toHaveURL(/\/inicio$/)
     await expect(
-      page.getByRole("heading", { name: "Hola, Anunciante" })
+      page.getByRole("heading", { name: saludoDe("Anunciante") })
     ).toBeVisible()
   })
 
@@ -191,7 +191,7 @@ test.describe("administrador con TOTP", () => {
     await escribirCodigoMfa(page)
     await expect(page).toHaveURL(/\/inicio$/)
     await expect(
-      page.getByRole("heading", { name: "Hola, Administración" })
+      page.getByRole("heading", { name: saludoDe("Administración") })
     ).toBeVisible()
   })
 
@@ -239,7 +239,7 @@ test.describe("administrador invitado", () => {
     await expect(page).toHaveURL(/\/inicio$/)
     await expect(
       page.getByRole("heading", {
-        name: `Hola, ${NOMBRE_INVITADO_E2E.split(" ")[0]}`,
+        name: saludoDe(NOMBRE_INVITADO_E2E.split(" ")[0]),
       })
     ).toBeVisible()
   })

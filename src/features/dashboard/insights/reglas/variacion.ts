@@ -5,6 +5,7 @@
  * aporta al menos el 30 % del cambio en la misma dirección.
  */
 import type { FilaKpi } from "@/components/kpi/tipos"
+import { rutaExplorador } from "@/features/geo/rutas"
 import {
   formatearCompacto,
   formatearCOPCompacto,
@@ -12,7 +13,7 @@ import {
   formatearPorcentaje,
 } from "@/lib/format"
 
-import { construirHref, METRICA_MAPA, RUTAS_INSIGHTS } from "../rutas"
+import { METRICA_MAPA } from "../rutas"
 import {
   type DesgloseVariacion,
   type EntradaInsights,
@@ -178,15 +179,11 @@ function accionMapa(
     etiqueta: depto
       ? `Explorar ${depto.nombre} en el mapa`
       : "Explorar en el mapa",
-    href: construirHref(
-      RUTAS_INSIGHTS.mapa,
-      {
-        metrica: METRICA_MAPA[kpi],
-        nivel: depto ? "departamental" : undefined,
-        depto: depto?.clave,
-      },
-      periodo
-    ),
+    href: rutaExplorador({
+      metrica: METRICA_MAPA[kpi],
+      departamento: depto?.clave,
+      periodo,
+    }),
   }
 }
 

@@ -41,24 +41,35 @@ function zonaDePais(codigo: string, valor: number, nombre?: string): ZonaMundo {
 }
 
 function ordenar(zonas: ZonaMundo[]): ZonaMundo[] {
-  return zonas.sort((a, b) => b.valor - a.valor || a.nombre.localeCompare(b.nombre, "es"))
+  return zonas.sort(
+    (a, b) => b.valor - a.valor || a.nombre.localeCompare(b.nombre, "es")
+  )
 }
 
 async function desdeRpc(
   supabase: ClienteGeo,
   rango: RangoFechas
 ): Promise<IngresosPorUbicacion> {
-  const periodo = { metrica: "accesos", desde: serializarFecha(rango.desde), hasta: serializarFecha(rango.hasta), departamento: null } as const
+  const periodo = {
+    metrica: "accesos",
+    desde: serializarFecha(rango.desde),
+    hasta: serializarFecha(rango.hasta),
+    departamento: null,
+  } as const
   const [paises, departamentos] = await Promise.all([
     geoMetricas(supabase, { ...periodo, nivel: "internacional" }),
     geoMetricas(supabase, { ...periodo, nivel: "nacional" }),
   ])
   const zonas = paises.flatMap((fila) =>
-    fila.valor && fila.valor > 0 ? [zonaDePais(fila.codigo, fila.valor, fila.nombre)] : []
+    fila.valor && fila.valor > 0
+      ? [zonaDePais(fila.codigo, fila.valor, fila.nombre)]
+      : []
   )
   return {
     paises: ordenar(zonas),
-    departamentos: Object.fromEntries(departamentos.map((fila) => [fila.codigo, fila.valor ?? 0])),
+    departamentos: Object.fromEntries(
+      departamentos.map((fila) => [fila.codigo, fila.valor ?? 0])
+    ),
     total: zonas.reduce((suma, zona) => suma + zona.valor, 0),
     estimado: false,
   }
@@ -82,7 +93,10 @@ async function desdeTabla(
   const paginas = paginasEstratificadas(total, MAXIMO_FILAS)
   const lecturas = await Promise.all(
     paginas.map(([desde, hasta]) =>
-      aplicarFiltros(supabase.from("accesos").select("pais_iso2, departamento_codigo"), filtros)
+      aplicarFiltros(
+        supabase.from("accesos").select("pais_iso2, departamento_codigo"),
+        filtros
+      )
         .not("pais_iso2", "is", null)
         .order("id", { ascending: true })
         .range(desde, hasta)
@@ -93,19 +107,28 @@ async function desdeTabla(
   const porDepartamento: Record<string, number> = {}
   for (const { data, error: errorPagina } of lecturas) {
     if (errorPagina) throw traducirError(errorPagina)
-    for (const { pais_iso2: pais, departamento_codigo: departamento } of data ?? []) {
+    for (const { pais_iso2: pais, departamento_codigo: departamento } of data ??
+      []) {
       if (!pais) continue
       const codigo = pais.toUpperCase()
       porPais.set(codigo, (porPais.get(codigo) ?? 0) + factor)
       if (codigo === "CO" && departamento) {
-        porDepartamento[departamento] = (porDepartamento[departamento] ?? 0) + factor
+        porDepartamento[departamento] =
+          (porDepartamento[departamento] ?? 0) + factor
       }
     }
   }
   return {
-    paises: ordenar([...porPais].map(([codigo, valor]) => zonaDePais(codigo, Math.round(valor)))),
+    paises: ordenar(
+      [...porPais].map(([codigo, valor]) =>
+        zonaDePais(codigo, Math.round(valor))
+      )
+    ),
     departamentos: Object.fromEntries(
-      Object.entries(porDepartamento).map(([codigo, valor]) => [codigo, Math.round(valor)])
+      Object.entries(porDepartamento).map(([codigo, valor]) => [
+        codigo,
+        Math.round(valor),
+      ])
     ),
     total,
     estimado: factor > 1,

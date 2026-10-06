@@ -2,7 +2,7 @@ import { ArrowUpRight, ChevronRight, Lock, Users } from "lucide-react"
 import Link from "next/link"
 
 import { EstadoVacio } from "@/components/feedback/estado-vacio"
-import { buttonVariants } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import {
   AvatarPersona,
   IndicadorMfa,
@@ -52,13 +52,14 @@ export async function SeccionUsuariosRol({
       }
       acciones={
         total > 0 ? (
-          <Link
+          <EnlaceBoton
             href={rutaUsuariosDelRol(rol.id)}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            variant="outline"
+            size="sm"
           >
             Ver en Usuarios
             <ArrowUpRight data-icon="inline-end" aria-hidden />
-          </Link>
+          </EnlaceBoton>
         ) : null
       }
       className="[&>div:last-child]:p-0"

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server"
 
 import { leerParametrosGeo, type ParametrosGeo } from "@/features/geo/esquemas"
-import { metricaPermitida } from "@/features/geo/metricas"
+import { calorPermitido, metricaPermitida } from "@/features/geo/metricas"
 import { obtenerProveedorGeo } from "@/features/geo/proveedor-servidor"
 import {
   type ErrorApiGeo,
@@ -25,13 +25,15 @@ import { desdeErrorZod } from "@/lib/result"
  *   ?vista=puntos&nivel=internacional&metrica=accesos&…       (modo calor)
  *   ?vista=detalle&nivel=departamental&depto=05&zona=05001&metrica=gmv&…
  *
- * Autoriza con el DAL (sesión vigente + `analitica.mapa`, y `accesos.ver`
- * para la métrica de accesos) y responde JSON con estados HTTP reales (el
- * cliente es React Query, no una navegación). La BD vuelve a autorizar: la
- * RPC es `security invoker` y las tablas de los puntos aplican su RLS.
+ * Autoriza con el DAL (sesión vigente + `analitica.mapa`; `accesos.ver`
+ * para la métrica de accesos y `medios.ver` para los puntos de calor de
+ * medios, que salen de la tabla con la RLS del usuario) y responde JSON con
+ * estados HTTP reales (el cliente es React Query, no una navegación). La BD
+ * vuelve a autorizar: las RPC son `security invoker` y las tablas de los
+ * puntos aplican su RLS.
  *
- * El detalle se compone aquí, en una sola solicitud, mientras la BD no tenga
- * `detalle_zona_geo` (KPI, evolución y destacados en paralelo).
+ * El detalle sale de la RPC `detalle_zona_geo` (KPI con comparativo,
+ * evolución mensual y medios con más GMV) en una sola solicitud del cliente.
  */
 
 /** Caché del navegador corta y privada (los datos dependen de los permisos). */
@@ -44,10 +46,7 @@ const ESTADO_POR_MOTIVO: Readonly<Record<MotivoErrorGeo, number>> = {
   fallo: 502,
 }
 
-function responderError(
-  estado: number,
-  error: ErrorApiGeo["error"]
-): Response {
+function responderError(estado: number, error: ErrorApiGeo["error"]): Response {
   return Response.json({ error } satisfies ErrorApiGeo, {
     status: estado,
     headers: { "Cache-Control": "no-store" },
@@ -97,7 +96,9 @@ function consultar(
         metricasKpi: parametros.consulta.metricasKpi.filter((metrica) =>
           metricaPermitida(metrica, tienePermiso)
         ),
-        conMedios: tienePermiso("reportes.ver"),
+        // Nombres y GMV por medio: lo mismo que exige la RLS de sus tablas.
+        conMedios:
+          tienePermiso("medios.ver") && tienePermiso("asignaciones.ver"),
       })
   }
 }
@@ -118,10 +119,17 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const tienePermiso = (permiso: ClavePermiso) =>
       tieneAlgunPermiso(usuario, [permiso])
-    if (!metricaPermitida(parametros.datos.consulta.metrica, tienePermiso)) {
+    const { vista, consulta } = parametros.datos
+    if (!metricaPermitida(consulta.metrica, tienePermiso)) {
       return responderError(403, {
         motivo: "no-autorizado",
         mensaje: "No tienes permiso para consultar esta métrica.",
+      })
+    }
+    if (vista === "puntos" && !calorPermitido(consulta.metrica, tienePermiso)) {
+      return responderError(403, {
+        motivo: "no-autorizado",
+        mensaje: "No tienes permiso para ver estos puntos en el mapa de calor.",
       })
     }
 

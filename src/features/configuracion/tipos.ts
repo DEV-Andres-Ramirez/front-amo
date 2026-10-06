@@ -46,6 +46,8 @@ export interface PermisosConfiguracion {
   tributario: boolean
   catalogos: boolean
   verAuditoria: boolean
+  /** `datos_sensibles.ver`: ve y busca identificaciones completas (NIT). */
+  datosSensibles: boolean
 }
 
 // ── Precios ─────────────────────────────────────────────────────────────────

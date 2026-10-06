@@ -19,17 +19,18 @@ export function nombrePlataforma(plataforma: Plataforma): string {
   return NOMBRES_PLATAFORMA[plataforma]
 }
 
-export const NOMBRES_DOCUMENTO_MEDIO: Readonly<Record<DocumentoMedio, string>> = {
-  CEDULA_FRENTE: "Cédula (frente)",
-  CEDULA_REVERSO: "Cédula (reverso)",
-  PRUEBA_VIDA: "Prueba de vida",
-  RUT: "RUT",
-  RUT_SOCIEDAD: "RUT de la sociedad",
-  CAMARA_COMERCIO: "Cámara de Comercio",
-  CERT_BANCARIA: "Certificación bancaria",
-  CERT_BILLETERA: "Certificado de billetera",
-  SEG_SOCIAL: "Seguridad social",
-}
+export const NOMBRES_DOCUMENTO_MEDIO: Readonly<Record<DocumentoMedio, string>> =
+  {
+    CEDULA_FRENTE: "Cédula (frente)",
+    CEDULA_REVERSO: "Cédula (reverso)",
+    PRUEBA_VIDA: "Prueba de vida",
+    RUT: "RUT",
+    RUT_SOCIEDAD: "RUT de la sociedad",
+    CAMARA_COMERCIO: "Cámara de Comercio",
+    CERT_BANCARIA: "Certificación bancaria",
+    CERT_BILLETERA: "Certificado de billetera",
+    SEG_SOCIAL: "Seguridad social",
+  }
 
 export const NOMBRES_RETENCION: Readonly<Record<TipoRetencion, string>> = {
   RETEFUENTE: "Retención en la fuente",
@@ -87,10 +88,7 @@ export const NOMBRES_FORMATO: Readonly<Record<string, string>> = {
 }
 
 /** "30.000 – 60.000 seguidores" · "Más de 120.000 seguidores". */
-export function rangoSeguidores(
-  minimo: number,
-  maximo: number | null
-): string {
+export function rangoSeguidores(minimo: number, maximo: number | null): string {
   if (maximo === null) return `Desde ${formatearNumero(minimo)} seguidores`
   return `${formatearNumero(minimo)} – ${formatearNumero(maximo)} seguidores`
 }

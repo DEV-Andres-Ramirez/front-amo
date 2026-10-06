@@ -11,10 +11,11 @@
  * `desde`, `hasta`); así los enlaces de los insights abren el reporte filtrado.
  */
 import { tz } from "@date-fns/tz"
-import { subMonths } from "date-fns"
+import { endOfMonth, isLastDayOfMonth, subDays, subMonths } from "date-fns"
 import {
   createLoader,
   createParser,
+  createSerializer,
   type inferParserType,
   parseAsStringLiteral,
 } from "nuqs/server"
@@ -27,12 +28,17 @@ import {
   rangoDeValores,
 } from "@/features/auditoria/periodo"
 import { departamentoPorCodigo } from "@/features/geo/departamentos"
-import { parseAsCodigoDepartamento, parseAsDia } from "@/features/geo/estado-url"
 import {
+  parseAsCodigoDepartamento,
+  parseAsDia,
+} from "@/features/geo/estado-url"
+import {
+  diasEnRango,
   inicioDelDia,
   parsearFecha,
   periodoAnterior,
   PRESETS_RANGO,
+  rangoDesdePreset,
   type RangoFechas,
   serializarFecha,
   ZONA,
@@ -40,7 +46,8 @@ import {
 import { formatearFecha } from "@/lib/format"
 import type { FiltroDocumento } from "@/lib/export/marca"
 
-import type { ReporteCatalogo } from "./catalogo"
+import type { FiltroReporte, ReporteCatalogo } from "./catalogo"
+import type { ContextoDatos } from "./tipos"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -71,6 +78,9 @@ export type ValoresFiltros = inferParserType<typeof parsersFiltros>
 
 const cargarValores = createLoader(parsersFiltros)
 
+/** `?periodo=esteAno&departamento=05` a partir de los valores (enlaces que conservan filtros). */
+export const serializarFiltros = createSerializer(parsersFiltros)
+
 /** Filtros ya resueltos (fechas de Bogotá) con los que consultan los reportes. */
 export interface FiltrosReporte {
   rango: RangoFechas
@@ -82,15 +92,23 @@ export interface FiltrosReporte {
   agrupacion: Agrupacion
   /** Fecha de corte de la cartera (por defecto, hoy). */
   corte: Date
-  /** Mismo día del mes anterior: comparativo de la cartera. */
+  /** Mismo día (o cierre) del mes anterior: comparativo de la cartera. */
   corteAnterior: Date
 }
 
 const enBogota = { in: tz(ZONA) }
 
-/** Mismo día del mes anterior (o el último día, si ese mes es más corto). */
+/**
+ * Mismo día del mes anterior (o su último día, si ese mes es más corto). Un
+ * cierre de mes se compara con el cierre anterior: 30 de sept → 31 de ago.
+ */
 export function mesAntes(fecha: Date): Date {
-  return inicioDelDia(subMonths(fecha, 1, enBogota))
+  const anterior = subMonths(fecha, 1, enBogota)
+  return inicioDelDia(
+    isLastDayOfMonth(fecha, enBogota)
+      ? endOfMonth(anterior, enBogota)
+      : anterior
+  )
 }
 
 /** Un corte en el futuro no tiene sentido: se limita a hoy. */
@@ -98,6 +116,37 @@ export function resolverCorte(texto: string | null, ahora: Date): Date {
   const hoy = inicioDelDia(ahora)
   const elegido = parsearFecha(texto)
   return elegido && elegido.getTime() <= hoy.getTime() ? elegido : hoy
+}
+
+export const CORTES_SUGERIDOS = [
+  "hoy",
+  "finMes",
+  "finTrimestre",
+  "finAno",
+] as const
+export type CorteSugerido = (typeof CORTES_SUGERIDOS)[number]
+
+export const ETIQUETAS_CORTE: Readonly<Record<CorteSugerido, string>> = {
+  hoy: "Hoy",
+  finMes: "Cierre del mes anterior",
+  finTrimestre: "Cierre del trimestre anterior",
+  finAno: "Cierre del año anterior",
+}
+
+/** Fechas de corte habituales de la cartera (cierres contables), en Bogotá. */
+export function fechaCorteSugerido(corte: CorteSugerido, ahora: Date): Date {
+  const diaAntesDe = (preset: "esteTrimestre" | "esteAno") =>
+    inicioDelDia(subDays(rangoDesdePreset(preset, ahora).desde, 1, enBogota))
+  switch (corte) {
+    case "hoy":
+      return inicioDelDia(ahora)
+    case "finMes":
+      return rangoDesdePreset("mesAnterior", ahora).hasta
+    case "finTrimestre":
+      return diaAntesDe("esteTrimestre")
+    case "finAno":
+      return diaAntesDe("esteAno")
+  }
 }
 
 export function filtrosDesdeValores(
@@ -116,6 +165,53 @@ export function filtrosDesdeValores(
     corte,
     corteAnterior: mesAntes(corte),
   }
+}
+
+/**
+ * Deja solo los filtros que aplican (`filtrosPara` del catálogo). La URL
+ * puede traer de más —un enlace de otro reporte, o `?anunciante=` abierto por
+ * un anunciante—: lo que no aplica se descarta antes de consultar, para que
+ * el resumen, la portada de los documentos y la bitácora digan lo consultado.
+ */
+export function limitarFiltros(
+  aplicables: readonly FiltroReporte[],
+  filtros: FiltrosReporte
+): FiltrosReporte {
+  const usa = (filtro: FiltroReporte) => aplicables.includes(filtro)
+  return {
+    ...filtros,
+    departamento: usa("departamento") ? filtros.departamento : null,
+    anunciante: usa("anunciante") ? filtros.anunciante : null,
+    sector: usa("sector") ? filtros.sector : null,
+  }
+}
+
+/**
+ * Filtros de una exportación para la bitácora: solo los que aplican, con las
+ * fechas ya resueltas (un «últimos 30 días» de hoy no es el de mañana). Los
+ * anunciantes y sectores van por su id, nunca por su nombre.
+ */
+export function filtrosParaBitacora(
+  aplicables: readonly FiltroReporte[],
+  filtros: FiltrosReporte
+): Record<string, string> {
+  const usa = (filtro: FiltroReporte) => aplicables.includes(filtro)
+  const registro: Record<string, string> = {}
+  if (usa("periodo")) {
+    registro.periodo = filtros.rango.preset
+    registro.desde = serializarFecha(filtros.rango.desde)
+    registro.hasta = serializarFecha(filtros.rango.hasta)
+  }
+  if (usa("corte")) registro.corte = serializarFecha(filtros.corte)
+  if (usa("departamento") && filtros.departamento) {
+    registro.departamento = filtros.departamento
+  }
+  if (usa("anunciante") && filtros.anunciante) {
+    registro.anunciante = filtros.anunciante
+  }
+  if (usa("sector") && filtros.sector) registro.sector = filtros.sector
+  if (usa("agrupacion")) registro.agrupacion = filtros.agrupacion
+  return registro
 }
 
 /** Servidor: `await cargarFiltros(props.searchParams)`. */
@@ -163,6 +259,26 @@ export function entradaDesdeValores(valores: ValoresFiltros): EntradaFiltros {
     agrupacion: valores.agrupacion,
     corte: valores.corte,
   }
+}
+
+/**
+ * Las RPC de analítica aceptan periodos de hasta diez años (`rango_kpi`,
+ * migración `analitica_base`): más allá responden `AMO_CONFIG_INVALIDA`.
+ */
+export const MAXIMO_DIAS_PERIODO = 3661
+
+export const MENSAJE_PERIODO_EXCEDIDO =
+  "Los reportes consultan como máximo diez años. Elige un periodo más corto."
+
+/** El periodo supera lo que las RPC aceptan: no se consulta (ni se exporta). */
+export function periodoExcedido(
+  reporte: Pick<ReporteCatalogo, "filtros">,
+  filtros: Pick<FiltrosReporte, "rango">
+): boolean {
+  return (
+    reporte.filtros.includes("periodo") &&
+    diasEnRango(filtros.rango) > MAXIMO_DIAS_PERIODO
+  )
 }
 
 /** Argumentos de fecha de las RPC ('YYYY-MM-DD'). */
@@ -225,11 +341,14 @@ export function describirFiltros(
     reporte.filtros.includes(filtro)
 
   if (usa("periodo")) {
-    const etiqueta = etiquetaRango(filtros.rango)
     const fechas = fechasDelRango(filtros.rango)
+    // Un rango personalizado ya se nombra con sus fechas: no se repiten.
+    const personalizado = filtros.rango.preset === "personalizado"
     lista.push({
       etiqueta: "Periodo",
-      valor: etiqueta === fechas ? fechas : `${etiqueta} (${fechas})`,
+      valor: personalizado
+        ? fechas
+        : `${etiquetaRango(filtros.rango)} (${fechas})`,
     })
     if (reporte.comparativo) {
       lista.push({
@@ -276,4 +395,32 @@ export function describirFiltros(
     })
   }
   return lista
+}
+
+/**
+ * Lo que todo reporte sabe de su consulta: los filtros en palabras, el texto
+ * del comparativo ("frente al mes anterior (1–31 ago 2026)" o "frente al corte
+ * anterior (31 de agosto de 2026)") y el periodo que conservan los enlaces.
+ */
+export function contextoDatos(
+  reporte: Pick<ReporteCatalogo, "filtros" | "comparativo">,
+  filtros: FiltrosReporte,
+  nMinimo: number,
+  nombres: NombresFiltros = {}
+): ContextoDatos {
+  const usaCorte = reporte.filtros.includes("corte")
+  const comparacion = usaCorte
+    ? `frente al corte anterior (${formatearFecha(filtros.corteAnterior, "largo")})`
+    : textoComparacion(filtros)
+  return {
+    filtros: describirFiltros(reporte, filtros, nombres),
+    comparacion: reporte.comparativo ? comparacion : null,
+    nMinimo,
+    periodo: usaCorte
+      ? null
+      : {
+          desde: serializarFecha(filtros.rango.desde),
+          hasta: serializarFecha(filtros.rango.hasta),
+        },
+  }
 }

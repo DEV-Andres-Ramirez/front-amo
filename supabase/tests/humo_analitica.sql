@@ -8,6 +8,11 @@
 -- analitica.n_minimo_tasas se baja a 2 dentro de la transacción para ejercitar las tasas agregadas.
 -- Cada prueba deja `true` si pasa o un texto con lo observado si falla.
 begin;
+-- Límite del lado del servidor: la suite retira los datos demo dentro de la transacción (unos 15 s con el juego demo
+-- actual) y mientras tanto los mantiene bloqueados. Si no termina a tiempo (p. ej. espera a otra transacción), se
+-- cancela y revierte en vez de seguir viva cuando el cliente (MCP) ya dejó de esperar. No ejecutar en paralelo con
+-- otra suite que también purgue.
+set local statement_timeout = '45s';
 
 do $humo$
 declare
@@ -65,6 +70,11 @@ begin
   -- ── Preparación (owner, modo_carga): agosto de 2026 con julio como comparación ──────────────────────
   update public.configuracion set valor = to_jsonb(2) where clave = 'analitica.n_minimo_tasas';
   perform set_config('amo.modo_carga', 'on', true);
+  -- La suite compara valores exactos de toda la plataforma (KPI, embudo, mapa): los datos demo que traiga la BD se
+  -- retiran dentro de esta transacción con la purga de la propia BD; el rollback final los restaura.
+  perform set_config('amo.purga', 'on', true);
+  perform private.purgar_demo();
+  perform set_config('amo.purga', '', true);
   insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at)
   select u, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', e, now(), now(), now()
   from (values (u_adm, 'humo9.adm@amo.test'), (u_fin, 'humo9.fin@amo.test'), (u_ana, 'humo9.ana@amo.test'),
@@ -250,8 +260,13 @@ begin
   select jsonb_object_agg(s.segmento, s.cantidad) into v_j from public.salud_medios('2026-08-01', '2026-08-31') s;
   r := r || jsonb_build_object('a15_salud_medios',
     (select count(*) = 5 from jsonb_object_keys(v_j)) and (v_j ->> 'activos')::int >= 2 and (v_j ->> 'nuevos')::int >= 1);
+  -- «A hoy» con el reloj fijo: la ventana de actividad (medios.dias_actividad, 90 días) se mide desde private.ahora()
+  -- y los datos de la prueba son de julio y agosto de 2026; con la fecha real la aceptación del 10 de julio sale de la
+  -- ventana el 8 de octubre de 2026 y el GMV esperado dejaría de cumplirse.
+  perform set_config('amo.reloj', '2026-09-30 15:00:00+00', true);
   select jsonb_agg(jsonb_build_object('m', x.medio_id, 'g', x.gmv_90d, 'ab', x.asignaciones_abiertas) order by x.gmv_90d desc)
     into v_j from public.medios_en_riesgo(50) x where x.medio_id in (me_a, me_b);
+  perform set_config('amo.reloj', '', true);
   r := r || jsonb_build_object('a16_medios_en_riesgo',
     v_j = jsonb_build_array(jsonb_build_object('m', me_a, 'g', 700000, 'ab', 1), jsonb_build_object('m', me_b, 'g', 300000, 'ab', 0)));
   select count(*) as filas, sum(h.cantidad) as total, max(h.cantidad) filter (where h.dia_semana = 1 and h.hora = 10) as lunes_10

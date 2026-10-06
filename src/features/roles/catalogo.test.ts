@@ -104,9 +104,9 @@ describe("búsqueda de permisos", () => {
   })
 
   it("exige todas las palabras en la descripción, la clave o el módulo", () => {
-    expect(coincideBusqueda("liquidaciones.aprobar", "liquidacion aprobar")).toBe(
-      true
-    )
+    expect(
+      coincideBusqueda("liquidaciones.aprobar", "liquidacion aprobar")
+    ).toBe(true)
     expect(coincideBusqueda("usuarios.invitar", "Usuarios")).toBe(true)
     expect(coincideBusqueda("usuarios.invitar", "invitar pagos")).toBe(false)
     expect(coincideBusqueda("reportes.ver", "   ")).toBe(true)

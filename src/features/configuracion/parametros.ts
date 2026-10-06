@@ -271,7 +271,8 @@ export const FICHAS: Readonly<Record<string, FichaParametro>> = {
     grupo: "cortes",
     titulo: "Cortes requeridos",
     defecto: ["H24", "H72", "D7"],
-    impacto: "Aplica a las ofertas nuevas; las publicadas conservan sus cortes.",
+    impacto:
+      "Aplica a las ofertas nuevas; las publicadas conservan sus cortes.",
   },
   "metricas.plazo_carga_horas": {
     grupo: "cortes",
@@ -514,7 +515,9 @@ export function tituloParametro(clave: string): string {
 
 export function grupoDe(clave: string): GrupoParametros {
   const id = FICHAS[clave]?.grupo ?? GRUPO_OTROS
-  return GRUPOS_POR_ID.get(id) ?? (GRUPOS_POR_ID.get(GRUPO_OTROS) as GrupoParametros)
+  return (
+    GRUPOS_POR_ID.get(id) ?? (GRUPOS_POR_ID.get(GRUPO_OTROS) as GrupoParametros)
+  )
 }
 
 /** Las comisiones exigen además `configuracion.comisiones` (RLS de §3.2). */

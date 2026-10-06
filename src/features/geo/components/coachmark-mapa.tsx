@@ -75,11 +75,19 @@ export function CoachmarkMapa({
         <m.div
           role="dialog"
           aria-label="Cómo usar el mapa"
-          initial={{ opacity: 0, y: reducido ? 0 : 12, scale: reducido ? 1 : 0.98 }}
+          initial={{
+            opacity: 0,
+            y: reducido ? 0 : 12,
+            scale: reducido ? 1 : 0.98,
+          }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: reducido ? 0 : 8 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
-          className={cn(CLASE_PANEL, "flex w-[min(22rem,calc(100%-2rem))] items-start gap-3 p-3.5", className)}
+          className={cn(
+            CLASE_PANEL,
+            "flex w-[min(22rem,calc(100%-2rem))] items-start gap-3 p-3.5",
+            className
+          )}
         >
           <span className="relative grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
             <span
@@ -97,7 +105,12 @@ export function CoachmarkMapa({
               <span className="font-semibold">Explorar</span>
               {tactil ? "" : " o doble clic"} para bajar de nivel.
             </p>
-            <Button size="sm" variant="secondary" className="self-start" onClick={marcarVisto}>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="self-start"
+              onClick={marcarVisto}
+            >
               Entendido
             </Button>
           </div>

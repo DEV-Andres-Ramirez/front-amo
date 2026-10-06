@@ -44,6 +44,17 @@ export interface TarjetaKpiProps {
   /** Toda la tarjeta enlaza al detalle (reporte o sección). */
   href?: Route
   etiquetaComparacion?: string
+  /**
+   * El indicador no se compara con otro periodo (una foto de hoy, un total a
+   * la fecha): en lugar de la variación se muestra este rótulo, que dice por
+   * qué («Foto de hoy»). Se ignoran `valorAnterior` y `variacion`.
+   */
+  sinComparativo?: string
+  /**
+   * Texto cuando no hay valor. Un indicador a fecha de corte no tiene
+   * «periodo»: quien lo usa dice qué falta («Sin saldo a la fecha de corte»).
+   */
+  textoSinDatos?: string
   cargando?: boolean
   /** Posición en la rejilla: escalona la entrada. */
   indice?: number
@@ -134,8 +145,9 @@ function EsqueletoContenido() {
 
 /**
  * Tarjeta de indicador: cifra animada (NumberFlow), variación frente al
- * periodo anterior con color según el sentido del KPI, sparkline y definición
- * a un toque. Estados: cargando, sin datos y muestra insuficiente (n < mínimo).
+ * periodo anterior con color según el sentido del KPI (o el rótulo de por qué
+ * no se compara), sparkline y definición a un toque. Estados: cargando, sin
+ * datos y muestra insuficiente (n < mínimo).
  */
 export function TarjetaKpi({
   titulo,
@@ -151,6 +163,8 @@ export function TarjetaKpi({
   icono: Icono,
   href,
   etiquetaComparacion = "vs. periodo anterior",
+  sinComparativo,
+  textoSinDatos = "Sin datos en el periodo",
   cargando = false,
   indice = 0,
   className,
@@ -158,8 +172,10 @@ export function TarjetaKpi({
   const clases = cn(
     "group/kpi relative flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-3.5 sm:p-4",
     "animate-aparecer-arriba motion-reduce:animate-none",
+    // El enlace cubre toda la tarjeta: su foco de teclado se dibuja en ella
+    // con el anillo de marca (un simple cambio de borde no se distinguía).
     href &&
-      "transition-[border-color,box-shadow,translate] duration-300 ease-suave hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-glow has-[a:focus-visible]:border-primary/50 motion-reduce:hover:translate-y-0",
+      "transition-[border-color,box-shadow,translate] duration-300 ease-suave hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-glow has-[a:focus-visible]:border-primary has-[a:focus-visible]:anillo-foco motion-reduce:hover:translate-y-0",
     className
   )
   const estilo = { animationDelay: `${indice * 55}ms` }
@@ -175,9 +191,10 @@ export function TarjetaKpi({
 
   const muestraInsuficiente = n != null && nMinimo != null && n < nMinimo
   const sinValor = valor === null || !Number.isFinite(valor)
-  const delta = sinValor
-    ? null
-    : presentarDelta({ valor, valorAnterior, variacion, unidad, sentido })
+  const delta =
+    sinValor || sinComparativo
+      ? null
+      : presentarDelta({ valor, valorAnterior, variacion, unidad, sentido })
   const formato = sinValor ? null : formatoCifraKpi(unidad, valor)
   const tieneSerie = (serie?.filter((v) => v !== null).length ?? 0) > 1
 
@@ -243,8 +260,14 @@ export function TarjetaKpi({
                   </span>
                 </>
               ) : (
-                "Sin datos en el periodo"
+                textoSinDatos
               )}
+            </p>
+          ) : sinComparativo ? (
+            <p className="line-clamp-2 max-w-full text-[0.6875rem] leading-tight text-pretty text-muted-foreground">
+              {muestraInsuficiente
+                ? `${sinComparativo} · n = ${formatearNumero(n)}`
+                : sinComparativo}
             </p>
           ) : delta ? (
             <>

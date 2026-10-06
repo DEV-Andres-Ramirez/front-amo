@@ -1,10 +1,9 @@
 "use client"
 
 import { ArrowLeft, MailCheck } from "lucide-react"
-import Link from "next/link"
 import { useActionState, useState } from "react"
 
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 
 import type { CamposFormularioAuth } from "../acciones-contrato"
 import { ACCIONES_AUTH } from "./acciones"
@@ -49,16 +48,15 @@ function SolicitudEnviada({ aviso }: { aviso?: string }) {
           </p>
         ) : null}
       </div>
-      <Button
+      <EnlaceBoton
         variant="outline"
         size="lg"
         className="h-10"
-        nativeButton={false}
-        render={<Link href="/ingresar" />}
+        href="/ingresar"
       >
         <ArrowLeft data-icon="inline-start" aria-hidden />
         Volver a ingresar
-      </Button>
+      </EnlaceBoton>
     </div>
   )
 }

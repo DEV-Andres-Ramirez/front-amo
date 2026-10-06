@@ -3,11 +3,10 @@ import "server-only"
 import { cache } from "react"
 
 import { perfilesVisibles } from "@/features/auditoria/servidor"
+import type { OpcionCatalogo } from "@/features/operacion/tipos"
 import { tieneAlgunPermiso } from "@/lib/auth/dal"
+import { registrarEvento } from "@/lib/auth/registro"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
-import { crearClienteAdmin } from "@/lib/supabase/admin"
-import { obtenerContextoSolicitud } from "@/lib/supabase/contexto"
-import { argumentosRpc } from "@/lib/supabase/rpc"
 import { crearClienteServidor } from "@/lib/supabase/server"
 import type { Json } from "@/types/database.types"
 
@@ -46,7 +45,10 @@ export function informar(operacion: string, error: unknown): void {
 type Respuesta<T> = PromiseLike<{ data: T | null; error: ErrorConsulta | null }>
 
 /** Espera una consulta y devuelve sus filas, o lanza con la operación en el mensaje. */
-export async function leer<T>(operacion: string, consulta: Respuesta<T>): Promise<T> {
+export async function leer<T>(
+  operacion: string,
+  consulta: Respuesta<T>
+): Promise<T> {
   const { data, error } = await consulta
   if (error) fallar(operacion, error)
   if (data === null) throw new Error(`No se pudo ${operacion} (sin datos).`)
@@ -64,49 +66,9 @@ export function numero(valor: unknown): number {
   return numeroONulo(valor) ?? 0
 }
 
-const N_MINIMO_POR_DEFECTO = 20
-
-/**
- * `analitica.n_minimo_tasas` (docs/modelo-datos.md §7). Quien no puede leer
- * la configuración recibe el valor por defecto: es el mismo que usa la BD.
- */
-export const nMinimoTasas = cache(async (): Promise<number> => {
-  const supabase = await crearClienteServidor()
-  const { data } = await supabase
-    .from("configuracion")
-    .select("valor")
-    .eq("clave", "analitica.n_minimo_tasas")
-    .maybeSingle()
-  const valor = numeroONulo(data?.valor)
-  return valor !== null && valor >= 1 ? Math.round(valor) : N_MINIMO_POR_DEFECTO
-})
-
 // ── Opciones de los filtros ──────────────────────────────────────────────────
 
-export interface OpcionCatalogo {
-  id: string
-  nombre: string
-}
-
-const LIMITE_ANUNCIANTES = 1000
-
-/** Anunciantes para el filtro (requiere `anunciantes.ver`; sin él, lista vacía). */
-export const opcionesAnunciantes = cache(
-  async (usuario: UsuarioSesion): Promise<OpcionCatalogo[]> => {
-    if (!tieneAlgunPermiso(usuario, ["anunciantes.ver"])) return []
-    const supabase = await crearClienteServidor()
-    const filas = await leer(
-      "listar los anunciantes",
-      supabase
-        .from("anunciantes")
-        .select("id, nombre_comercial")
-        .is("deleted_at", null)
-        .order("nombre_comercial")
-        .limit(LIMITE_ANUNCIANTES)
-    )
-    return filas.map((fila) => ({ id: fila.id, nombre: fila.nombre_comercial }))
-  }
-)
+export type { OpcionCatalogo }
 
 export const opcionesSectores = cache(async (): Promise<OpcionCatalogo[]> => {
   const supabase = await crearClienteServidor()
@@ -131,36 +93,18 @@ export const ENTIDAD_REPORTES = "reportes"
  * formato, las filas y los filtros. Se registra ANTES de entregar los datos:
  * la exportación queda auditada aunque el navegador no genere el archivo.
  */
-export async function registrarExportacionReporte(
+export function registrarExportacionReporte(
   actor: UsuarioSesion,
   reporte: SlugReporte,
   metadatos: Record<string, Json>
 ): Promise<boolean> {
-  try {
-    const [admin, solicitud] = await Promise.all([
-      crearClienteAdmin({ actorId: actor.id }),
-      obtenerContextoSolicitud(),
-    ])
-    const { error } = await admin.rpc(
-      "registrar_evento_srv",
-      argumentosRpc<"registrar_evento_srv">({
-        p_actor_id: actor.id,
-        p_accion: "EXPORTAR",
-        p_entidad: ENTIDAD_REPORTES,
-        p_entidad_id: reporte,
-        p_metadatos: metadatos,
-        p_ip: solicitud.ip,
-        p_pais: solicitud.pais,
-        p_ciudad: solicitud.ciudad,
-        p_ua: solicitud.userAgent,
-      })
-    )
-    if (error) throw error
-    return true
-  } catch (error) {
-    informar(`registrar_evento_srv(EXPORTAR ${reporte})`, error)
-    return false
-  }
+  return registrarEvento({
+    actorId: actor.id,
+    accion: "EXPORTAR",
+    entidad: ENTIDAD_REPORTES,
+    entidadId: reporte,
+    metadatos,
+  })
 }
 
 export interface UltimaExportacion {
@@ -199,9 +143,12 @@ async function ultimasDelEquipo(
   const primeras = new Map<SlugReporte, (typeof filas)[number]>()
   for (const fila of filas) {
     const slug = fila.entidad_id
-    if (slug && esSlugReporte(slug) && !primeras.has(slug)) primeras.set(slug, fila)
+    if (slug && esSlugReporte(slug) && !primeras.has(slug))
+      primeras.set(slug, fila)
   }
-  const actores = [...primeras.values()].flatMap((f) => (f.actor_id ? [f.actor_id] : []))
+  const actores = [...primeras.values()].flatMap((f) =>
+    f.actor_id ? [f.actor_id] : []
+  )
   const perfiles = await perfilesVisibles(actores)
   return Object.fromEntries(
     [...primeras].map(([slug, fila]) => {
@@ -239,7 +186,12 @@ async function ultimasPropias(): Promise<
       esSlugReporte(slug) &&
       !resultado[slug]
     ) {
-      resultado[slug] = { at: fila.created_at, formato: null, por: null, propia: true }
+      resultado[slug] = {
+        at: fila.created_at,
+        formato: null,
+        por: null,
+        propia: true,
+      }
     }
   }
   return resultado

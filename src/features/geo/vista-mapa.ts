@@ -39,7 +39,18 @@ export interface EntradaVistaMapa {
 }
 
 export interface VistaMapa {
+  /**
+   * Sin actividad (ver `sinActividad`) no hay puestos ni participación y
+   * `conDatos` es 0: el ámbito se presenta como un mapa sin datos.
+   */
   readonly ranking: Ranking
+  /**
+   * Métrica aditiva sin ningún valor positivo. En departamentos y municipios
+   * la BD devuelve una fila por zona aunque valga 0; si todas valen 0, el
+   * periodo no tuvo actividad en el ámbito y un "Puesto 1 de 33" o un mapa
+   * pintado de un solo color dirían lo contrario.
+   */
+  readonly sinActividad: boolean
   readonly escala: EscalaCoropletica
   /** Color por código de polígono (solo zonas con dato). */
   readonly colores: ReadonlyMap<string, string>
@@ -63,6 +74,19 @@ function zonaSinDato({ codigo, nombre }: ZonaDibujable): ValorZona {
   }
 }
 
+/** Ranking de un ámbito sin actividad: los ceros se listan, pero sin puesto. */
+function rankingSinActividad(ranking: Ranking): Ranking {
+  return {
+    ...ranking,
+    filas: ranking.filas.map((fila) => ({
+      ...fila,
+      posicion: null,
+      participacion: null,
+    })),
+    conDatos: 0,
+  }
+}
+
 export function construirVistaMapa({
   filas,
   universo,
@@ -80,17 +104,27 @@ export function construirVistaMapa({
     }
   }
 
-  const ranking = construirRanking(zonas, opciones)
-  const valores = ranking.filas.flatMap((fila) =>
-    fila.valor === null ? [] : [fila.valor]
+  const completo = construirRanking(zonas, opciones)
+  const sinActividad =
+    aditiva &&
+    completo.conDatos > 0 &&
+    completo.filas.every((fila) => fila.valor === null || fila.valor <= 0)
+  const ranking = sinActividad ? rankingSinActividad(completo) : completo
+  // Solo se colorean las zonas con dato; sin actividad, ninguna.
+  const coloreables = sinActividad
+    ? []
+    : ranking.filas.flatMap((fila) =>
+        fila.valor === null ? [] : [{ codigo: fila.codigo, valor: fila.valor }]
+      )
+  const escala = crearEscalaCuantiles(
+    coloreables.map((zona) => zona.valor),
+    { tema }
   )
-  const escala = crearEscalaCuantiles(valores, { tema })
 
   const colores = new Map<string, string>()
   const claseDe = new Map<string, number>()
   const conteos = escala.leyenda.map(() => 0)
-  for (const fila of ranking.filas) {
-    if (fila.valor === null) continue
+  for (const fila of coloreables) {
     const clase = clasificar(fila.valor, escala.cortes)
     colores.set(fila.codigo, escala.colores[clase] ?? escala.colorSinDatos)
     claseDe.set(fila.codigo, clase)
@@ -99,6 +133,7 @@ export function construirVistaMapa({
 
   return {
     ranking,
+    sinActividad,
     escala,
     colores,
     claseDe,

@@ -1,10 +1,9 @@
 import { House, ShieldAlert } from "lucide-react"
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { IlustracionAnillos } from "@/components/feedback/ilustraciones"
 import { ContenedorPagina } from "@/components/layout/contenedor-pagina"
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { RUTA_INICIO } from "@/lib/auth/navegacion"
 
 export const metadata: Metadata = { title: "Sin permiso" }
@@ -35,14 +34,10 @@ export default function SinPermiso() {
             tu trabajo, pídeselo a un administrador.
           </p>
         </div>
-        <Button
-          size="lg"
-          nativeButton={false}
-          render={<Link href={RUTA_INICIO} />}
-        >
+        <EnlaceBoton size="lg" href={RUTA_INICIO}>
           <House data-icon="inline-start" aria-hidden />
           Ir al inicio
-        </Button>
+        </EnlaceBoton>
       </div>
     </ContenedorPagina>
   )

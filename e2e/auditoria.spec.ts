@@ -1,17 +1,18 @@
-import { expect, type Page, test } from "@playwright/test"
-
-import { generarContrasena } from "../scripts/bootstrap/contrasena"
 import {
-  asegurarTotp,
   clienteComoSuperadmin,
-  codigoTotpEstable,
   type CuentaE2E,
-  emailDe,
-  prepararCuenta,
 } from "../scripts/bootstrap/provision-e2e"
 import type { ClienteSupabase } from "../scripts/bootstrap/supabase"
-import { PASO_TOTP_SEGUNDOS } from "../scripts/bootstrap/totp"
 import { credenciales, entorno, ingresar } from "./utilidades/cuentas"
+import {
+  abrirSesionMfa,
+  type CookiesSesion,
+  type CredencialesMfa,
+  prepararCuentaMfa,
+  usarSesion,
+} from "./utilidades/mfa"
+import { expect, test } from "./utilidades/prueba"
+import { PROYECTO_CON_CUENTAS } from "./utilidades/proyectos"
 
 /**
  * Auditoría (bitácora) y Accesos contra `pnpm build && pnpm start` y el
@@ -34,40 +35,6 @@ const AUDITOR: CuentaE2E = {
   conTotp: true,
 }
 
-const PROYECTO_CON_CUENTAS = "escritorio"
-
-interface CredencialesAuditor {
-  id: string
-  email: string
-  password: string
-  secreto: string
-}
-
-let ultimoPasoTotp = Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-
-/** Código de un periodo TOTP posterior al último usado (Supabase no acepta repetirlo). */
-async function codigoNuevo(secreto: string): Promise<string> {
-  const pasoActual = () => Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-  while (pasoActual() <= ultimoPasoTotp) {
-    await new Promise((resolver) => setTimeout(resolver, 1000))
-  }
-  const codigo = await codigoTotpEstable(secreto)
-  ultimoPasoTotp = pasoActual()
-  return codigo
-}
-
-async function ingresarComoAuditor(
-  page: Page,
-  auditor: CredencialesAuditor
-): Promise<void> {
-  await ingresar(page, auditor)
-  await expect(page).toHaveURL(/\/mfa\/verificar/)
-  await page
-    .getByLabel("Código de verificación")
-    .fill(await codigoNuevo(auditor.secreto))
-  await expect(page).toHaveURL(/\/inicio$/)
-}
-
 /** Espera a que el registro de la exportación llegue a la bitácora. */
 async function exportacionesRegistradas(
   servicio: ClienteSupabase,
@@ -85,39 +52,35 @@ async function exportacionesRegistradas(
 }
 
 const TITULO_EVENTO_PERFIL = /^(Editó|Creó|Cambió el estado de) un usuario$/
+const INICIO_EVENTO_PERFIL = /^(Editó|Creó|Cambió el estado de) un usuario\b/
 
 test.describe("auditoría y accesos", () => {
   test.describe.configure({ mode: "serial", timeout: 150_000 })
 
-  let auditor: CredencialesAuditor
+  let auditor: CredencialesMfa
+  let sesionAuditor: CookiesSesion
   let servicio: ClienteSupabase
 
   // Playwright exige desestructurar los fixtures aunque no se usen.
-  test.beforeAll(async ({}, info) => {
+  test.beforeAll(async ({ browser }, info) => {
     info.skip(
       info.project.name !== PROYECTO_CON_CUENTAS,
       "Cuenta compartida y datos reales: esta suite corre solo en el proyecto de escritorio."
     )
     info.setTimeout(90_000)
     servicio = await clienteComoSuperadmin(entorno)
-    const email = emailDe(AUDITOR)
-    const password = generarContrasena()
-    const id = await prepararCuenta(servicio, AUDITOR, password)
-    const secreto = await asegurarTotp(
-      entorno,
-      servicio,
-      id,
-      { email, password },
-      undefined
+    auditor = await prepararCuentaMfa(servicio, AUDITOR)
+    sesionAuditor = await abrirSesionMfa(
+      browser,
+      info.project.use.baseURL,
+      auditor
     )
-    ultimoPasoTotp = Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-    auditor = { id, email, password, secreto }
   })
 
   test("bitácora: indicadores, búsqueda, visor de diferencias y enlace directo", async ({
     page,
   }) => {
-    await ingresarComoAuditor(page, auditor)
+    await usarSesion(page, sesionAuditor)
     // La búsqueda cubre el id de la entidad: los eventos del perfil del auditor.
     await page.goto(`/administracion/auditoria?q=${auditor.id}`)
     await expect(
@@ -157,7 +120,7 @@ test.describe("auditoría y accesos", () => {
   })
 
   test("línea de tiempo agrupada por día", async ({ page }) => {
-    await ingresarComoAuditor(page, auditor)
+    await usarSesion(page, sesionAuditor)
     await page.goto(`/administracion/auditoria?q=${auditor.id}`)
     await page.getByRole("button", { name: "Línea de tiempo" }).click()
     await expect
@@ -169,11 +132,15 @@ test.describe("auditoría y accesos", () => {
     await expect(
       linea.getByRole("heading", { level: 3, name: /^Hoy/ })
     ).toBeVisible()
+    // En la línea de tiempo el botón del evento nombra además el resumen del
+    // cambio, el actor y el origen.
     await linea
-      .getByRole("button", { name: TITULO_EVENTO_PERFIL })
+      .getByRole("button", { name: INICIO_EVENTO_PERFIL })
       .first()
       .click()
-    await expect(page.getByRole("dialog")).toBeVisible()
+    await expect(
+      page.getByRole("dialog", { name: TITULO_EVENTO_PERFIL })
+    ).toBeVisible()
   })
 
   test("exportar la bitácora genera el archivo y deja constancia", async ({
@@ -184,7 +151,7 @@ test.describe("auditoría y accesos", () => {
       auditor.id,
       "bitacora"
     )
-    await ingresarComoAuditor(page, auditor)
+    await usarSesion(page, sesionAuditor)
     await page.goto(`/administracion/auditoria?q=${auditor.id}`)
 
     const descarga = page.waitForEvent("download")
@@ -209,7 +176,7 @@ test.describe("auditoría y accesos", () => {
   test("accesos: el ingreso aparece con su resultado, filtros y exportación", async ({
     page,
   }) => {
-    await ingresarComoAuditor(page, auditor)
+    await usarSesion(page, sesionAuditor)
     await page.goto("/administracion/accesos")
     await expect(
       page.getByRole("heading", { level: 1, name: "Accesos" })

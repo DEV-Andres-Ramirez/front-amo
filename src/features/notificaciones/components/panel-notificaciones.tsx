@@ -1,11 +1,11 @@
 "use client"
 
 import { ArrowRight, BellOff, Check, CheckCheck, RotateCw } from "lucide-react"
-import Link from "next/link"
 import type { ReactNode } from "react"
 import { toast } from "sonner"
 
 import { Esqueleto } from "@/components/feedback/esqueletos"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { Button } from "@/components/ui/button"
 import { PopoverDescription, PopoverTitle } from "@/components/ui/popover"
 import {
@@ -202,15 +202,15 @@ export function PanelNotificaciones({
       </div>
 
       <div className="border-t p-1.5">
-        <Button
+        <EnlaceBoton
           variant="ghost"
           className="w-full justify-between"
-          nativeButton={false}
-          render={<Link href={RUTA_NOTIFICACIONES} onClick={onCerrar} />}
+          href={RUTA_NOTIFICACIONES}
+          onClick={onCerrar}
         >
           Ver todas las notificaciones
           <ArrowRight aria-hidden data-icon="inline-end" />
-        </Button>
+        </EnlaceBoton>
       </div>
     </>
   )

@@ -12,7 +12,13 @@ import { MapaCalorActividad } from "@/components/charts/mapa-calor-actividad"
 import { TarjetaGrafico } from "@/components/charts/tarjeta-grafico"
 import { ControlSegmentado } from "@/features/roles/components/control-segmentado"
 
-import { type FuenteActividad, picoActividad, totalCalor } from "../datos"
+import { SegmentosEnLinea } from "../../components/segmentos-en-linea"
+import {
+  ALTO_MAPA_CALOR,
+  type FuenteActividad,
+  picoActividad,
+  totalCalor,
+} from "../datos"
 
 const FUENTES: Readonly<
   Record<FuenteActividad, { etiqueta: string; unidad: Unidad; vacio: string }>
@@ -37,6 +43,9 @@ const FUENTES: Readonly<
 /**
  * Actividad por día de la semana y hora de Bogotá. Las fuentes llegan todas
  * desde el servidor (168 celdas cada una): cambiar de fuente es inmediato.
+ * El selector de fuente va en el encabezado si la celda mide al menos 36 rem
+ * y, si no, al pie: junto a las acciones de la tarjeta dejaba el título y la
+ * descripción con dos palabras por línea.
  */
 export function MapaCalorPanel({
   fuentes,
@@ -51,6 +60,10 @@ export function MapaCalorPanel({
   const [fuente, setFuente] = useState<FuenteActividad>(
     disponibles[0] ?? "asignaciones"
   )
+  const opciones = disponibles.map((valor) => ({
+    valor,
+    etiqueta: FUENTES[valor].etiqueta,
+  }))
   const celdas = fuentes[fuente] ?? []
   const { unidad, vacio } = FUENTES[fuente]
   const total = totalCalor(celdas)
@@ -59,21 +72,18 @@ export function MapaCalorPanel({
   return (
     <TarjetaGrafico
       titulo="Actividad por día y hora"
-      descripcion="Cuándo ocurre la actividad (hora de Bogotá), sumada en el periodo."
-      alto="min-h-72"
+      descripcion="Hora de Bogotá, sumada en el periodo."
+      alto={ALTO_MAPA_CALOR}
       nombreArchivo={`Actividad por día y hora · ${FUENTES[fuente].etiqueta}`}
       className={className}
       acciones={
         disponibles.length > 1 ? (
           <ControlSegmentado
             etiqueta="Fuente de la actividad"
-            opciones={disponibles.map((valor) => ({
-              valor,
-              etiqueta: FUENTES[valor].etiqueta,
-            }))}
+            opciones={opciones}
             valor={fuente}
             onCambio={setFuente}
-            className="w-auto max-sm:hidden"
+            className="w-auto @max-xl/bloque:hidden"
           />
         ) : null
       }
@@ -81,27 +91,26 @@ export function MapaCalorPanel({
         total === 0 ? { titulo: "Sin actividad", descripcion: vacio } : false
       }
       pie={
-        <div className="flex flex-col gap-2">
+        // `span` y control en línea: en pantalla completa el pie va en un `<p>`.
+        // Ahí (fuera de la celda) el control del pie es el único que se ve.
+        <span className="flex flex-col gap-2">
           {disponibles.length > 1 ? (
-            <ControlSegmentado
+            <SegmentosEnLinea
               etiqueta="Fuente de la actividad"
-              opciones={disponibles.map((valor) => ({
-                valor,
-                etiqueta: FUENTES[valor].etiqueta,
-              }))}
+              opciones={opciones}
               valor={fuente}
               onCambio={setFuente}
-              className="sm:hidden"
+              className="@xl/bloque:hidden"
             />
           ) : null}
           {pico ? (
             <span className="cifras">
               {conUnidad(total, unidad)} en total · pico el{" "}
-              {DIAS_SEMANA[pico.diaSemana - 1].toLocaleLowerCase("es-CO")}{" "}
-              de {franjaHoraria(pico.hora)} ({conUnidad(pico.cantidad, unidad)})
+              {DIAS_SEMANA[pico.diaSemana - 1].toLocaleLowerCase("es-CO")} de{" "}
+              {franjaHoraria(pico.hora)} ({conUnidad(pico.cantidad, unidad)})
             </span>
           ) : null}
-        </div>
+        </span>
       }
     >
       <MapaCalorActividad

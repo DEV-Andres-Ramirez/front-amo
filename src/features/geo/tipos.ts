@@ -22,7 +22,7 @@ export interface ConsultaDetalleGeo extends ConsultaMapaGeo {
   readonly zona: string
   /** Métricas de las tarjetas del detalle (las del nivel que el usuario puede ver). */
   readonly metricasKpi: readonly MetricaGeo[]
-  /** Incluir los medios destacados de la zona (requiere `reportes.ver`). */
+  /** Incluir los medios destacados de la zona (requiere `medios.ver` y `asignaciones.ver`). */
   readonly conMedios: boolean
 }
 
@@ -80,6 +80,13 @@ export interface KpiZona {
   readonly metrica: MetricaGeo
   readonly valor: number | null
   readonly n: number | null
+  /**
+   * Valor del periodo anterior de igual duración; `null` sin comparativo
+   * (fotos actuales, tasas con muestra insuficiente).
+   */
+  readonly anterior: number | null
+  /** (valor − anterior) / anterior; `null` si el anterior es 0 o no existe. */
+  readonly variacion: number | null
 }
 
 export interface PuntoSerieZona {
@@ -131,15 +138,15 @@ export interface RespuestaDetalleGeo {
   readonly sinSerie: MotivoSinSerie | null
   /** Subzonas con mayor valor (departamentos de Colombia, municipios de un departamento). */
   readonly top: TopZona | null
-  /** Medios con más asignaciones en la zona (solo con `reportes.ver`). */
+  /** Medios con más GMV comprometido en la zona (solo si `conMedios`). */
   readonly medios: TopZona | null
   readonly origen: OrigenDatosGeo
 }
 
 /**
  * Fuente de datos del explorador. Dos implementaciones: Supabase (RPC
- * `geo_metricas` y lecturas con la RLS del usuario, producción) y simulada
- * (determinista, solo desarrollo y pruebas).
+ * `geo_metricas` y `detalle_zona_geo`, y lecturas con la RLS del usuario;
+ * producción) y simulada (determinista, solo desarrollo y pruebas).
  */
 export interface ProveedorMetricasGeo {
   mapa(consulta: ConsultaMapaGeo): Promise<RespuestaMapaGeo>
@@ -148,10 +155,7 @@ export interface ProveedorMetricasGeo {
 }
 
 export type MotivoErrorGeo =
-  | "no-disponible"
-  | "no-autorizado"
-  | "consulta-invalida"
-  | "fallo"
+  "no-disponible" | "no-autorizado" | "consulta-invalida" | "fallo"
 
 /** Error esperado de un proveedor; el Route Handler lo traduce a un estado HTTP. */
 export class ErrorDatosGeo extends Error {

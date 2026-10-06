@@ -16,6 +16,7 @@ import Link from "next/link"
 import { type ReactNode, useState } from "react"
 import { toast } from "sonner"
 
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -386,14 +387,10 @@ export function PanelDetalleEvento({
               )}
             >
               {ruta ? (
-                <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href={ruta} />}
-                >
+                <EnlaceBoton variant="outline" href={ruta}>
                   {evento.textoRuta}
                   <ArrowRight data-icon="inline-end" aria-hidden />
-                </Button>
+                </EnlaceBoton>
               ) : null}
               <Button variant="ghost" onClick={copiarEnlace}>
                 <Copy data-icon="inline-start" aria-hidden />

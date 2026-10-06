@@ -24,7 +24,11 @@ export const TIPOS_RETENCION = ENUMS.retencion_tipo
 export const TIPOS_DOCUMENTO_ELECTRONICO = ENUMS.documento_electronico_tipo
 export const TIPOS_TERMINOS = ENUMS.terminos_tipo
 export const CANALES = ENUMS.notificacion_canal
-export const CONCEPTOS_RETENCION = ["SERVICIOS", "PUBLICIDAD", "HONORARIOS"] as const
+export const CONCEPTOS_RETENCION = [
+  "SERVICIOS",
+  "PUBLICIDAD",
+  "HONORARIOS",
+] as const
 export const CLAVES_FORMATO = [
   "POST_FEED",
   "REEL",
@@ -177,9 +181,7 @@ const valorJson: z.ZodType<ValorParametro> = z.union([
 ])
 
 export const esquemaGuardarParametro = z.object({
-  clave: z
-    .string()
-    .regex(PATRON_CLAVE_PARAMETRO, "Parámetro desconocido."),
+  clave: z.string().regex(PATRON_CLAVE_PARAMETRO, "Parámetro desconocido."),
   valor: valorJson,
   actualizadoAt: marcaTiempo,
 })
@@ -192,8 +194,14 @@ export interface OpcionesValidacionValor {
 }
 
 function enRango(reglas: ReglasParametro) {
-  const min = reglas.tipo === "PORCENTAJE" ? Math.max(0, reglas.minimo ?? 0) : reglas.minimo
-  const max = reglas.tipo === "PORCENTAJE" ? Math.min(1, reglas.maximo ?? 1) : reglas.maximo
+  const min =
+    reglas.tipo === "PORCENTAJE"
+      ? Math.max(0, reglas.minimo ?? 0)
+      : reglas.minimo
+  const max =
+    reglas.tipo === "PORCENTAJE"
+      ? Math.min(1, reglas.maximo ?? 1)
+      : reglas.maximo
   return { min, max }
 }
 
@@ -203,8 +211,9 @@ function textoRango(
   max: number | null
 ): string {
   const f = (n: number) =>
-    reglas.tipo === "PORCENTAJE" ? `${formato(n * 100)} %` : formato(n)
-  if (min !== null && max !== null) return `Debe estar entre ${f(min)} y ${f(max)}.`
+    reglas.tipo === "PORCENTAJE" ? `${formato(n * 100)}%` : formato(n)
+  if (min !== null && max !== null)
+    return `Debe estar entre ${f(min)} y ${f(max)}.`
   if (min !== null) return `Debe ser al menos ${f(min)}.`
   return `No puede pasar de ${f(max ?? 0)}.`
 }
@@ -284,7 +293,13 @@ export function esquemaValorParametro(
 
 // ── Tarifas ─────────────────────────────────────────────────────────────────
 
-export const INICIOS_TARIFA = ["pronto", "manana", "lunes", "mes", "fecha"] as const
+export const INICIOS_TARIFA = [
+  "pronto",
+  "manana",
+  "lunes",
+  "mes",
+  "fecha",
+] as const
 export type InicioTarifa = (typeof INICIOS_TARIFA)[number]
 
 /** Cuánto después de "ahora" entra una tarifa "lo antes posible" (margen de reloj). */
@@ -351,7 +366,10 @@ export const esquemaFranja = z
         message: "Usa F seguida de un dígito (F4).",
       })
     }
-    if (datos.seguidoresMax !== null && datos.seguidoresMax <= datos.seguidoresMin) {
+    if (
+      datos.seguidoresMax !== null &&
+      datos.seguidoresMax <= datos.seguidoresMin
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["seguidoresMax"],
@@ -431,7 +449,11 @@ export const esquemaExcepcion = z
       })
     }
     if (!datos.desdeAhora && parsearFecha(datos.desde) === null) {
-      ctx.addIssue({ code: "custom", path: ["desde"], message: "Elige el día." })
+      ctx.addIssue({
+        code: "custom",
+        path: ["desde"],
+        message: "Elige el día.",
+      })
     }
     if (
       datos.hasta !== null &&
@@ -453,6 +475,9 @@ export const esquemaIdExcepcion = z.object({
   id,
   actualizadoAt: marcaTiempo,
 })
+
+/** Resultados que devuelve cada búsqueda de anunciante o campaña. */
+export const LIMITE_BUSQUEDA_OBJETIVOS = 8
 
 export const esquemaBuscarObjetivo = z.object({
   objetivo: z.enum(OBJETIVOS_COMISION),
@@ -512,7 +537,12 @@ export type EntradaNivel = z.input<typeof esquemaNivel>
 
 export const esquemaParametrosAnio = z.object({
   nuevo: z.boolean(),
-  anio: numero({ min: 2020, max: 2100, decimales: 0, mensaje: "Escribe el año." }),
+  anio: numero({
+    min: 2020,
+    max: 2100,
+    decimales: 0,
+    mensaje: "Escribe el año.",
+  }),
   uvt: numero({ min: 1, max: 9_999_999_999, decimales: 2 }),
   smlmv: numero({ min: 1, max: 999_999_999_999, decimales: 2 }),
   umbralSegSocialSmlmv: numeroOpcional({ min: 0.01, max: 9999, decimales: 2 }),
@@ -522,14 +552,19 @@ export const esquemaParametrosAnio = z.object({
 
 export type EntradaParametrosAnio = z.input<typeof esquemaParametrosAnio>
 
-function vigenciaDias<
-  T extends { desde: string; hasta: string | null },
->(datos: T, ctx: z.RefinementCtx) {
-  if (datos.hasta !== null && datos.hasta <= datos.desde) {
+/**
+ * `hasta` es el ÚLTIMO día incluido (la acción guarda el fin exclusivo, un día
+ * después): una vigencia de un solo día, con `hasta` igual a `desde`, es válida.
+ */
+function vigenciaDias<T extends { desde: string; hasta: string | null }>(
+  datos: T,
+  ctx: z.RefinementCtx
+) {
+  if (datos.hasta !== null && datos.hasta < datos.desde) {
     ctx.addIssue({
       code: "custom",
       path: ["hasta"],
-      message: "Debe ser posterior al inicio.",
+      message: "Debe ser igual o posterior al inicio.",
     })
   }
 }
@@ -554,9 +589,7 @@ export type EntradaRetencion = z.input<typeof esquemaRetencion>
 export const esquemaReteica = z
   .object({
     id: id.nullable(),
-    municipioCodigo: z
-      .string()
-      .regex(PATRON_MUNICIPIO, "Elige el municipio."),
+    municipioCodigo: z.string().regex(PATRON_MUNICIPIO, "Elige el municipio."),
     tarifaPorMil: numero({ min: 0, max: 20, decimales: 4 }),
     baseMinimaUvt: numero({ min: 0, max: 99_999_999, decimales: 2 }),
     desde: dia,
@@ -594,7 +627,10 @@ export const esquemaResolucion = z
         message: "Debe ser igual o mayor que el inicio del rango.",
       })
     }
-    if (datos.vigenteHasta !== null && datos.vigenteHasta < datos.vigenteDesde) {
+    if (
+      datos.vigenteHasta !== null &&
+      datos.vigenteHasta < datos.vigenteDesde
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["vigenteHasta"],
@@ -679,9 +715,15 @@ export const esquemaPublicarTerminos = z
     inmediata: z.boolean(),
     dia: z.string(),
     hora: z.string(),
-    confirmacion: z.literal(TEXTO_CONFIRMAR_PUBLICACION, {
-      error: `Escribe ${TEXTO_CONFIRMAR_PUBLICACION} para confirmar.`,
-    }),
+    confirmacion: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .pipe(
+        z.literal(TEXTO_CONFIRMAR_PUBLICACION, {
+          error: `Escribe ${TEXTO_CONFIRMAR_PUBLICACION} para confirmar.`,
+        })
+      ),
     actualizadoAt: marcaTiempo,
   })
   .superRefine((datos, ctx) => {

@@ -1,16 +1,15 @@
 import "server-only"
 
 import { Building2, Earth, MapPinned, MapPinOff } from "lucide-react"
-import type { Route } from "next"
-import Link from "next/link"
 import type { ReactNode } from "react"
 
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { cargarPeriodo, etiquetaRango } from "@/features/auditoria/periodo"
 import { MapaIngresos } from "@/features/geo/components/mapa-ingresos"
+import { rutaExplorador } from "@/features/geo/rutas"
 import { tieneAlgunPermiso } from "@/lib/auth/dal"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
-import { serializarFecha } from "@/lib/fechas"
+import { serializarRango } from "@/lib/fechas"
 import { formatearNumero } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -115,9 +114,9 @@ const VACIO_UBICACION = {
  * Distribución de "Origen de los ingresos".
  *
  * Ranura del mapa de accesos (`MapaIngresos`, módulo geo): planisferio por
- * país y Colombia por departamento, en SVG; ocupa la columna ancha con los
- * rankings apilados a su derecha. Sin mapa, los rankings comparten la fila y
- * el encabezado enlaza al explorador.
+ * país y Colombia por departamento, en SVG, a todo el ancho; debajo, los
+ * rankings comparten la fila. Sin mapa, quedan solo los rankings y el
+ * encabezado enlaza al explorador.
  */
 function DisposicionOrigen({
   mapa,
@@ -128,18 +127,10 @@ function DisposicionOrigen({
   paises: ReactNode
   ciudades: ReactNode
 }) {
-  if (!mapa) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2">
-        {paises}
-        {ciudades}
-      </div>
-    )
-  }
   return (
-    <div className="grid gap-4 lg:grid-cols-5">
-      <div className="min-w-0 lg:col-span-3">{mapa}</div>
-      <div className="grid min-w-0 gap-4 md:grid-cols-2 lg:col-span-2 lg:grid-cols-1">
+    <div className="flex flex-col gap-4">
+      {mapa ? <div className="min-w-0">{mapa}</div> : null}
+      <div className="grid gap-4 md:grid-cols-2">
         {paises}
         {ciudades}
       </div>
@@ -192,7 +183,11 @@ export async function SeccionOrigenAccesos({
   const rankings = await rankingsAccesos(rango)
   const nota = notaSinUbicacion(rankings)
   const enlaceMapa = tieneAlgunPermiso(usuario, ["analitica.mapa"])
-    ? (`/analitica/mapa?nivel=internacional&metrica=accesos&desde=${serializarFecha(rango.desde)}&hasta=${serializarFecha(rango.hasta)}` as Route)
+    ? rutaExplorador({
+        nivel: "internacional",
+        metrica: "accesos",
+        periodo: serializarRango(rango),
+      })
     : null
 
   return (
@@ -206,15 +201,10 @@ export async function SeccionOrigenAccesos({
         descripcion={`Desde dónde se conectan las personas · ${formatearNumero(rankings.total)} ${rankings.total === 1 ? "ingreso exitoso" : "ingresos exitosos"}`}
         accion={
           enlaceMapa ? (
-            <Button
-              variant="outline"
-              size="sm"
-              nativeButton={false}
-              render={<Link href={enlaceMapa} />}
-            >
+            <EnlaceBoton variant="outline" size="sm" href={enlaceMapa}>
               <MapPinned data-icon="inline-start" aria-hidden />
               Ver en el mapa
-            </Button>
+            </EnlaceBoton>
           ) : null
         }
       />

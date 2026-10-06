@@ -18,7 +18,12 @@ import { Constants } from "@/types/database.types"
 
 import type { ColumnaReporte } from "../columnas"
 import { type EspecGrafico, sinValores } from "../graficos"
-import { indicador, sumar } from "../indicadores"
+import {
+  ETIQUETA_CUENTAS_DE_HOY,
+  ETIQUETA_FOTO,
+  indicador,
+  sumar,
+} from "../indicadores"
 import type { FacetaReporte } from "../tabla"
 import type {
   ContenidoReporte,
@@ -69,6 +74,7 @@ export const columnasUsuariosAccesos: readonly ColumnaReporte<FilaUsuarioAcceso>
   [
     {
       id: "usuario",
+      detalle: (f) => f.email,
       titulo: "Usuario",
       tipo: "texto",
       valor: nombreUsuario,
@@ -223,9 +229,9 @@ const DEFINICION_SIN_INGRESO = definicionPropia(
   {
     definicion:
       "Cuentas activas que no iniciaron sesión ni una vez en el periodo.",
-    calculo: "Perfiles activos sin ingresos exitosos en el periodo.",
+    calculo: "Perfiles activos hoy sin ingresos exitosos en el periodo.",
     ancla: "Fecha del intento de ingreso",
-    nota: "Candidatas a revisión: una cuenta que no se usa es un riesgo sin beneficio.",
+    nota: "Candidatas a revisión: una cuenta que no se usa es un riesgo sin beneficio. No se compara con el periodo anterior porque se cuenta sobre las cuentas de hoy, incluidas las creadas después.",
   }
 )
 
@@ -276,6 +282,8 @@ function indicadoresAccesos(datos: DatosUsuariosAccesos) {
       clave: "activos_sin_mfa",
       titulo: "Sin verificación en dos pasos",
       actual: totales.activosSinMfa,
+      // El factor es el de hoy: no cambia con el periodo consultado.
+      sinComparativo: ETIQUETA_FOTO,
       unidad: "conteo",
       sentido: "menor",
       definicion: DEFINICION_SIN_MFA,
@@ -285,7 +293,9 @@ function indicadoresAccesos(datos: DatosUsuariosAccesos) {
       clave: "activos_sin_ingreso",
       titulo: "Cuentas activas sin ingresos",
       actual: totales.activosSinIngreso,
-      anterior: anterior.activosSinIngreso,
+      // Las cuentas son las de hoy: en el periodo anterior contarían también
+      // las que aún no existían, y la baja sería una mejora que no ocurrió.
+      sinComparativo: ETIQUETA_CUENTAS_DE_HOY,
       unidad: "conteo",
       sentido: "menor",
       definicion: DEFINICION_SIN_INGRESO,
@@ -325,7 +335,9 @@ function graficoMasActivos(datos: DatosUsuariosAccesos): EspecGrafico {
     nombreCategoria: "Usuario",
     limite: 10,
     vacio:
-      elementos.length === 0 ? { titulo: "Nadie ingresó en el periodo" } : false,
+      elementos.length === 0
+        ? { titulo: "Nadie ingresó en el periodo" }
+        : false,
   }
 }
 
@@ -356,7 +368,9 @@ function graficoPorRol(datos: DatosUsuariosAccesos): EspecGrafico {
   }
 }
 
-export function vistaUsuariosAccesos(datos: DatosUsuariosAccesos): VistaReporte {
+export function vistaUsuariosAccesos(
+  datos: DatosUsuariosAccesos
+): VistaReporte {
   return {
     indicadores: indicadoresAccesos(datos),
     graficos: [
@@ -405,6 +419,11 @@ export const NOTAS_USUARIOS_ACCESOS: readonly NotaDefinicion[] = [
     termino: "Verificación en dos pasos",
     explicacion:
       "La cuenta tiene un autenticador (código de seis dígitos) verificado. Es obligatoria para los roles internos.",
+  },
+  {
+    termino: "Indicadores sin comparativo",
+    explicacion:
+      "«Sin verificación en dos pasos» es una foto de hoy: no cambia con el periodo elegido. «Cuentas activas sin ingresos» se cuenta sobre las cuentas activas hoy, así que no se compara con el periodo anterior: incluiría cuentas que entonces no existían.",
   },
   {
     termino: "Último acceso",

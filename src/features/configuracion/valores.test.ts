@@ -49,10 +49,11 @@ describe("porcentajes", () => {
 describe("normalizarValor y sonIguales", () => {
   it("ordena listas por sus opciones y quita repetidos", () => {
     expect(
-      normalizarValor(
-        { tipo: "LISTA_TEXTO", opciones: ["H24", "H72", "D7"] },
-        ["D7", "H24", "D7"]
-      )
+      normalizarValor({ tipo: "LISTA_TEXTO", opciones: ["H24", "H72", "D7"] }, [
+        "D7",
+        "H24",
+        "D7",
+      ])
     ).toEqual(["H24", "D7"])
     expect(
       normalizarValor({ tipo: "LISTA_TEXTO", opciones: null }, ["VE", "CO"])
@@ -70,15 +71,24 @@ describe("normalizarValor y sonIguales", () => {
 })
 
 describe("presentarValor", () => {
-  const unidad = (tipo: "ENTERO" | "DECIMAL" | "PORCENTAJE", u: string | null) => ({
+  const unidad = (
+    tipo: "ENTERO" | "DECIMAL" | "PORCENTAJE",
+    u: string | null
+  ) => ({
     tipo,
     unidad: u,
   })
 
   it("formatea porcentajes, pesos, multiplicadores y conteos", () => {
-    expect(limpio(presentarValor(unidad("PORCENTAJE", "%"), 0.2).texto)).toBe("20 %")
-    expect(limpio(presentarValor(unidad("PORCENTAJE", "%"), 0.155).texto)).toBe("15,5 %")
-    expect(limpio(presentarValor(unidad("ENTERO", "COP"), 100).texto)).toBe("$ 100")
+    expect(limpio(presentarValor(unidad("PORCENTAJE", "%"), 0.2).texto)).toBe(
+      "20%"
+    )
+    expect(limpio(presentarValor(unidad("PORCENTAJE", "%"), 0.155).texto)).toBe(
+      "15,5%"
+    )
+    expect(limpio(presentarValor(unidad("ENTERO", "COP"), 100).texto)).toBe(
+      "$ 100"
+    )
     expect(presentarValor(unidad("DECIMAL", "×"), 1.25).texto).toBe("1,25×")
     expect(presentarValor(unidad("ENTERO", "seguidores"), 30000).texto).toBe(
       "30.000 seguidores"
@@ -92,7 +102,9 @@ describe("presentarValor", () => {
       texto: "720 min",
       equivalencia: "12 horas",
     })
-    expect(presentarValor(unidad("ENTERO", "días"), 1825).equivalencia).toBe("5 años")
+    expect(presentarValor(unidad("ENTERO", "días"), 1825).equivalencia).toBe(
+      "5 años"
+    )
     expect(presentarValor(unidad("ENTERO", "min"), 45).equivalencia).toBeNull()
     expect(equivalenciaTiempo(10080, "min")).toBe("7 días")
     expect(equivalenciaTiempo(72, "h")).toBe("3 días")
@@ -101,9 +113,15 @@ describe("presentarValor", () => {
   })
 
   it("nombra opciones, listas y mapas en español", () => {
-    expect(presentarValor({ tipo: "TEXTO", unidad: null }, "D7").texto).toBe("7 días")
+    expect(presentarValor({ tipo: "TEXTO", unidad: null }, "D7").texto).toBe(
+      "7 días"
+    )
     expect(
-      presentarValor({ tipo: "LISTA_TEXTO", unidad: null }, ["H24", "H72", "D7"]).texto
+      presentarValor({ tipo: "LISTA_TEXTO", unidad: null }, [
+        "H24",
+        "H72",
+        "D7",
+      ]).texto
     ).toBe("24 horas, 72 horas y 7 días")
     expect(
       presentarValor({ tipo: "LISTA_TEXTO", unidad: null }, ["CO"], {
@@ -125,26 +143,76 @@ describe("presentarValor", () => {
       "Valor no válido"
     )
   })
+
+  it("muestra listas y mapas en el orden de las opciones, no en el del jsonb", () => {
+    // Postgres devuelve las claves de un jsonb por longitud: TIKTOK antes que FACEBOOK.
+    const opciones = ["FACEBOOK", "INSTAGRAM", "TIKTOK"]
+    expect(
+      presentarValor(
+        { tipo: "MAPA_DECIMAL", unidad: "×", opciones },
+        { TIKTOK: 20, FACEBOOK: 3, INSTAGRAM: 2 }
+      ).texto
+    ).toBe("Facebook 3× · Instagram 2× · TikTok 20×")
+    expect(
+      limpio(
+        presentarValor(
+          {
+            tipo: "LISTA_TEXTO",
+            unidad: null,
+            opciones: ["H24", "H72", "D7"],
+          },
+          ["D7", "H24"]
+        ).texto
+      )
+    ).toBe("24 horas y 7 días")
+    // Sin opciones (países habituales) se respeta el orden guardado.
+    expect(
+      presentarValor({ tipo: "LISTA_TEXTO", unidad: null }, ["VE", "CO"], {
+        etiquetas: { CO: "Colombia", VE: "Venezuela" },
+      }).texto
+    ).toBe("Venezuela y Colombia")
+  })
 })
 
 describe("describirDiferencia", () => {
   it("expresa porcentajes en puntos porcentuales", () => {
     expect(
       describirDiferencia({ tipo: "PORCENTAJE", unidad: "%" }, 0.2, 0.22)
-    ).toEqual({ tipo: "numero", direccion: "sube", delta: "+2 p. p.", relativa: null })
+    ).toEqual({
+      tipo: "numero",
+      direccion: "sube",
+      delta: "+2 p. p.",
+      relativa: null,
+    })
   })
 
   it("expresa números con unidad y variación relativa", () => {
-    const diferencia = describirDiferencia({ tipo: "ENTERO", unidad: "min" }, 30, 15)
-    expect(diferencia).toMatchObject({ tipo: "numero", direccion: "baja", delta: "−15 min" })
+    const diferencia = describirDiferencia(
+      { tipo: "ENTERO", unidad: "min" },
+      30,
+      15
+    )
+    expect(diferencia).toMatchObject({
+      tipo: "numero",
+      direccion: "baja",
+      delta: "−15 min",
+    })
     if (diferencia.tipo !== "numero") throw new Error("tipo")
-    expect(limpio(diferencia.relativa ?? "")).toBe("−50,0 %")
+    expect(limpio(diferencia.relativa ?? "")).toBe("−50,0%")
   })
 
   it("lista lo que se agrega y lo que se quita", () => {
     expect(
-      describirDiferencia({ tipo: "LISTA_TEXTO", unidad: null }, ["H24", "D7"], ["H72", "D7"])
-    ).toEqual({ tipo: "lista", agregados: ["72 horas"], quitados: ["24 horas"] })
+      describirDiferencia(
+        { tipo: "LISTA_TEXTO", unidad: null },
+        ["H24", "D7"],
+        ["H72", "D7"]
+      )
+    ).toEqual({
+      tipo: "lista",
+      agregados: ["72 horas"],
+      quitados: ["24 horas"],
+    })
   })
 
   it("compara mapas clave por clave", () => {
@@ -160,8 +228,29 @@ describe("describirDiferencia", () => {
     })
   })
 
+  it("lista los cambios de un mapa en el orden de las opciones", () => {
+    const diferencia = describirDiferencia(
+      {
+        tipo: "MAPA_DECIMAL",
+        unidad: "×",
+        opciones: ["FACEBOOK", "INSTAGRAM", "TIKTOK"],
+      },
+      { TIKTOK: 20, FACEBOOK: 3, INSTAGRAM: 2 },
+      { TIKTOK: 25, FACEBOOK: 4, INSTAGRAM: 2 }
+    )
+    expect(diferencia).toEqual({
+      tipo: "mapa",
+      cambios: [
+        { etiqueta: "Facebook", antes: "3×", despues: "4×" },
+        { etiqueta: "TikTok", antes: "20×", despues: "25×" },
+      ],
+    })
+  })
+
   it("un booleano o un texto es un cambio simple", () => {
-    expect(describirDiferencia({ tipo: "BOOLEANO", unidad: null }, true, false)).toEqual({
+    expect(
+      describirDiferencia({ tipo: "BOOLEANO", unidad: null }, true, false)
+    ).toEqual({
       tipo: "simple",
     })
   })

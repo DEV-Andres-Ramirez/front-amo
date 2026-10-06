@@ -1,13 +1,12 @@
 "use client"
 
-import type { Route } from "next"
 import { useRouter } from "next/navigation"
 import { type CSSProperties, useId, useMemo, useState } from "react"
 
 import { departamentoPorCodigo } from "@/features/geo/departamentos"
 import { formatearValorGeo } from "@/features/geo/formato"
-import { DEPARTAMENTOS_SIN_DESCENSO } from "@/features/geo/niveles"
 import type { MetricaGeo } from "@/features/geo/metricas"
+import { type PeriodoEnlace, rutaExplorador } from "@/features/geo/rutas"
 import { crearEscalaCuantiles, COLOR_SIN_DATOS } from "@/lib/geo/escalas"
 import {
   PATHS_DEPARTAMENTOS,
@@ -25,10 +24,17 @@ export interface MiniMapaColombiaProps {
   etiqueta: string
   /** Departamento resaltado. */
   destacado?: string | null
-  /** Cada departamento abre el explorador geográfico en ese departamento. */
+  /**
+   * Cada departamento abre el explorador geográfico en ese departamento, con
+   * la misma métrica del mini-mapa y el `periodo` de quien lo muestra.
+   */
   enlazar?: boolean
+  /** Periodo de las cifras; viaja en los enlaces al explorador. */
+  periodo?: PeriodoEnlace
   /** Muestra la leyenda de clases bajo el mapa. */
   conLeyenda?: boolean
+  /** Cómo se nombra una zona sin dato, en la leyenda y en cada zona ("Sin ingresos"). */
+  etiquetaSinDatos?: string
   className?: string
 }
 
@@ -38,14 +44,6 @@ type EstiloRelleno = CSSProperties & {
 }
 
 const CODIGOS = Object.keys(PATHS_DEPARTAMENTOS)
-
-function rutaExplorador(codigo: string): Route {
-  return (
-    DEPARTAMENTOS_SIN_DESCENSO.has(codigo)
-      ? "/analitica/mapa"
-      : `/analitica/mapa?nivel=departamental&depto=${codigo}`
-  ) as Route
-}
 
 /**
  * Mini-mapa coroplético de Colombia en SVG pre-proyectado (sin Mapbox): para
@@ -58,7 +56,9 @@ export function MiniMapaColombia({
   etiqueta,
   destacado = null,
   enlazar = false,
+  periodo,
   conLeyenda = true,
+  etiquetaSinDatos = "Sin datos",
   className,
 }: MiniMapaColombiaProps) {
   const id = useId()
@@ -80,9 +80,19 @@ export function MiniMapaColombia({
     "--relleno-oscuro": escalaOscura.colorPara(valores[codigo]),
   })
 
+  // Mismo destino que las filas del ranking vecino: métrica y periodo incluidos.
+  const abrirExplorador = (codigo: string) =>
+    router.push(rutaExplorador({ departamento: codigo, metrica, periodo }))
+
   const activo = hover ?? destacado
   const departamentoActivo = departamentoPorCodigo(activo)
   const patron = `${id}-rayado`
+  const cifraDe = (codigo: string): string => {
+    const valor = valores[codigo]
+    return valor === null || valor === undefined
+      ? etiquetaSinDatos
+      : formatearValorGeo(valor, metrica)
+  }
 
   return (
     <figure className={cn("flex flex-col gap-3", className)}>
@@ -138,7 +148,7 @@ export function MiniMapaColombia({
             const departamento = departamentoPorCodigo(codigo)
             const valor = valores[codigo]
             const sinDato = valor === null || valor === undefined
-            const texto = `${departamento?.nombre ?? codigo}: ${formatearValorGeo(valor, metrica)}`
+            const texto = `${departamento?.nombre ?? codigo}: ${cifraDe(codigo)}`
             return (
               <path
                 key={codigo}
@@ -154,14 +164,11 @@ export function MiniMapaColombia({
                 onPointerLeave={() => setHover(null)}
                 onFocus={() => setHover(codigo)}
                 onBlur={() => setHover(null)}
-                onClick={
-                  enlazar ? () => router.push(rutaExplorador(codigo)) : undefined
-                }
+                onClick={enlazar ? () => abrirExplorador(codigo) : undefined}
                 onKeyDown={
                   enlazar
                     ? (evento) => {
-                        if (evento.key === "Enter")
-                          router.push(rutaExplorador(codigo))
+                        if (evento.key === "Enter") abrirExplorador(codigo)
                       }
                     : undefined
                 }
@@ -186,7 +193,7 @@ export function MiniMapaColombia({
         <div
           aria-hidden
           className={cn(
-            "vidrio pointer-events-none absolute right-2 bottom-2 rounded-lg px-2.5 py-1.5 text-xs shadow-sm transition-opacity duration-200",
+            "pointer-events-none absolute right-2 bottom-2 rounded-lg vidrio px-2.5 py-1.5 text-xs shadow-sm transition-opacity duration-200",
             departamentoActivo ? "opacity-100" : "opacity-0"
           )}
         >
@@ -196,7 +203,7 @@ export function MiniMapaColombia({
                 {departamentoActivo.nombreCorto}
               </span>{" "}
               <span className="cifras text-muted-foreground">
-                {formatearValorGeo(valores[departamentoActivo.codigo], metrica)}
+                {cifraDe(departamentoActivo.codigo)}
               </span>
             </>
           ) : null}
@@ -224,10 +231,14 @@ export function MiniMapaColombia({
             </span>
           ))}
           <span className="flex items-center gap-1.5">
-            <svg aria-hidden className="size-2.5 rounded-[3px]" viewBox="0 0 10 10">
+            <svg
+              aria-hidden
+              className="size-2.5 rounded-[3px]"
+              viewBox="0 0 10 10"
+            >
               <rect width={10} height={10} fill={`url(#${patron})`} />
             </svg>
-            Sin datos
+            {etiquetaSinDatos}
           </span>
         </figcaption>
       ) : null}

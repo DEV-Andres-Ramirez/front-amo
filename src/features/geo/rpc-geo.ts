@@ -5,13 +5,17 @@ import { argumentosRpc } from "@/lib/supabase/rpc"
 import type { crearClienteServidor } from "@/lib/supabase/server"
 
 import { NIVEL_RPC, type NivelGeo } from "./metricas"
-import { type ConsultaMapaGeo, ErrorDatosGeo, type FilaMetricaGeo } from "./tipos"
+import {
+  type ConsultaMapaGeo,
+  ErrorDatosGeo,
+  type FilaMetricaGeo,
+} from "./tipos"
 
 /**
- * `geo_metricas` (docs/modelo-datos.md §5.9) con el cliente del USUARIO: la
- * RPC es `security invoker`, valida `analitica.mapa` (y `accesos.ver` para
- * los accesos) y la RLS limita las filas. Aquí solo se tipan sus filas y se
- * traducen sus errores a motivos con estado HTTP.
+ * RPC geográficas (docs/modelo-datos.md §5.9) con el cliente del USUARIO:
+ * son `security invoker`, validan `analitica.mapa` (y `accesos.ver` para los
+ * accesos) y la RLS limita las filas. Aquí se tipan las filas de
+ * `geo_metricas` y se traducen los errores a motivos con estado HTTP.
  */
 
 export type ClienteGeo = Awaited<ReturnType<typeof crearClienteServidor>>
@@ -32,7 +36,10 @@ export function traducirError(error: ErrorPostgrest): ErrorDatosGeo {
       "La base de datos aún no expone la analítica geográfica. Intenta de nuevo en unos minutos."
     )
   }
-  if (error.message === "AMO_NO_AUTORIZADO" || SIN_PERMISO.has(error.code ?? "")) {
+  if (
+    error.message === "AMO_NO_AUTORIZADO" ||
+    SIN_PERMISO.has(error.code ?? "")
+  ) {
     return new ErrorDatosGeo(
       "no-autorizado",
       "No tienes permiso para consultar esta métrica."
@@ -60,7 +67,7 @@ export function traducirError(error: ErrorPostgrest): ErrorDatosGeo {
  * `valor_por_100k` llegan `null` (tasas con n insuficiente, países sin
  * población); `numeric` puede llegar como texto.
  */
-function numeroONulo(valor: unknown): number | null {
+export function numeroONulo(valor: unknown): number | null {
   if (valor === null || valor === undefined || valor === "") return null
   const numero = typeof valor === "number" ? valor : Number(valor)
   return Number.isFinite(numero) ? numero : null

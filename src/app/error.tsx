@@ -1,11 +1,10 @@
 "use client"
 
 import { House } from "lucide-react"
-import Link from "next/link"
 
 import { EstadoError } from "@/components/feedback/estado-error"
 import { PantallaEstado } from "@/components/feedback/pantalla-estado"
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 
 interface ErrorRaizProps {
   error: Error & { digest?: string }
@@ -23,14 +22,10 @@ export default function ErrorRaiz({ error, retry }: ErrorRaizProps) {
         onReintentar={retry}
         digest={error.digest}
       >
-        <Button
-          variant="outline"
-          render={<Link href="/" />}
-          nativeButton={false}
-        >
+        <EnlaceBoton variant="outline" href="/">
           <House data-icon="inline-start" aria-hidden />
           Ir al inicio
-        </Button>
+        </EnlaceBoton>
       </EstadoError>
     </PantallaEstado>
   )

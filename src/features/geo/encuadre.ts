@@ -5,7 +5,10 @@
 import type { Encuadre } from "@/components/maps/tipos"
 import type { Bbox, Posicion } from "@/lib/geo/tipos"
 
-import { departamentoPorCodigo, listarDepartamentosCliente } from "./departamentos"
+import {
+  departamentoPorCodigo,
+  listarDepartamentosCliente,
+} from "./departamentos"
 import type { EstadoNivel } from "./niveles"
 
 /** Centro de Colombia: el globo siempre arranca mirando al país. */

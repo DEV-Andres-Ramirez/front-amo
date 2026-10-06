@@ -1,59 +1,54 @@
 import "server-only"
 
-import { argumentosRpc } from "@/lib/supabase/rpc"
-import { formatearNumero, formatearPorcentaje } from "@/lib/format"
+import { formatearNumero } from "@/lib/format"
+import { municipiosRepresentadosPor } from "@/lib/geo/catalogo"
 
+import { agruparPorGeometria, tasaPonderada } from "./agregacion"
 import { crearLimitador, type Limitador } from "./concurrencia"
 import {
   DEFINICIONES_METRICAS,
   type MetricaGeo,
   metricaDisponibleEn,
+  NIVEL_RPC,
 } from "./metricas"
 import { CODIGO_COLOMBIA } from "./niveles"
 import {
   type ClienteGeo,
   type ConsultaRpcGeo,
   geoMetricas,
+  numeroONulo,
   traducirError,
 } from "./rpc-geo"
-import { cubetasSerie } from "./serie"
-import {
-  type ConsultaDetalleGeo,
-  ErrorDatosGeo,
-  type FilaMetricaGeo,
-  type KpiZona,
-  type MotivoSinSerie,
-  type RespuestaDetalleGeo,
-  type SerieZona,
-  type TopZona,
+import { type CubetaSerie, cubetasSerie } from "./serie"
+import type {
+  ConsultaDetalleGeo,
+  FilaMetricaGeo,
+  KpiZona,
+  MotivoSinSerie,
+  PuntoSerieZona,
+  RespuestaDetalleGeo,
+  SerieZona,
+  TopZona,
 } from "./tipos"
 
 /**
- * Detalle de una zona compuesto en el servidor (una sola solicitud del
- * cliente) mientras la BD no tenga `detalle_zona_geo`: KPI de todas las
- * métricas del nivel, evolución de la métrica activa (una lectura de
- * `geo_metricas` por cubeta), subzonas destacadas y los medios con más
- * asignaciones (`reporte_cumplimiento_medios`). Todo con el cliente del
- * usuario y con un tope de lecturas en vuelo.
+ * Detalle de una zona, en una sola solicitud del cliente. La RPC
+ * `detalle_zona_geo` (docs/modelo-datos.md §5.9) trae en UNA llamada los KPI
+ * de todas las métricas del nivel con su comparativo, la evolución mensual y
+ * los medios con más GMV. Aquí solo se añade lo que la RPC no cubre:
+ *
+ * - la evolución diaria o semanal de la métrica activa en periodos cortos
+ *   (uno o dos meses no dan una serie mensual): una lectura de `geo_metricas`
+ *   por cubeta, como máximo 15 (`CUBETAS_MAXIMAS_SERIE_FINA`);
+ * - las subzonas destacadas: una lectura del nivel inferior.
+ *
+ * Todo con el cliente del usuario (RPC `security invoker`, RLS) y con un tope
+ * de lecturas en vuelo.
  */
 
 /** Lecturas simultáneas a PostgREST por detalle. */
 const LECTURAS_EN_VUELO = 8
 const TOP = 5
-
-/**
- * Consulta a la RPC que trae la zona con el menor trabajo posible: un
- * departamento se pide filtrado (una fila); municipios y países, con su nivel.
- */
-function ambitoDeZona(consulta: ConsultaDetalleGeo): Omit<ConsultaRpcGeo, "metrica"> {
-  const { nivel, desde, hasta } = consulta
-  if (nivel === "nacional") return { nivel, desde, hasta, departamento: consulta.zona }
-  return { nivel, desde, hasta, departamento: consulta.departamento }
-}
-
-function filaDeZona(filas: readonly FilaMetricaGeo[], zona: string) {
-  return filas.find((fila) => fila.codigo === zona)
-}
 
 type Lectura<T> = () => Promise<T>
 
@@ -62,46 +57,118 @@ function leer<T>(limitar: Limitador, lecturas: readonly Lectura<T>[]) {
   return Promise.allSettled(lecturas.map((lectura) => limitar(lectura)))
 }
 
-// ── KPI ──────────────────────────────────────────────────────────────────────
+// ── RPC detalle_zona_geo ─────────────────────────────────────────────────────
 
-function lecturasKpi(
-  supabase: ClienteGeo,
-  consulta: ConsultaDetalleGeo
-): Lectura<FilaMetricaGeo[]>[] {
-  const ambito = ambitoDeZona(consulta)
-  return consulta.metricasKpi.map(
-    (metrica) => () => geoMetricas(supabase, { ...ambito, metrica })
-  )
-}
-
-function kpisDe(
-  consulta: ConsultaDetalleGeo,
-  resultados: readonly PromiseSettledResult<FilaMetricaGeo[]>[]
-): KpiZona[] {
-  return consulta.metricasKpi.map((metrica, indice) => {
-    const resultado = resultados[indice]
-    const fila =
-      resultado?.status === "fulfilled"
-        ? filaDeZona(resultado.value, consulta.zona)
-        : undefined
-    return { metrica, valor: fila?.valor ?? null, n: fila?.n ?? null }
-  })
+/**
+ * Fila de la RPC. Tres secciones: `kpi` (clave = métrica), `serie` (clave =
+ * métrica, `periodo` = primer día del mes) y `medio` (clave = id del medio,
+ * `valor` = GMV, `n` = asignaciones, `detalle` = municipio). Los tipos
+ * generados declaran las columnas no nulas; en la práctica llegan `null`.
+ */
+interface FilaDetalleRpc {
+  seccion: string
+  clave: string
+  nombre: string | null
+  detalle: string | null
+  periodo: string | null
+  valor: unknown
+  n: unknown
+  valor_anterior: unknown
+  variacion: unknown
 }
 
 /**
- * Un error de la métrica activa (permiso, RPC ausente) es el error del
- * detalle; el de una métrica secundaria solo deja su tarjeta sin valor.
+ * Códigos que la RPC debe leer. La zona es un POLÍGONO: en un departamento
+ * puede dibujar a más de un municipio (el de Río Viejo representa también a
+ * Norosí); se lee cada uno y se funden con la regla del mapa.
  */
-function errorPrincipal(
+function codigosDeZona(consulta: ConsultaDetalleGeo): string[] {
+  if (consulta.nivel !== "departamental") return [consulta.zona]
+  const codigos = municipiosRepresentadosPor(consulta.zona).map(
+    ({ codigo }) => codigo
+  )
+  return codigos.length > 0 ? codigos : [consulta.zona]
+}
+
+async function leerDetalle(
+  supabase: ClienteGeo,
   consulta: ConsultaDetalleGeo,
-  resultados: readonly PromiseSettledResult<FilaMetricaGeo[]>[]
-): ErrorDatosGeo | null {
-  const indice = consulta.metricasKpi.indexOf(consulta.metrica)
-  const resultado = indice >= 0 ? resultados[indice] : undefined
-  if (resultado?.status !== "rejected") return null
-  return resultado.reason instanceof ErrorDatosGeo
-    ? resultado.reason
-    : new ErrorDatosGeo("fallo", "No se pudo consultar el detalle de la zona.")
+  codigo: string
+): Promise<FilaDetalleRpc[]> {
+  const { data, error } = await supabase.rpc("detalle_zona_geo", {
+    p_nivel: NIVEL_RPC[consulta.nivel],
+    p_codigo: codigo,
+    p_desde: consulta.desde,
+    p_hasta: consulta.hasta,
+  })
+  if (error) throw traducirError(error)
+  return (data ?? []) as FilaDetalleRpc[]
+}
+
+interface Medida {
+  readonly valor: number | null
+  readonly n: number | null
+}
+
+const SIN_MEDIDA: Medida = { valor: null, n: null }
+
+const medidaDe = (fila: FilaDetalleRpc): Medida => ({
+  valor: numeroONulo(fila.valor),
+  n: numeroONulo(fila.n),
+})
+
+function sumar(valores: readonly (number | null)[]): number | null {
+  const presentes = valores.filter((valor): valor is number => valor !== null)
+  return presentes.length > 0
+    ? presentes.reduce((suma, valor) => suma + valor, 0)
+    : null
+}
+
+/** Una medida a partir de las de cada municipio del polígono: suma, o tasa ponderada por `n`. */
+function fundir(medidas: readonly Medida[], aditiva: boolean): Medida {
+  if (medidas.length <= 1) return medidas[0] ?? SIN_MEDIDA
+  return {
+    valor: aditiva
+      ? sumar(medidas.map((m) => m.valor))
+      : tasaPonderada(medidas),
+    n: sumar(medidas.map((m) => m.n)),
+  }
+}
+
+// ── KPI ──────────────────────────────────────────────────────────────────────
+
+function variacionDe(
+  valor: number | null,
+  anterior: number | null
+): number | null {
+  return valor === null || !anterior ? null : (valor - anterior) / anterior
+}
+
+function kpiDe(metrica: MetricaGeo, filas: readonly FilaDetalleRpc[]): KpiZona {
+  const propias = filas.filter(
+    (fila) => fila.seccion === "kpi" && fila.clave === metrica
+  )
+  const { aditiva } = DEFINICIONES_METRICAS[metrica]
+  const actual = fundir(propias.map(medidaDe), aditiva)
+  if (propias.length === 1) {
+    return {
+      metrica,
+      ...actual,
+      anterior: numeroONulo(propias[0].valor_anterior),
+      variacion: numeroONulo(propias[0].variacion),
+    }
+  }
+  // Polígono compartido: el comparativo solo se puede fundir si la métrica se
+  // suma (la tasa anterior llega sin su `n`).
+  const anterior = aditiva
+    ? sumar(propias.map((fila) => numeroONulo(fila.valor_anterior)))
+    : null
+  return {
+    metrica,
+    ...actual,
+    anterior,
+    variacion: variacionDe(actual.valor, anterior),
+  }
 }
 
 // ── Serie ────────────────────────────────────────────────────────────────────
@@ -115,42 +182,106 @@ function planSerie(consulta: ConsultaDetalleGeo) {
     : cubetasSerie(consulta.desde, consulta.hasta)
 }
 
-function lecturasSerie(
-  supabase: ClienteGeo,
+/** Una cubeta sin fila no tuvo movimiento (0) o, en una tasa, no tiene muestra. */
+function valorSinFila(metrica: MetricaGeo): number | null {
+  return DEFINICIONES_METRICAS[metrica].aditiva ? 0 : null
+}
+
+/** Evolución mensual: viene en la RPC, un punto por mes recortado al periodo. */
+function puntosMensuales(
+  consulta: ConsultaDetalleGeo,
+  cubetas: readonly CubetaSerie[],
+  filas: readonly FilaDetalleRpc[]
+): PuntoSerieZona[] {
+  const porMes = new Map<string, Medida[]>()
+  for (const fila of filas) {
+    if (
+      fila.seccion !== "serie" ||
+      fila.clave !== consulta.metrica ||
+      !fila.periodo
+    )
+      continue
+    const mes = fila.periodo.slice(0, 7)
+    porMes.set(mes, [...(porMes.get(mes) ?? []), medidaDe(fila)])
+  }
+  const { aditiva } = DEFINICIONES_METRICAS[consulta.metrica]
+  return cubetas.map((cubeta) => ({
+    ...cubeta,
+    valor:
+      fundir(porMes.get(cubeta.desde.slice(0, 7)) ?? [], aditiva).valor ??
+      valorSinFila(consulta.metrica),
+  }))
+}
+
+/**
+ * Consulta a `geo_metricas` que trae la zona con el menor trabajo posible: un
+ * departamento se pide filtrado (una fila); municipios y países, con su nivel.
+ */
+function ambitoDeZona(
   consulta: ConsultaDetalleGeo
+): Omit<ConsultaRpcGeo, "desde" | "hasta"> {
+  const { nivel, metrica } = consulta
+  return {
+    nivel,
+    metrica,
+    departamento: nivel === "nacional" ? consulta.zona : consulta.departamento,
+  }
+}
+
+/** Evolución diaria o semanal: una lectura de `geo_metricas` por cubeta. */
+function lecturasSerieFina(
+  supabase: ClienteGeo,
+  consulta: ConsultaDetalleGeo,
+  cubetas: readonly CubetaSerie[]
 ): Lectura<FilaMetricaGeo[]>[] {
-  const plan = planSerie(consulta)
-  if (!plan) return []
   const ambito = ambitoDeZona(consulta)
-  return plan.cubetas.map(
-    (cubeta) => () =>
-      geoMetricas(supabase, {
-        ...ambito,
-        metrica: consulta.metrica,
-        desde: cubeta.desde,
-        hasta: cubeta.hasta,
-      })
+  return cubetas.map(
+    ({ desde, hasta }) =>
+      () =>
+        geoMetricas(supabase, { ...ambito, desde, hasta })
   )
+}
+
+/** Valor del polígono en una lectura de `geo_metricas` (funde a sus municipios). */
+function valorDeZona(
+  filas: readonly FilaMetricaGeo[],
+  consulta: ConsultaDetalleGeo
+): number | null {
+  const [fundida] = agruparPorGeometria(
+    filas.filter((fila) => fila.codigoGeometria === consulta.zona),
+    { aditiva: DEFINICIONES_METRICAS[consulta.metrica].aditiva, por100k: false }
+  )
+  return fundida?.valor ?? null
 }
 
 function serieDe(
   consulta: ConsultaDetalleGeo,
-  resultados: readonly PromiseSettledResult<FilaMetricaGeo[]>[]
+  filas: readonly FilaDetalleRpc[],
+  finas: readonly PromiseSettledResult<FilaMetricaGeo[]>[]
 ): { serie: SerieZona | null; sinSerie: MotivoSinSerie | null } {
   const plan = planSerie(consulta)
   if (!plan) return { serie: null, sinSerie: "foto-actual" }
-  if (resultados.some((r) => r.status === "rejected")) {
-    return { serie: null, sinSerie: "fallo" }
+
+  let puntos: PuntoSerieZona[]
+  if (plan.granularidad === "mes") {
+    puntos = puntosMensuales(consulta, plan.cubetas, filas)
+  } else {
+    // La evolución es complementaria: su fallo no tumba el detalle.
+    if (finas.some((lectura) => lectura.status === "rejected")) {
+      return { serie: null, sinSerie: "fallo" }
+    }
+    puntos = plan.cubetas.map((cubeta, indice) => {
+      const lectura = finas[indice]
+      const valor =
+        lectura?.status === "fulfilled"
+          ? valorDeZona(lectura.value, consulta)
+          : null
+      return { ...cubeta, valor: valor ?? valorSinFila(consulta.metrica) }
+    })
   }
-  const puntos = plan.cubetas.map((cubeta, indice) => {
-    const resultado = resultados[indice]
-    const fila =
-      resultado?.status === "fulfilled"
-        ? filaDeZona(resultado.value, consulta.zona)
-        : undefined
-    return { ...cubeta, valor: fila?.valor ?? (DEFINICIONES_METRICAS[consulta.metrica].aditiva ? 0 : null) }
-  })
-  const conValor = puntos.some((punto) => punto.valor !== null && punto.valor !== 0)
+  const conValor = puntos.some(
+    (punto) => punto.valor !== null && punto.valor !== 0
+  )
   return conValor
     ? { serie: { granularidad: plan.granularidad, puntos }, sinSerie: null }
     : { serie: null, sinSerie: "sin-datos" }
@@ -159,7 +290,11 @@ function serieDe(
 // ── Subzonas destacadas ──────────────────────────────────────────────────────
 
 function subconsulta(consulta: ConsultaDetalleGeo): ConsultaRpcGeo | null {
-  const base = { metrica: consulta.metrica, desde: consulta.desde, hasta: consulta.hasta }
+  const base = {
+    metrica: consulta.metrica,
+    desde: consulta.desde,
+    hasta: consulta.hasta,
+  }
   if (consulta.nivel === "nacional") {
     return { ...base, nivel: "departamental", departamento: consulta.zona }
   }
@@ -198,7 +333,10 @@ function topDe(
     .slice(0, TOP)
   if (filas.length === 0) return null
   return {
-    titulo: tituloTop(sub.nivel === "nacional" ? "Departamentos" : "Municipios", consulta.metrica),
+    titulo: tituloTop(
+      sub.nivel === "nacional" ? "Departamentos" : "Municipios",
+      consulta.metrica
+    ),
     metrica: consulta.metrica,
     filas: filas.map((fila) => ({
       codigo: fila.codigo,
@@ -211,78 +349,49 @@ function topDe(
 
 // ── Medios destacados ────────────────────────────────────────────────────────
 
-interface FilaMedioRpc {
-  medio_id: string
-  medio: string
-  comprometidas: number
-  tasa_cumplimiento: number | null
-}
-
-/** Departamento de la zona para la RPC; `undefined` si la zona no está en Colombia. */
-function departamentoDeZona(consulta: ConsultaDetalleGeo): string | null | undefined {
-  switch (consulta.nivel) {
-    case "internacional":
-      return consulta.zona === CODIGO_COLOMBIA ? null : undefined
-    case "nacional":
-      return consulta.zona
-    case "departamental":
-      return consulta.departamento
-  }
-}
-
-async function leerMediosDeZona(
-  supabase: ClienteGeo,
+/**
+ * Contexto de un medio: en un municipio, cuántas asignaciones suman su GMV;
+ * en un departamento o en el país, su municipio (la RPC lo trae como
+ * "Municipio (Departamento)").
+ */
+function contextoMedio(
   consulta: ConsultaDetalleGeo,
-  departamento: string | null
-): Promise<FilaMedioRpc[]> {
-  const [reporte, delMunicipio] = await Promise.all([
-    supabase.rpc(
-      "reporte_cumplimiento_medios",
-      argumentosRpc<"reporte_cumplimiento_medios">({
-        p_desde: consulta.desde,
-        p_hasta: consulta.hasta,
-        p_departamento: departamento,
-      })
-    ),
-    // La RPC agrupa por departamento: en un municipio se cruzan sus medios.
-    consulta.nivel === "departamental"
-      ? supabase.from("medios").select("id").eq("municipio_codigo", consulta.zona)
-      : null,
-  ])
-  if (reporte.error) throw traducirError(reporte.error)
-  if (delMunicipio?.error) throw traducirError(delMunicipio.error)
-  const ids = delMunicipio ? new Set(delMunicipio.data.map(({ id }) => id)) : null
-  return (reporte.data as FilaMedioRpc[]).filter(
-    (fila) => fila.comprometidas > 0 && (!ids || ids.has(fila.medio_id))
-  )
-}
-
-function lecturasMedios(
-  supabase: ClienteGeo,
-  consulta: ConsultaDetalleGeo
-): Lectura<FilaMedioRpc[]>[] {
-  const departamento = departamentoDeZona(consulta)
-  if (!consulta.conMedios || departamento === undefined) return []
-  return [() => leerMediosDeZona(supabase, consulta, departamento)]
+  lugar: string | null,
+  asignaciones: number
+): string | null {
+  if (consulta.nivel === "departamental") {
+    return `${formatearNumero(asignaciones)} ${asignaciones === 1 ? "asignación" : "asignaciones"}`
+  }
+  return lugar?.replace(/\s*\([^)]*\)$/, "") || null
 }
 
 function mediosDe(
-  resultados: readonly PromiseSettledResult<FilaMedioRpc[]>[]
+  consulta: ConsultaDetalleGeo,
+  filas: readonly FilaDetalleRpc[]
 ): TopZona | null {
-  const resultado = resultados[0]
-  if (resultado?.status !== "fulfilled" || resultado.value.length === 0) return null
+  const medios = filas
+    .filter((fila) => fila.seccion === "medio")
+    .map((fila) => ({
+      id: fila.clave,
+      nombre: fila.nombre ?? "Medio sin nombre",
+      lugar: fila.detalle,
+      gmv: numeroONulo(fila.valor) ?? 0,
+      asignaciones: numeroONulo(fila.n) ?? 0,
+    }))
+    // Con un polígono compartido llegan los cinco primeros de cada municipio.
+    .sort((a, b) => b.gmv - a.gmv || b.asignaciones - a.asignaciones)
+    .slice(0, TOP)
+  if (medios.length === 0) return null
   return {
-    titulo: "Medios con más asignaciones",
-    descripcion: "Asignaciones con entrega en el periodo y su cumplimiento.",
-    metrica: "asignaciones",
-    filas: resultado.value.slice(0, TOP).map((fila) => ({
-      codigo: fila.medio_id,
-      nombre: fila.medio,
-      valor: fila.comprometidas,
-      detalle:
-        fila.tasa_cumplimiento === null
-          ? null
-          : `${formatearPorcentaje(Number(fila.tasa_cumplimiento), 0)} a tiempo`,
+    titulo: "Medios con más GMV",
+    descripcion:
+      "GMV comprometido por sus asignaciones aceptadas en el periodo.",
+    metrica: "gmv",
+    filas: medios.map((medio) => ({
+      codigo: medio.id,
+      nombre: medio.nombre,
+      valor: medio.gmv,
+      detalle: contextoMedio(consulta, medio.lugar, medio.asignaciones),
     })),
   }
 }
@@ -294,20 +403,25 @@ export async function componerDetalle(
   consulta: ConsultaDetalleGeo
 ): Promise<RespuestaDetalleGeo> {
   const limitar = crearLimitador(LECTURAS_EN_VUELO)
-  const [kpis, serie, top, medios] = await Promise.all([
-    leer(limitar, lecturasKpi(supabase, consulta)),
-    leer(limitar, lecturasSerie(supabase, consulta)),
+  const plan = planSerie(consulta)
+  const cubetasFinas = plan && plan.granularidad !== "mes" ? plan.cubetas : []
+  // Un fallo de la RPC (permiso, zona inexistente) es el error del detalle.
+  const [detalle, finas, top] = await Promise.all([
+    Promise.all(
+      codigosDeZona(consulta).map((codigo) =>
+        limitar(() => leerDetalle(supabase, consulta, codigo))
+      )
+    ),
+    leer(limitar, lecturasSerieFina(supabase, consulta, cubetasFinas)),
     leer(limitar, lecturasTop(supabase, consulta)),
-    leer(limitar, lecturasMedios(supabase, consulta)),
   ])
-  const error = errorPrincipal(consulta, kpis)
-  if (error) throw error
+  const filas = detalle.flat()
   return {
     consulta,
-    kpis: kpisDe(consulta, kpis),
-    ...serieDe(consulta, serie),
+    kpis: consulta.metricasKpi.map((metrica) => kpiDe(metrica, filas)),
+    ...serieDe(consulta, filas, finas),
     top: topDe(consulta, top),
-    medios: mediosDe(medios),
+    medios: consulta.conMedios ? mediosDe(consulta, filas) : null,
     origen: "base-de-datos",
   }
 }

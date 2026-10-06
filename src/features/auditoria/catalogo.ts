@@ -250,12 +250,66 @@ const ENTIDADES: Readonly<Record<string, Entidad>> = {
   sesion: { nombre: "Sesión", complemento: "la sesión" },
 }
 
-/** "reteica_municipal" → "Reteica municipal"; "-cion"/"-sion" recuperan la tilde. */
+/**
+ * Palabras frecuentes de los identificadores de la BD (sin tildes ni eñes)
+ * con su ortografía: así una columna nueva se lee bien aunque nadie le haya
+ * puesto etiqueta («Es pública», «Máximo», «Número de…»).
+ */
+const ORTOGRAFIA: Readonly<Record<string, string>> = {
+  anio: "año",
+  automatica: "automática",
+  automatico: "automático",
+  calculo: "cálculo",
+  categoria: "categoría",
+  categorias: "categorías",
+  codigo: "código",
+  codigos: "códigos",
+  credito: "crédito",
+  debito: "débito",
+  dias: "días",
+  electronica: "electrónica",
+  electronico: "electrónico",
+  limite: "límite",
+  limites: "límites",
+  maxima: "máxima",
+  maximo: "máximo",
+  maximos: "máximos",
+  metrica: "métrica",
+  metricas: "métricas",
+  minima: "mínima",
+  minimo: "mínimo",
+  minimos: "mínimos",
+  modulo: "módulo",
+  modulos: "módulos",
+  numero: "número",
+  numeros: "números",
+  pais: "país",
+  paises: "países",
+  publica: "pública",
+  publico: "público",
+  razon: "razón",
+  regimen: "régimen",
+  telefono: "teléfono",
+  titulo: "título",
+  titulos: "títulos",
+  ultima: "última",
+  ultimas: "últimas",
+  ultimo: "último",
+  ultimos: "últimos",
+  unica: "única",
+  unico: "único",
+}
+
+/**
+ * "reteica_municipal" → "Reteica municipal". Recupera la ortografía que los
+ * identificadores pierden: "-cion"/"-sion" y las palabras de `ORTOGRAFIA`.
+ */
 export function humanizar(identificador: string): string {
   const texto = identificador
     .toLocaleLowerCase("es-CO")
     .replace(/_/g, " ")
     .replace(/\b(\p{L}+)(c|s)ion\b/gu, "$1$2ión")
+    .replace(/\p{L}+/gu, (palabra) => ORTOGRAFIA[palabra] ?? palabra)
     .replace(/\s+/g, " ")
     .trim()
   return texto.charAt(0).toLocaleUpperCase("es-CO") + texto.slice(1)

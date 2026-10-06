@@ -9,10 +9,11 @@ import { centrosSinPoligono } from "./sin-poligono"
 import type { ProveedorMetricasGeo, RespuestaMapaGeo } from "./tipos"
 
 /**
- * Proveedor de producción. Todo se lee con el cliente del USUARIO: la RPC
- * `geo_metricas` es `security invoker` (valida `analitica.mapa` y, para los
- * accesos, `accesos.ver`) y las tablas de los puntos del modo calor aplican
- * su RLS. La ruta ya autorizó con el DAL; la BD vuelve a hacerlo.
+ * Proveedor de producción. Todo se lee con el cliente del USUARIO: las RPC
+ * `geo_metricas` y `detalle_zona_geo` son `security invoker` (validan
+ * `analitica.mapa` y, para los accesos, `accesos.ver`) y las tablas de los
+ * puntos del modo calor aplican su RLS. La ruta ya autorizó con el DAL; la BD
+ * vuelve a hacerlo.
  */
 export function crearProveedorSupabase(): ProveedorMetricasGeo {
   return {

@@ -25,12 +25,13 @@ import {
 import { TIPO_ZONA } from "./niveles"
 import type { ConsultaDetalleGeo, ConsultaMapaGeo } from "./tipos"
 
+const FECHA_INVALIDA = "Usa una fecha válida con formato AAAA-MM-DD."
+
+// Los mensajes llegan a la interfaz (aviso del mapa): siempre en español,
+// también cuando falta el parámetro o no es una opción conocida.
 const dia = z
-  .string()
-  .refine(
-    (valor) => parsearFecha(valor) !== null,
-    "Usa una fecha válida con formato AAAA-MM-DD."
-  )
+  .string({ error: FECHA_INVALIDA })
+  .refine((valor) => parsearFecha(valor) !== null, FECHA_INVALIDA)
 
 const ZONA_VALIDA: Readonly<
   Record<NivelGeo, (zona: string, departamento: string | null) => boolean>
@@ -45,9 +46,13 @@ const ZONA_VALIDA: Readonly<
 
 export const esquemaParametrosGeo = z
   .object({
-    vista: z.enum(["mapa", "puntos", "detalle"]).default("mapa"),
-    nivel: z.enum(NIVELES_GEO),
-    metrica: z.enum(METRICAS_GEO),
+    vista: z
+      .enum(["mapa", "puntos", "detalle"], {
+        error: "La vista pedida no existe.",
+      })
+      .default("mapa"),
+    nivel: z.enum(NIVELES_GEO, { error: "El nivel del mapa no es válido." }),
+    metrica: z.enum(METRICAS_GEO, { error: "La métrica no existe." }),
     desde: dia,
     hasta: dia,
     depto: z.string().optional(),
@@ -93,7 +98,11 @@ export const esquemaParametrosGeo = z
     const departamento = p.nivel === "departamental" ? (p.depto ?? null) : null
     if (
       p.nivel === "departamental" &&
-      !(departamento && /^\d{2}$/.test(departamento) && obtenerDepartamento(departamento))
+      !(
+        departamento &&
+        /^\d{2}$/.test(departamento) &&
+        obtenerDepartamento(departamento)
+      )
     ) {
       ctx.addIssue({
         code: "custom",

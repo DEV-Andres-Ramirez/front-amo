@@ -27,9 +27,8 @@ vi.mock("@/features/geo/proveedor-servidor", () => ({
 }))
 
 const { GET } = await import("./route")
-const { crearProveedorSimulado } = await import(
-  "@/features/geo/proveedor-simulado"
-)
+const { crearProveedorSimulado } =
+  await import("@/features/geo/proveedor-simulado")
 
 function conPermisos(...permisos: ClavePermiso[]) {
   dal.acceso = {
@@ -55,7 +54,9 @@ describe("GET /api/geo/metricas", () => {
     dal.acceso = { tipo: "sin-sesion" }
     const respuesta = await pedir(MAPA)
     expect(respuesta.status).toBe(401)
-    expect(await respuesta.json()).toMatchObject({ error: { motivo: "sin-sesion" } })
+    expect(await respuesta.json()).toMatchObject({
+      error: { motivo: "sin-sesion" },
+    })
   })
 
   it("una sesión revocada también es 401", async () => {
@@ -105,18 +106,33 @@ describe("GET /api/geo/metricas", () => {
     expect(metricas).not.toContain("accesos")
   })
 
-  it("los medios destacados del detalle exigen `reportes.ver`", async () => {
-    conPermisos("analitica.mapa")
-    const sinReportes = await (await pedir(`${MAPA}&vista=detalle&zona=05`)).json()
-    expect(sinReportes.medios).toBeNull()
+  it("los medios destacados del detalle exigen `medios.ver` y `asignaciones.ver`", async () => {
+    conPermisos("analitica.mapa", "medios.ver")
+    const sinAsignaciones = await (
+      await pedir(`${MAPA}&vista=detalle&zona=05`)
+    ).json()
+    expect(sinAsignaciones.medios).toBeNull()
 
-    conPermisos("analitica.mapa", "reportes.ver")
-    const conReportes = await (await pedir(`${MAPA}&vista=detalle&zona=05`)).json()
-    expect(conReportes.medios.filas.length).toBeGreaterThan(0)
+    conPermisos("analitica.mapa", "medios.ver", "asignaciones.ver")
+    const completo = await (await pedir(`${MAPA}&vista=detalle&zona=05`)).json()
+    expect(completo.medios.filas.length).toBeGreaterThan(0)
+  })
+
+  it("los puntos de calor de medios exigen `medios.ver` (los lee la RLS de la tabla)", async () => {
+    const PUNTOS =
+      "vista=puntos&nivel=nacional&metrica=medios&desde=2026-09-01&hasta=2026-09-30"
+    conPermisos("analitica.mapa")
+    expect((await pedir(PUNTOS)).status).toBe(403)
+    // El coroplético de medios no lo exige: es un agregado de la RPC.
+    expect((await pedir(MAPA)).status).toBe(200)
+
+    conPermisos("analitica.mapa", "medios.ver")
+    expect((await pedir(PUNTOS)).status).toBe(200)
   })
 
   it("los puntos del modo calor se piden aparte y respetan el permiso de la métrica", async () => {
-    const PUNTOS = "vista=puntos&nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30"
+    const PUNTOS =
+      "vista=puntos&nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30"
     conPermisos("analitica.mapa")
     expect((await pedir(PUNTOS)).status).toBe(403)
 
@@ -125,7 +141,10 @@ describe("GET /api/geo/metricas", () => {
     expect(respuesta.status).toBe(200)
     const cuerpo = await respuesta.json()
     expect(cuerpo.puntos.length).toBeGreaterThan(0)
-    expect(cuerpo).toMatchObject({ consulta: { metrica: "accesos" }, origen: "simulado" })
+    expect(cuerpo).toMatchObject({
+      consulta: { metrica: "accesos" },
+      origen: "simulado",
+    })
 
     const sinPuntos = await pedir(PUNTOS.replace("accesos", "gmv"))
     expect(sinPuntos.status).toBe(400)
@@ -134,7 +153,9 @@ describe("GET /api/geo/metricas", () => {
   it("el mapa ya no arrastra los puntos (el coroplético no espera coordenadas)", async () => {
     conPermisos("analitica.mapa", "accesos.ver")
     const cuerpo = await (
-      await pedir("nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30")
+      await pedir(
+        "nivel=nacional&metrica=accesos&desde=2026-09-01&hasta=2026-09-30"
+      )
     ).json()
     expect(cuerpo).not.toHaveProperty("puntos")
   })
@@ -144,7 +165,11 @@ describe("GET /api/geo/metricas", () => {
     const noDisponible = async (): Promise<never> => {
       throw new ErrorDatosGeo("no-disponible", "Falta la función geo_metricas.")
     }
-    proveedor.actual = { mapa: noDisponible, puntos: noDisponible, detalle: noDisponible }
+    proveedor.actual = {
+      mapa: noDisponible,
+      puntos: noDisponible,
+      detalle: noDisponible,
+    }
     const respuesta = await pedir(MAPA)
     expect(respuesta.status).toBe(503)
     expect(respuesta.headers.get("cache-control")).toBe("no-store")

@@ -42,7 +42,9 @@ export function razonPonderada<T>(
   razon: (fila: T) => number | null,
   peso: (fila: T) => number
 ): { valor: number | null; filas: T[] } {
-  const conRazon = filas.filter((fila) => razon(fila) !== null && peso(fila) > 0)
+  const conRazon = filas.filter(
+    (fila) => razon(fila) !== null && peso(fila) > 0
+  )
   const pesoTotal = sumar(conRazon, peso)
   if (pesoTotal <= 0) return { valor: null, filas: conRazon }
   const ponderado = sumar(conRazon, (fila) => (razon(fila) ?? 0) * peso(fila))
@@ -52,8 +54,16 @@ export function razonPonderada<T>(
 export function totalesDesempeno(
   filas: readonly FilaCampana[]
 ): TotalesDesempeno {
-  const cpm = razonPonderada(filas, (f) => f.cpm, (f) => f.impresiones)
-  const engagement = razonPonderada(filas, (f) => f.engagement, (f) => f.alcance)
+  const cpm = razonPonderada(
+    filas,
+    (f) => f.cpm,
+    (f) => f.impresiones
+  )
+  const engagement = razonPonderada(
+    filas,
+    (f) => f.engagement,
+    (f) => f.alcance
+  )
   const costoAlcance = razonPonderada(
     filas,
     (f) => f.costoPorAlcance,
@@ -80,6 +90,7 @@ const RESULTADOS = ["con-verificadas", "sin-verificadas"] as const
 export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   {
     id: "campana",
+    detalle: (f) => f.anunciante,
     titulo: "Campaña",
     tipo: "texto",
     valor: (f) => f.campana,
@@ -89,6 +100,7 @@ export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   },
   {
     id: "anunciante",
+    ocultaPorDefecto: true,
     titulo: "Anunciante",
     tipo: "texto",
     valor: (f) => f.anunciante,
@@ -106,11 +118,11 @@ export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   },
   {
     id: "cupos",
+    ocultaPorDefecto: true,
     titulo: "Cupos",
     tipo: "entero",
     valor: (f) => f.cupos,
     ordenable: true,
-    ocultarBajo: "xl",
     totalizar: true,
   },
   {
@@ -158,12 +170,12 @@ export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   },
   {
     id: "impresiones",
+    ocultaPorDefecto: true,
     titulo: "Impresiones",
     tipo: "entero",
     valor: (f) => f.impresiones,
     ordenable: true,
     totalizar: true,
-    ocultarBajo: "xl",
   },
   {
     id: "interacciones",
@@ -197,6 +209,7 @@ export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   },
   {
     id: "cpm",
+    tituloCorto: "CPM",
     titulo: "CPM efectivo",
     tipo: "cop",
     valor: (f) => f.cpm,
@@ -238,6 +251,7 @@ export const columnasDesempeno: readonly ColumnaReporte<FilaCampana>[] = [
   },
   {
     id: "nVerificadas",
+    tituloCorto: "Muestra (n)",
     titulo: "Verificadas (n)",
     tipo: "entero",
     valor: (f) => f.nVerificadas,
@@ -291,8 +305,11 @@ export const estadoTablaDesempeno = definirEstadoTabla({
 function indicadoresDesempeno(datos: DatosDesempeno) {
   const { totales, anterior } = datos
   const nMinimo = datos.contexto.nMinimo
+  // De un solo anunciante las razones son exactas: se informan y se comparan
+  // siempre; el agregado de varios exige la muestra mínima en ambos periodos.
+  const entidad = datos.unAnunciante
   const anteriorSiAlcanza = (valor: number | null) =>
-    anterior.verificadas >= nMinimo ? valor : null
+    entidad || anterior.verificadas >= nMinimo ? valor : null
   return [
     indicador({
       clave: "gmv_comprometido",
@@ -344,6 +361,7 @@ function indicadoresDesempeno(datos: DatosDesempeno) {
       definicion: definicionKpi("cpm_efectivo"),
       n: totales.verificadas,
       nMinimo,
+      entidad,
       icono: "porcentaje",
     }),
     indicador({
@@ -356,6 +374,7 @@ function indicadoresDesempeno(datos: DatosDesempeno) {
       definicion: definicionKpi("engagement"),
       n: totales.verificadas,
       nMinimo,
+      entidad,
       icono: "usuarios",
     }),
   ]
@@ -417,8 +436,7 @@ function graficoCupos(datos: DatosDesempeno): EspecGrafico {
     ],
     formato: "numero",
     nombreCategoria: "Campaña",
-    vacio:
-      campanas.length === 0 ? { titulo: "Sin ofertas publicadas" } : false,
+    vacio: campanas.length === 0 ? { titulo: "Sin ofertas publicadas" } : false,
   }
 }
 
@@ -434,9 +452,7 @@ function graficosPlataforma(
   const comparables = porPlataforma.filter(
     (f) => f.cpm !== null && f.n >= nMinimo
   )
-  const excluidas = porPlataforma.filter(
-    (f) => f.cpm !== null && f.n < nMinimo
-  )
+  const excluidas = porPlataforma.filter((f) => f.cpm !== null && f.n < nMinimo)
   return [
     {
       id: "plataforma-gmv",

@@ -1,8 +1,7 @@
 /**
  * Tipos de dominio de la operación que las consultas entregan a la interfaz.
  * Son DTO planos (serializables en RSC): solo lo que cada vista muestra,
- * nunca columnas sensibles (rutas de documentos, datos `_privado`, NIT
- * completo sin permiso).
+ * nunca columnas sensibles (rutas de documentos, datos `_privado`).
  */
 import type {
   IndicadoresAsignaciones,
@@ -67,7 +66,6 @@ export type MedioFila = {
   /** GMV verificado histórico; `null` si quien consulta no ve asignaciones. */
   gmvVerificado: number | null
   creadoAt: string
-  esDemo: boolean
 }
 
 export interface ResumenMedios {
@@ -210,7 +208,7 @@ export type AnuncianteFila = {
   id: string
   nombreComercial: string
   razonSocial: string
-  /** Enmascarado salvo `datos_sensibles.ver`. */
+  /** NIT con su dígito o identificación extranjera, completos (dato público). */
   identificacion: string | null
   sector: string | null
   paisIso2: string
@@ -223,8 +221,9 @@ export type AnuncianteFila = {
   inversion: number
   /** Saldo por cobrar; `null` sin permiso de facturas. */
   cartera: number | null
+  /** Facturas con saldo ya vencidas; `null` sin `facturas.ver`. */
+  facturasVencidas: number | null
   creadoAt: string
-  esDemo: boolean
 }
 
 export interface ResumenAnunciantes {
@@ -242,7 +241,6 @@ export interface AnuncianteDetalle {
   nombreComercial: string
   razonSocial: string
   identificacion: string | null
-  identificacionVisible: boolean
   tipoIdentificacion: "NIT" | "Identificación tributaria"
   sector: string | null
   paisIso2: string
@@ -476,6 +474,8 @@ export interface AsignacionDetalle {
   causaCancelacion: string | null
   motivo: string | null
   creadaAt: string
+  /** `null` = el medio rechazó la oferta en el marketplace: nunca tuvo cupo ni precio. */
+  aceptadaAt: string | null
   fechaLimite: string | null
   ventanaInicio: string | null
   ventanaFin: string | null

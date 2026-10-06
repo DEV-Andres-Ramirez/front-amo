@@ -51,7 +51,9 @@ export function paginasEstratificadas(
 }
 
 /** Filas efectivamente leídas por un conjunto de páginas. */
-export function filasLeidas(paginas: readonly (readonly [number, number])[]): number {
+export function filasLeidas(
+  paginas: readonly (readonly [number, number])[]
+): number {
   return paginas.reduce((suma, [desde, hasta]) => suma + hasta - desde + 1, 0)
 }
 
@@ -92,7 +94,9 @@ export function agregarEnCuadricula(
     if (celda) celda[2] += factor
     else celdas.set(clave, [x, y, factor])
   }
-  return [...celdas.values()].map(
-    ([lon, lat, peso]): PuntoGeo => [lon, lat, Math.round(peso * 100) / 100]
-  )
+  return [...celdas.values()].map(([lon, lat, peso]): PuntoGeo => [
+    lon,
+    lat,
+    Math.round(peso * 100) / 100,
+  ])
 }

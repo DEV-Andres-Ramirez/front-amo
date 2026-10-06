@@ -70,10 +70,9 @@ export const PRESETS_MAPA = [
 export type PresetMapa = (typeof PRESETS_MAPA)[number]
 
 export const ETIQUETAS_PRESET_MAPA: Readonly<Record<PresetMapa, string>> =
-  Object.fromEntries(PRESETS_MAPA.map((p) => [p, ETIQUETAS_PRESET[p]])) as Record<
-    PresetMapa,
-    string
-  >
+  Object.fromEntries(
+    PRESETS_MAPA.map((p) => [p, ETIQUETAS_PRESET[p]])
+  ) as Record<PresetMapa, string>
 
 /**
  * Rango efectivo: el de la URL si ambos extremos son válidos y el intervalo no
@@ -89,7 +88,10 @@ export function rangoDelMapa(
   if (inicio && fin) {
     const rango = rangoPersonalizado(inicio, fin)
     if (diasEnRango(rango) <= DIAS_MAXIMOS_RANGO) {
-      return { ...rango, preset: presetCoincidente(rango, ahora) ?? "personalizado" }
+      return {
+        ...rango,
+        preset: presetCoincidente(rango, ahora) ?? "personalizado",
+      }
     }
   }
   return rangoDesdePreset(PRESET_POR_DEFECTO, ahora)
@@ -118,5 +120,8 @@ export function rangoParaUrl(
   if (presetCoincidente(rango, ahora) === PRESET_POR_DEFECTO) {
     return { desde: null, hasta: null }
   }
-  return { desde: serializarFecha(rango.desde), hasta: serializarFecha(rango.hasta) }
+  return {
+    desde: serializarFecha(rango.desde),
+    hasta: serializarFecha(rango.hasta),
+  }
 }

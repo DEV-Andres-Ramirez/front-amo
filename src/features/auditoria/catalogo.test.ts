@@ -32,6 +32,15 @@ describe("vocabulario", () => {
     expect(humanizar("TIPO_SESION")).toBe("Tipo sesión")
   })
 
+  it("humanizar devuelve la ortografía a las palabras frecuentes sin tilde", () => {
+    expect(humanizar("es_publica")).toBe("Es pública")
+    expect(humanizar("numero_maximo")).toBe("Número máximo")
+    expect(humanizar("codigo_pais")).toBe("Código país")
+    expect(humanizar("ultimos_dias")).toBe("Últimos días")
+    // Solo palabras completas: no toca las que las contienen.
+    expect(humanizar("publicador")).toBe("Publicador")
+  })
+
   it("entidades conocidas y desconocidas", () => {
     expect(nombreEntidad("perfiles")).toBe("Usuario")
     expect(complementoEntidad("perfiles")).toBe("un usuario")

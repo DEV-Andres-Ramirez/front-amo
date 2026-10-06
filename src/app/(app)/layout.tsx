@@ -1,6 +1,10 @@
 import { cookies } from "next/headers"
 
 import { ShellAplicacion } from "@/components/layout/shell-aplicacion"
+import {
+  COOKIE_VISTA_TABLET,
+  pistaVistaTablet,
+} from "@/components/layout/vista-tablet"
 import { ProveedorPreferencias } from "@/features/cuenta/components/proveedor-preferencias"
 import { preferenciasPropias } from "@/features/cuenta/queries"
 import { obtenerUsuarioShell } from "@/lib/auth/dal"
@@ -35,6 +39,9 @@ export default async function LayoutAplicacion({ children }: LayoutProps<"/">) {
         usuario={usuario}
         barraLateralAbierta={preferenciaBarraLateral(
           almacenCookies.get(COOKIE_BARRA_LATERAL)?.value
+        )}
+        vistaTablet={pistaVistaTablet(
+          almacenCookies.get(COOKIE_VISTA_TABLET)?.value
         )}
       >
         {children}

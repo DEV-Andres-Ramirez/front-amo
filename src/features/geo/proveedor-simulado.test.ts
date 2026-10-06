@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 
-import { listarDepartamentos, municipiosDeDepartamento } from "@/lib/geo/catalogo"
+import {
+  listarDepartamentos,
+  municipiosDeDepartamento,
+} from "@/lib/geo/catalogo"
 
 import { metricasDelNivel } from "./metricas"
 import { crearProveedorSimulado } from "./proveedor-simulado"
@@ -65,7 +68,9 @@ describe("proveedor simulado (AMO_GEO_MOCK)", () => {
     const calor = await proveedor.puntos(BASE)
     expect(calor.puntos.length).toBeGreaterThan(0)
     expect(calor.total).toBe(calor.muestra)
-    expect((await proveedor.puntos({ ...BASE, metrica: "gmv" })).puntos).toEqual([])
+    expect(
+      (await proveedor.puntos({ ...BASE, metrica: "gmv" })).puntos
+    ).toEqual([])
   })
 
   it("las tasas con muestra insuficiente vuelven sin valor pero con n", async () => {
@@ -90,6 +95,23 @@ describe("proveedor simulado (AMO_GEO_MOCK)", () => {
     expect(detalle.sinSerie).toBeNull()
     expect(detalle.top?.filas.length).toBeLessThanOrEqual(5)
     expect(detalle.medios?.filas).toHaveLength(5)
+    expect(detalle.medios?.metrica).toBe("gmv")
+  })
+
+  it("los KPI traen el comparativo con el periodo anterior, como `detalle_zona_geo`", async () => {
+    const { kpis } = await proveedor.detalle({
+      ...BASE,
+      metrica: "gmv",
+      zona: "05",
+      metricasKpi: ["gmv", "medios"],
+      conMedios: false,
+    })
+    for (const kpi of kpis) {
+      expect(kpi.anterior).toBeGreaterThan(0)
+      expect(kpi.variacion).toBeCloseTo(
+        ((kpi.valor ?? 0) - (kpi.anterior ?? 0)) / (kpi.anterior ?? 1)
+      )
+    }
   })
 
   it("la audiencia es una foto actual: sin evolución", async () => {

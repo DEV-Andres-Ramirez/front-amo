@@ -15,6 +15,8 @@ import {
 import { type Miga, migas as migasDeRuta } from "@/lib/auth/navegacion"
 import { cn } from "@/lib/utils"
 
+import { useTituloMiga } from "./titulo-miga"
+
 function ContenidoMiga({ miga, esUltima }: { miga: Miga; esUltima: boolean }) {
   if (esUltima) {
     return (
@@ -32,8 +34,10 @@ function ContenidoMiga({ miga, esUltima }: { miga: Miga; esUltima: boolean }) {
 }
 
 /**
- * Migas de la ruta actual según el registro de navegación. En móvil solo se
- * ve la página actual (el resto queda para lectores de pantalla).
+ * Migas de la ruta actual según el registro de navegación; la última lleva el
+ * título que la página haya fijado con `<TituloMiga>` (el nombre del registro
+ * de una ficha). En móvil solo se ve la página actual (el resto queda para
+ * lectores de pantalla).
  */
 export function MigasPan({
   migas,
@@ -44,7 +48,8 @@ export function MigasPan({
   className?: string
 }) {
   const rutaActual = usePathname()
-  const lista = migas ?? migasDeRuta(rutaActual)
+  const tituloPagina = useTituloMiga(rutaActual)
+  const lista = migas ?? migasDeRuta(rutaActual, tituloPagina)
   if (lista.length === 0) return null
 
   return (

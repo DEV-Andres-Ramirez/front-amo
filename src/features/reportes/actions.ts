@@ -8,17 +8,17 @@
 import "server-only"
 
 import { requerirPermiso } from "@/lib/auth/dal"
-import { serializarFecha } from "@/lib/fechas"
 import { desdeErrorZod, exito, fallo, type ResultadoAccion } from "@/lib/result"
-import type { Json } from "@/types/database.types"
 
-import { puedeVerReporte, REPORTES } from "./catalogo"
+import { filtrosPara, puedeVerReporte, REPORTES } from "./catalogo"
 import { cargarDatosReporte } from "./consultas"
 import { contenidoReporte } from "./definiciones"
 import {
-  type FiltrosReporte,
   filtrosDesdeValores,
-  type ValoresFiltros,
+  filtrosParaBitacora,
+  limitarFiltros,
+  MENSAJE_PERIODO_EXCEDIDO,
+  periodoExcedido,
   valoresDesdeEntrada,
 } from "./filtros"
 import {
@@ -27,25 +27,6 @@ import {
 } from "./schemas"
 import { informar, registrarExportacionReporte } from "./servidor"
 import type { ArchivoReporte } from "./tipos"
-
-function filtrosParaBitacora(
-  valores: ValoresFiltros,
-  filtros: FiltrosReporte,
-  usaCorte: boolean
-): Record<string, Json> {
-  const presentes = Object.fromEntries(
-    Object.entries(valores).filter(([, valor]) => valor !== null)
-  ) as Record<string, Json>
-  return {
-    ...presentes,
-    ...(usaCorte
-      ? { corte: serializarFecha(filtros.corte) }
-      : {
-          desde: serializarFecha(filtros.rango.desde),
-          hasta: serializarFecha(filtros.rango.hasta),
-        }),
-  }
-}
 
 /**
  * Prepara la exportación de un reporte: vuelve a consultar con los filtros de
@@ -67,18 +48,19 @@ export async function prepararExportacionReporte(
   }
 
   try {
-    const valores = valoresDesdeEntrada(validacion.data.filtros)
-    const filtros = filtrosDesdeValores(valores)
+    const aplicables = filtrosPara(catalogo, usuario)
+    const filtros = limitarFiltros(
+      aplicables,
+      filtrosDesdeValores(valoresDesdeEntrada(validacion.data.filtros))
+    )
+    if (periodoExcedido(catalogo, filtros))
+      return fallo(MENSAJE_PERIODO_EXCEDIDO)
     const datos = await cargarDatosReporte(reporte, filtros, usuario)
     const filas = contenidoReporte({ reporte, datos }).tabla.filas.length
     const registrado = await registrarExportacionReporte(usuario, reporte, {
       formato,
       filas,
-      filtros: filtrosParaBitacora(
-        valores,
-        filtros,
-        catalogo.filtros.includes("corte")
-      ),
+      filtros: filtrosParaBitacora(aplicables, filtros),
     })
     if (!registrado) {
       return fallo(

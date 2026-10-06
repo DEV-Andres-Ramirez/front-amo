@@ -35,9 +35,8 @@ import {
  * - `tema` lo aplica next-themes; aquí solo se trae el guardado en la cuenta
  *   cuando este navegador aún no eligió uno.
  *
- * Integración (coordinador): envolver el AppShell en `(app)/layout.tsx` con
- * `<ProveedorPreferencias inicial={await preferenciasPropias(usuario.id)}>`.
- * Mientras no esté, la página de Preferencias monta uno local.
+ * Lo monta `(app)/layout.tsx` alrededor del AppShell, con las preferencias
+ * guardadas en la cuenta: valen en todas las secciones.
  */
 
 export type EstadoGuardado = "inactivo" | "guardando" | "guardado" | "error"

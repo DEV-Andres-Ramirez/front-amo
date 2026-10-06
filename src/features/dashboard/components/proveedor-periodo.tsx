@@ -6,6 +6,7 @@ import {
   type ReactNode,
   use,
   useMemo,
+  useState,
   useTransition,
 } from "react"
 
@@ -17,10 +18,18 @@ import { parsersPeriodo, type ValoresPeriodo } from "../periodo"
 interface ContextoPeriodo {
   /** El servidor está calculando el panel del periodo nuevo. */
   actualizando: boolean
+  /** Veces que se cambió de periodo en esta visita (0 = aún ninguna). */
+  cambios: number
   porDefecto: PresetAutomatico
   valores: ValoresPeriodo
   fijar: (valores: ValoresPeriodo) => void
 }
+
+/**
+ * `id` del botón del selector de periodo: quien cambia el periodo desde un
+ * control que desaparece al hacerlo le devuelve ahí el foco.
+ */
+export const ID_SELECTOR_PERIODO = "selector-periodo-panel"
 
 const Contexto = createContext<ContextoPeriodo | null>(null)
 
@@ -30,6 +39,14 @@ export function usePeriodoPanel(): ContextoPeriodo {
     throw new Error("usePeriodoPanel debe usarse dentro de ProveedorPeriodo")
   }
   return contexto
+}
+
+/**
+ * ¿El servidor está calculando el panel de otro periodo? Fuera del proveedor
+ * (el aviso de un bloque que falló puede pintarse sin él), `false`.
+ */
+export function useActualizandoPanel(): boolean {
+  return use(Contexto)?.actualizando ?? false
 }
 
 /**
@@ -45,6 +62,7 @@ export function ProveedorPeriodo({
   children: ReactNode
 }) {
   const [actualizando, iniciar] = useTransition()
+  const [cambios, setCambios] = useState(0)
   const [valores, fijarValores] = useQueryStates(parsersPeriodo, {
     shallow: false,
     scroll: false,
@@ -53,16 +71,25 @@ export function ProveedorPeriodo({
   const valor = useMemo<ContextoPeriodo>(
     () => ({
       actualizando,
+      cambios,
       porDefecto,
       valores,
-      fijar: (siguientes) => void fijarValores(siguientes),
+      fijar: (siguientes) => {
+        setCambios((veces) => veces + 1)
+        void fijarValores(siguientes)
+      },
     }),
-    [actualizando, porDefecto, valores, fijarValores]
+    [actualizando, cambios, porDefecto, valores, fijarValores]
   )
   return <Contexto value={valor}>{children}</Contexto>
 }
 
-/** Contenido del panel: se atenúa y anuncia la carga al cambiar de periodo. */
+/**
+ * Contenido del panel: se atenúa y anuncia la carga al cambiar de periodo.
+ * Es además el contenedor de las consultas de tamaño (`@…/panel:`): las
+ * rejillas del panel se acomodan al ancho real del contenido, que cambia con
+ * la barra lateral abierta o plegada, y no al de la ventana.
+ */
 export function ContenidoPanel({
   className,
   children,
@@ -70,17 +97,31 @@ export function ContenidoPanel({
   className?: string
   children: ReactNode
 }) {
-  const { actualizando } = usePeriodoPanel()
+  const { actualizando, cambios } = usePeriodoPanel()
   return (
-    <div
-      aria-busy={actualizando || undefined}
-      className={cn(
-        "transition-opacity duration-300 ease-suave",
-        actualizando && "pointer-events-none opacity-55 motion-reduce:opacity-70",
-        className
-      )}
-    >
-      {children}
-    </div>
+    <>
+      {/*
+       * `aria-busy` no se anuncia: quien no ve el panel atenuarse se entera
+       * por esta región viva de que cambió el periodo y de que ya llegó.
+       */}
+      <p role="status" className="sr-only">
+        {actualizando
+          ? "Actualizando el panel…"
+          : cambios > 0
+            ? "Panel actualizado."
+            : ""}
+      </p>
+      <div
+        aria-busy={actualizando || undefined}
+        className={cn(
+          "@container/panel transition-opacity duration-300 ease-suave",
+          actualizando &&
+            "pointer-events-none opacity-55 motion-reduce:opacity-70",
+          className
+        )}
+      >
+        {children}
+      </div>
+    </>
   )
 }

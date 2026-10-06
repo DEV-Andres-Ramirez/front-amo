@@ -158,8 +158,11 @@ begin
   execute 'set local role authenticated';
   v_ts := now() + interval '1 day';
   select public.programar_tarifa(v_formato, v_franja, 380000.004, v_ts) into v_id;
+  -- Cuentan las vigencias no terminadas (la que regía, cerrada en v_ts, y la programada): la BD puede traer además
+  -- vigencias históricas ya cerradas de la misma tarifa (datos demo).
   r := r || jsonb_build_object('c1_programar_tarifa',
-    (select count(*) from public.tarifas where formato_id = v_formato and franja_id = v_franja) = 2
+    (select count(*) from public.tarifas where formato_id = v_formato and franja_id = v_franja
+       and (vigente_hasta is null or vigente_hasta > now())) = 2
     and exists (select 1 from public.tarifas where id = v_id and valor_base = 380000 and vigente_hasta is null
                                                 and creada_por = u_adm and not pendiente_validacion)
     and exists (select 1 from public.tarifas where formato_id = v_formato and franja_id = v_franja
@@ -295,6 +298,9 @@ begin
   end;
 
   -- ── (e) Resoluciones DIAN y consecutivo sin huecos ───────────────────────────────────────────────────
+  -- Solo hay una resolución activa por tipo y la BD puede traer las suyas (datos demo): se desactivan dentro de esta
+  -- transacción para que la prueba parta de «sin resolución activa» y numere con la propia.
+  update public.resoluciones_dian set activa = false where activa;
   insert into public.resoluciones_dian (tipo, prefijo, numero_resolucion, fecha_resolucion, rango_desde, rango_hasta,
                                         consecutivo_actual, vigente_desde, activa)
   values ('DOCUMENTO_SOPORTE', 'HUMO', '18764000000001', private.hoy(), 1, 2, 500, private.hoy(), true) returning id into v_id2;

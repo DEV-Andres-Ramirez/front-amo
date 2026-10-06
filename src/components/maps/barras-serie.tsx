@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 export interface BarraSerie {
   /** `null`: sin valor (muestra insuficiente); se marca en la base. */
   readonly valor: number | null
-  /** Periodo incompleto (primera o última cubeta): barra atenuada. */
+  /** Periodo incompleto (primera o última cubeta): barra de borde punteado. */
   readonly parcial: boolean
   /** Periodo de la barra ("sept 2026"). */
   readonly etiqueta: string
@@ -30,11 +30,19 @@ interface BarrasSerieProps {
  * periodo y su valor en el encabezado. Es una lista accesible (periodo y
  * valor por elemento), no un lienzo.
  */
-export function BarrasSerie({ barras, titulo, nota, className }: BarrasSerieProps) {
+export function BarrasSerie({
+  barras,
+  titulo,
+  nota,
+  className,
+}: BarrasSerieProps) {
   const id = useId()
   const lista = useRef<HTMLOListElement>(null)
   const [activa, setActiva] = useState<number | null>(null)
-  const maximo = barras.reduce((mayor, barra) => Math.max(mayor, barra.valor ?? 0), 0)
+  const maximo = barras.reduce(
+    (mayor, barra) => Math.max(mayor, barra.valor ?? 0),
+    0
+  )
   const ultima = barras.length - 1
   const enFoco = activa ?? ultima
   const lectura = barras[enFoco]
@@ -59,13 +67,16 @@ export function BarrasSerie({ barras, titulo, nota, className }: BarrasSerieProp
   }
 
   return (
-    <section aria-labelledby={`${id}-titulo`} className={cn("flex flex-col gap-2", className)}>
+    <section
+      aria-labelledby={`${id}-titulo`}
+      className={cn("flex flex-col gap-2", className)}
+    >
       <div className="flex items-baseline justify-between gap-3 text-xs">
         <h3 id={`${id}-titulo`} className="text-muted-foreground">
           {titulo}
         </h3>
         {lectura ? (
-          <p aria-hidden className="cifras truncate text-right">
+          <p aria-hidden className="truncate text-right cifras">
             <span className="text-muted-foreground">{lectura.etiqueta}</span>{" "}
             <span className="font-semibold">{lectura.texto}</span>
           </p>
@@ -102,9 +113,20 @@ export function BarrasSerie({ barras, titulo, nota, className }: BarrasSerieProp
                 <span
                   aria-hidden
                   className={cn(
-                    "w-full rounded-t-[3px] rounded-b-[1px] transition-[background-color,opacity] duration-200",
-                    destacada ? "bg-primary" : "bg-primary/45 group-hover:bg-primary/70",
-                    barra.parcial && "opacity-50"
+                    "w-full rounded-t-[3px] rounded-b-[1px] transition-[background-color,border-color] duration-200",
+                    // El periodo incompleto se distingue por el borde, no por
+                    // la intensidad: la última barra suele serlo y además es
+                    // la destacada por defecto.
+                    barra.parcial
+                      ? cn(
+                          "border border-dashed",
+                          destacada
+                            ? "border-primary bg-primary/40"
+                            : "border-primary/60 bg-primary/15 group-hover:bg-primary/30"
+                        )
+                      : destacada
+                        ? "bg-primary"
+                        : "bg-primary/45 group-hover:bg-primary/70"
                   )}
                   style={{ height: `${alto}%` }}
                 />
@@ -113,11 +135,20 @@ export function BarrasSerie({ barras, titulo, nota, className }: BarrasSerieProp
           )
         })}
       </ol>
-      <div aria-hidden className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+      <div
+        aria-hidden
+        className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground"
+      >
         <span className="truncate">{barras[0]?.etiqueta}</span>
-        {ultima > 0 ? <span className="truncate text-right">{barras[ultima]?.etiqueta}</span> : null}
+        {ultima > 0 ? (
+          <span className="truncate text-right">
+            {barras[ultima]?.etiqueta}
+          </span>
+        ) : null}
       </div>
-      {nota ? <p className="text-[0.6875rem] text-muted-foreground">{nota}</p> : null}
+      {nota ? (
+        <p className="text-[0.6875rem] text-muted-foreground">{nota}</p>
+      ) : null}
     </section>
   )
 }

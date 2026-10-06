@@ -32,7 +32,10 @@ describe("proyección Equal Earth", () => {
 })
 
 describe("trazos de países", () => {
-  const coleccion: FeatureCollection<Geometry, { codigo: string; nombre: string }> = {
+  const coleccion: FeatureCollection<
+    Geometry,
+    { codigo: string; nombre: string }
+  > = {
     type: "FeatureCollection",
     features: [
       {
@@ -40,13 +43,31 @@ describe("trazos de países", () => {
         properties: { codigo: "CO", nombre: "Colombia" },
         geometry: {
           type: "Polygon",
-          coordinates: [[[-79, -4], [-67, -4], [-67, 12], [-79, 12], [-79, -4]]],
+          coordinates: [
+            [
+              [-79, -4],
+              [-67, -4],
+              [-67, 12],
+              [-79, 12],
+              [-79, -4],
+            ],
+          ],
         },
       },
       {
         type: "Feature",
         properties: { codigo: "AQ", nombre: "Antártida" },
-        geometry: { type: "Polygon", coordinates: [[[0, -80], [10, -80], [10, -70], [0, -80]]] },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [0, -80],
+              [10, -80],
+              [10, -70],
+              [0, -80],
+            ],
+          ],
+        },
       },
       {
         type: "Feature",

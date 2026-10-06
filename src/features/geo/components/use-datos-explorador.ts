@@ -16,11 +16,7 @@ import {
 import { departamentoPorCodigo } from "../departamentos"
 import { urlGeometria } from "../encuadre"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
-import type {
-  CentroZona,
-  RespuestaMapaGeo,
-  RespuestaPuntosGeo,
-} from "../tipos"
+import type { CentroZona, RespuestaMapaGeo, RespuestaPuntosGeo } from "../tipos"
 import type { EstadoExplorador } from "../use-estado-explorador"
 import {
   type CirculosVista,

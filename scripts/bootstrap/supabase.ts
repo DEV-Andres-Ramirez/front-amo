@@ -150,6 +150,25 @@ export async function actualizarPerfil(
   }
 }
 
+/**
+ * INVITADO → ACTIVO por la vía del sistema (`activar_perfil_srv`, exige el
+ * correo confirmado). Idempotente: con otro estado no hace nada. El estado de
+ * un perfil no se escribe con UPDATE (AMO_ESTADO_SOLO_VIA_TRANSICION).
+ */
+export async function activarPerfil(
+  servicio: ClienteSupabase,
+  usuarioId: string
+): Promise<void> {
+  const { error } = await servicio.rpc("activar_perfil_srv", {
+    p_usuario_id: usuarioId,
+  })
+  if (error) {
+    throw new ErrorBootstrap(
+      `No se pudo activar el perfil: ${error.message}${error.details ? ` (${error.details})` : ""}`
+    )
+  }
+}
+
 /** Ruta de la página de confirmación de AMO (el GET no consume el token). */
 export function rutaConfirmacion(
   tokenHash: string,

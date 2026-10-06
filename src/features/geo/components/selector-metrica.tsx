@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
-import { DEFINICIONES_METRICAS, type MetricaGeo, METRICAS_GEO } from "../metricas"
+import {
+  DEFINICIONES_METRICAS,
+  type MetricaGeo,
+  METRICAS_GEO,
+} from "../metricas"
 import { ICONOS_METRICA } from "./iconos-metrica"
 
 interface SelectorMetricaProps {
@@ -64,7 +68,11 @@ export function SelectorMetrica({
           }
         </SelectValue>
       </SelectTrigger>
-      <SelectContent className="min-w-64" alignItemWithTrigger={false} align="start">
+      <SelectContent
+        className="min-w-64"
+        alignItemWithTrigger={false}
+        align="start"
+      >
         {opciones.map((opcion) => (
           <SelectItem key={opcion} value={opcion} className="py-2">
             <EtiquetaMetrica metrica={opcion} />

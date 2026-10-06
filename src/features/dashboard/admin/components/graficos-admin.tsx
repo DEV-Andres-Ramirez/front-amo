@@ -2,18 +2,20 @@
 
 import type { ElementoValor, EtapaEmbudo } from "@/components/charts/datos"
 import { conversionesEmbudo, mayorCaida } from "@/components/charts/datos"
+import { conUnidad } from "@/components/charts/formatos"
 import { GraficoBarrasRanking } from "@/components/charts/grafico-barras-ranking"
 import { GraficoCombo } from "@/components/charts/grafico-combo"
 import { GraficoDona } from "@/components/charts/grafico-dona"
 import { GraficoEmbudo } from "@/components/charts/grafico-embudo"
 import { TarjetaGrafico } from "@/components/charts/tarjeta-grafico"
-import {
-  formatearCOP,
-  formatearCOPCompacto,
-  formatearPorcentaje,
-} from "@/lib/format"
+import { formatearCOP, formatearPorcentaje } from "@/lib/format"
 
-import { type DatosTendenciaGmv, POR_GRANULARIDAD } from "../datos"
+import {
+  ALTO_DONA,
+  ALTO_EMBUDO,
+  type DatosTendenciaGmv,
+  POR_GRANULARIDAD,
+} from "../datos"
 
 /** GMV verificado (columnas) y comisión (línea), en bandas apiladas. */
 export function GraficoTendenciaGmv({
@@ -74,47 +76,71 @@ export function GraficoTendenciaGmv({
 }
 
 const UNIDAD_ASIGNACION = { singular: "asignación", plural: "asignaciones" }
+const UNIDAD_VISTA = { singular: "oferta vista", plural: "ofertas vistas" }
+const UNIDAD_VEZ = { singular: "vez", plural: "veces" }
 
-/** De las ofertas vistas a los negocios pagados, con la mayor fuga al pie. */
+/**
+ * De las asignaciones aceptadas a las pagadas (100 % = aceptadas), con la
+ * etapa donde más se frenan al pie. Las ofertas vistas son otra cohorte
+ * (`embudoPanel`): van como contexto, no como primera barra.
+ */
 export function GraficoEmbudoPanel({
   etapas,
+  vistas,
   vacio,
   className,
 }: {
+  /** De aceptadas a pagadas, en orden. */
   etapas: readonly EtapaEmbudo[]
+  /** Ofertas vistas por los medios en el periodo. */
+  vistas: number | null
   vacio: boolean
   className?: string
 }) {
-  // Desde las aceptadas: "vistas" es otra cohorte y casi siempre sería la
-  // mayor caída, lo que no dice nada nuevo (ya está en la tasa de aceptación).
-  const ejecucion = etapas.filter((etapa) => etapa.id !== "vistas")
-  const caida = mayorCaida(conversionesEmbudo(ejecucion))
-  const indice = caida ? ejecucion.findIndex((e) => e.id === caida.id) : -1
-  const previa = indice > 0 ? ejecucion[indice - 1] : null
+  const caida = mayorCaida(conversionesEmbudo(etapas))
+  const indice = caida ? etapas.findIndex((e) => e.id === caida.id) : -1
+  const previa = indice > 0 ? etapas[indice - 1] : null
+  const conVistas = vistas !== null && vistas > 0
+  const conCaida = Boolean(caida && previa && caida.deLaAnterior !== null)
   return (
     <TarjetaGrafico
       titulo="Embudo de asignaciones"
       descripcion="Asignaciones aceptadas en el periodo según la etapa más avanzada que alcanzaron."
-      alto="min-h-96"
+      alto={ALTO_EMBUDO}
       className={className}
       vacio={
         vacio
           ? {
               titulo: "Sin asignaciones aceptadas en el periodo",
-              descripcion:
-                "El embudo aparece cuando los medios acepten ofertas publicadas.",
+              descripcion: conVistas
+                ? `Los medios vieron ofertas ${conUnidad(vistas, UNIDAD_VEZ)} en el periodo, pero aún no aceptaron ninguna.`
+                : "El embudo aparece cuando los medios acepten ofertas publicadas.",
             }
           : false
       }
       pie={
-        !vacio && caida && previa && caida.deLaAnterior !== null ? (
+        // Solo contenido en línea: en pantalla completa el pie va en un `<p>`.
+        !vacio && (conVistas || conCaida) ? (
           <>
-            Mayor fuga: de {previa.nombre.toLocaleLowerCase("es-CO")} a{" "}
-            {caida.nombre.toLocaleLowerCase("es-CO")} avanza el{" "}
-            <span className="cifras font-medium text-foreground">
-              {formatearPorcentaje(caida.deLaAnterior, 1)}
-            </span>
-            .
+            {conVistas ? (
+              <>
+                <span className="font-medium cifras text-foreground">
+                  {conUnidad(vistas, UNIDAD_VISTA)}
+                </span>{" "}
+                por los medios en el periodo.{" "}
+              </>
+            ) : null}
+            {caida && previa && caida.deLaAnterior !== null ? (
+              <>
+                Donde más se frenan: de{" "}
+                {previa.nombre.toLocaleLowerCase("es-CO")} a{" "}
+                {caida.nombre.toLocaleLowerCase("es-CO")} avanza el{" "}
+                <span className="font-medium cifras text-foreground">
+                  {formatearPorcentaje(caida.deLaAnterior, 1)}
+                </span>{" "}
+                (las más recientes siguen en curso).
+              </>
+            ) : null}
           </>
         ) : null
       }
@@ -150,7 +176,7 @@ export function GraficoPlataformas({
     <TarjetaGrafico
       titulo="GMV por plataforma"
       descripcion="Participación de cada red en los negocios verificados."
-      alto="min-h-64"
+      alto={ALTO_DONA}
       className={className}
       vacio={
         segmentos.length === 0
@@ -167,7 +193,7 @@ export function GraficoPlataformas({
             {conCpm
               .map(
                 (fila) =>
-                  `${fila.nombre} ${formatearCOPCompacto(fila.cpm)}${fila.familia === "reproducciones" ? " (por mil reproducciones)" : ""}`
+                  `${fila.nombre} ${formatearCOP(fila.cpm === null ? null : Math.round(fila.cpm))}${fila.familia === "reproducciones" ? " (por mil reproducciones)" : ""}`
               )
               .join(" · ")}
           </span>
@@ -178,7 +204,8 @@ export function GraficoPlataformas({
         titulo="GMV por plataforma"
         segmentos={segmentos}
         formato="cop"
-        etiquetaTotal="GMV verificado"
+        // Corta: "GMV verificado" no cabe dentro del anillo en la tarjeta angosta.
+        etiquetaTotal="GMV"
         nombreCategoria="Plataforma"
         maximo={3}
       />
@@ -186,12 +213,15 @@ export function GraficoPlataformas({
   )
 }
 
-/** Formatos con más GMV verificado (cada uno con su plataforma). */
+/** Formatos con más GMV verificado (cada uno con la sigla de su plataforma). */
 export function GraficoFormatos({
   elementos,
+  siglas,
   className,
 }: {
   elementos: readonly ElementoValor[]
+  /** "FB: Facebook · IG: Instagram": qué significan las siglas del eje. */
+  siglas: string
   className?: string
 }) {
   return (
@@ -208,6 +238,7 @@ export function GraficoFormatos({
             }
           : false
       }
+      pie={elementos.length > 0 && siglas ? siglas : null}
     >
       <GraficoBarrasRanking
         titulo="GMV por formato"

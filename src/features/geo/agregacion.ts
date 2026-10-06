@@ -152,7 +152,8 @@ export function construirRanking(
     if (zona.valor === null) {
       return { ...zona, posicion: null, participacion: null }
     }
-    const posicion = zona.valor === valorAnterior ? posicionAnterior : indice + 1
+    const posicion =
+      zona.valor === valorAnterior ? posicionAnterior : indice + 1
     posicionAnterior = posicion
     valorAnterior = zona.valor
     return {

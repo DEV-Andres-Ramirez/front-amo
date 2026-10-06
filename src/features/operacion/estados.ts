@@ -7,6 +7,8 @@
 import type { Tono } from "@/features/usuarios/presentacion"
 import type { Database } from "@/types/database.types"
 
+import type { VigenciaVerificacion } from "./calculos"
+
 export type { Tono }
 
 type Enums = Database["public"]["Enums"]
@@ -53,11 +55,7 @@ export const ESTADOS_MEDIO: Catalogo<EstadoMedio> = {
     "exito",
     "Puede ver y aceptar ofertas de su nivel."
   ),
-  RECHAZADO: estado(
-    "Rechazado",
-    "peligro",
-    "La verificación no fue aprobada."
-  ),
+  RECHAZADO: estado("Rechazado", "peligro", "La verificación no fue aprobada."),
   SUSPENDIDO: estado(
     "Suspendido",
     "aviso",
@@ -76,11 +74,7 @@ export const ESTADOS_ANUNCIANTE: Catalogo<EstadoAnunciante> = {
     "exito",
     "Puede publicar campañas y ofertas."
   ),
-  RECHAZADO: estado(
-    "Rechazado",
-    "peligro",
-    "La verificación no fue aprobada."
-  ),
+  RECHAZADO: estado("Rechazado", "peligro", "La verificación no fue aprobada."),
   SUSPENDIDO: estado(
     "Suspendido",
     "aviso",
@@ -89,7 +83,11 @@ export const ESTADOS_ANUNCIANTE: Catalogo<EstadoAnunciante> = {
 }
 
 export const ESTADOS_CAMPANA: Catalogo<EstadoCampana> = {
-  BORRADOR: estado("Borrador", "neutro", "En preparación; no tiene ofertas publicadas."),
+  BORRADOR: estado(
+    "Borrador",
+    "neutro",
+    "En preparación; no tiene ofertas publicadas."
+  ),
   ACTIVA: estado("Activa", "exito", "Tiene ofertas en curso o por publicar."),
   FINALIZADA: estado("Finalizada", "info", "Terminó su vigencia."),
   CANCELADA: estado("Cancelada", "peligro", "Se canceló antes de terminar."),
@@ -211,7 +209,11 @@ export const ESTADOS_FACTURA: Catalogo<EstadoFactura> = {
   EMITIDA: estado("Emitida", "info", "Emitida y pendiente de pago."),
   PAGADA_PARCIAL: estado("Pago parcial", "aviso", "Tiene un saldo pendiente."),
   PAGADA: estado("Pagada", "exito", "Sin saldo pendiente."),
-  VENCIDA: estado("Vencida", "peligro", "Pasó su fecha de vencimiento con saldo."),
+  VENCIDA: estado(
+    "Vencida",
+    "peligro",
+    "Pasó su fecha de vencimiento con saldo."
+  ),
   ANULADA: estado("Anulada", "neutro", "Anulada; no cuenta en la cartera."),
 }
 
@@ -219,7 +221,36 @@ export const ESTADOS_LIQUIDACION: Catalogo<EstadoLiquidacion> = {
   BORRADOR: estado("Borrador", "neutro", "Generada; falta aprobarla."),
   APROBADA: estado("Aprobada", "info", "Aprobada y pendiente de pago."),
   PAGADA: estado("Pagada", "exito", "Pagada al medio."),
-  ANULADA: estado("Anulada", "neutro", "Anulada; sus asignaciones volvieron a verificadas."),
+  ANULADA: estado(
+    "Anulada",
+    "neutro",
+    "Anulada; sus asignaciones volvieron a verificadas."
+  ),
+}
+
+/** Vigencia de la verificación de una cuenta social (`private.cuenta_vigente`). */
+export const VIGENCIAS_VERIFICACION: Catalogo<VigenciaVerificacion> = {
+  sin_verificar: estado(
+    "Sin verificar",
+    "neutro",
+    "AMO aún no comprueba sus seguidores: no es elegible para ofertas."
+  ),
+  vigente: estado("Vigente", "exito", "Verificación al día."),
+  por_vencer: estado(
+    "Por vencer",
+    "aviso",
+    "La verificación vence en pocos días: conviene renovarla."
+  ),
+  en_gracia: estado(
+    "En gracia",
+    "aviso",
+    "Venció, pero sigue elegible durante el periodo de gracia."
+  ),
+  vencida: estado(
+    "Vencida",
+    "peligro",
+    "Venció y pasó la gracia: no es elegible hasta reverificarse."
+  ),
 }
 
 // ── Asignaciones: grupos y flujo ─────────────────────────────────────────────
@@ -286,7 +317,8 @@ export const GRUPOS: Readonly<
 > = {
   en_curso: {
     etiqueta: "En curso",
-    descripcion: "El medio tiene una acción pendiente (descargar, publicar o cargar métricas).",
+    descripcion:
+      "El medio tiene una acción pendiente (descargar, publicar o cargar métricas).",
     tono: "info",
   },
   por_revisar: {
@@ -404,21 +436,23 @@ export const ORIGENES_COMISION: Readonly<
   EXCEPCION_CAMPANA: "Excepción de la campaña",
 }
 
-export const MOTIVOS_DISPUTA: Readonly<Record<Enums["disputa_motivo"], string>> =
-  {
-    INCUMPLIMIENTO: "Incumplimiento",
-    METRICAS: "Métricas",
-    CONTENIDO: "Contenido",
-    PERMANENCIA: "Permanencia",
-    PAGO: "Pago",
-    OTRO: "Otro motivo",
-  }
-
-export const PARTES_DISPUTA: Readonly<Record<Enums["disputa_parte"], string>> = {
-  ANUNCIANTE: "el anunciante",
-  MEDIO: "el medio",
-  ADMIN: "AMO",
+export const MOTIVOS_DISPUTA: Readonly<
+  Record<Enums["disputa_motivo"], string>
+> = {
+  INCUMPLIMIENTO: "Incumplimiento",
+  METRICAS: "Métricas",
+  CONTENIDO: "Contenido",
+  PERMANENCIA: "Permanencia",
+  PAGO: "Pago",
+  OTRO: "Otro motivo",
 }
+
+export const PARTES_DISPUTA: Readonly<Record<Enums["disputa_parte"], string>> =
+  {
+    ANUNCIANTE: "el anunciante",
+    MEDIO: "el medio",
+    ADMIN: "AMO",
+  }
 
 export const TIPOS_DOCUMENTO_MEDIO: Readonly<
   Record<Enums["documento_medio_tipo"], string>
@@ -469,9 +503,9 @@ export function etiquetaDe<E extends string>(
   valor: string | null | undefined
 ): string {
   if (!valor) return "—"
-  const entrada = (catalogo as Readonly<Record<string, string | PresentacionEstado>>)[
-    valor
-  ]
+  const entrada = (
+    catalogo as Readonly<Record<string, string | PresentacionEstado>>
+  )[valor]
   if (!entrada) return valor
   return typeof entrada === "string" ? entrada : entrada.etiqueta
 }

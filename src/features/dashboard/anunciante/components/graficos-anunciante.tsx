@@ -6,11 +6,10 @@ import { TarjetaGrafico } from "@/components/charts/tarjeta-grafico"
 import {
   formatearCompacto,
   formatearCOP,
-  formatearCOPCompacto,
   formatearPorcentaje,
 } from "@/lib/format"
 
-import { POR_GRANULARIDAD } from "../../admin/datos"
+import { ALTO_DONA, POR_GRANULARIDAD } from "../../admin/datos"
 import type { DesempenoPlataforma, SerieDesempeno } from "../datos"
 
 /** Inversión verificada (columnas) y alcance (línea) en bandas apiladas. */
@@ -69,6 +68,55 @@ export function GraficoInversion({
   )
 }
 
+/**
+ * CPM y engagement de cada red. Tabla hecha con `span` y roles ARIA: es el
+ * pie de la tarjeta, que en pantalla completa va dentro de un `<p>`, donde
+ * un `<table>` no es HTML válido.
+ */
+function TablaEficiencia({
+  plataformas,
+}: {
+  plataformas: readonly DesempenoPlataforma[]
+}) {
+  return (
+    <span
+      role="table"
+      aria-label="Eficiencia por plataforma en el periodo"
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-x-5 text-xs"
+    >
+      <span
+        role="row"
+        className="col-span-3 grid grid-cols-subgrid pb-1 font-medium"
+      >
+        <span role="columnheader">Red</span>
+        <span role="columnheader" className="text-right">
+          CPM
+        </span>
+        <span role="columnheader" className="text-right">
+          Engagement
+        </span>
+      </span>
+      {plataformas.map((fila) => (
+        <span
+          key={fila.plataforma}
+          role="row"
+          className="col-span-3 grid grid-cols-subgrid border-t border-border/60 py-1 cifras text-foreground"
+        >
+          <span role="rowheader" className="font-medium">
+            {fila.nombre}
+          </span>
+          <span role="cell" className="text-right">
+            {formatearCOP(fila.cpm === null ? null : Math.round(fila.cpm))}
+          </span>
+          <span role="cell" className="text-right">
+            {formatearPorcentaje(fila.engagement, 1)}
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
 /** Reparto de la inversión por red y eficiencia de cada una (CPM y engagement). */
 export function GraficoPlataformasAnunciante({
   plataformas,
@@ -82,7 +130,7 @@ export function GraficoPlataformasAnunciante({
     <TarjetaGrafico
       titulo="Inversión por plataforma"
       descripcion="Dónde se ejecutó tu pauta y qué tan eficiente fue cada red."
-      alto="min-h-56"
+      alto={ALTO_DONA}
       className={className}
       vacio={
         conInversion.length === 0
@@ -94,39 +142,7 @@ export function GraficoPlataformasAnunciante({
       }
       pie={
         conInversion.length ? (
-          <table className="w-full text-left text-xs">
-            <caption className="sr-only">
-              Eficiencia por plataforma en el periodo
-            </caption>
-            <thead>
-              <tr className="text-muted-foreground">
-                <th scope="col" className="pb-1 font-medium">
-                  Red
-                </th>
-                <th scope="col" className="pb-1 text-right font-medium">
-                  CPM
-                </th>
-                <th scope="col" className="pb-1 text-right font-medium">
-                  Engagement
-                </th>
-              </tr>
-            </thead>
-            <tbody className="cifras text-foreground">
-              {conInversion.map((fila) => (
-                <tr key={fila.plataforma} className="border-t border-border/60">
-                  <th scope="row" className="py-1 font-medium">
-                    {fila.nombre}
-                  </th>
-                  <td className="py-1 text-right">
-                    {formatearCOPCompacto(fila.cpm)}
-                  </td>
-                  <td className="py-1 text-right">
-                    {formatearPorcentaje(fila.engagement, 1)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TablaEficiencia plataformas={conInversion} />
         ) : null
       }
     >

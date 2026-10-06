@@ -42,7 +42,7 @@ export function formatearValor(
 }
 
 /**
- * Marca de eje: compacta y redondeada ("$12,5 M", "1,2 k", "40 %"), porque las
+ * Marca de eje: compacta y redondeada ("$12,5 M", "25 mil", "40 %"), porque las
  * etiquetas del eje llevan los valores que no se rotulan directamente.
  */
 export function formatearEje(valor: number, formato: FormatoValor): string {

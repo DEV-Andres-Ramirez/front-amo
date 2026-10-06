@@ -3,7 +3,11 @@
  * (`?seccion=precios`). Módulo puro: lo usan la página (servidor) y la
  * navegación (cliente) con el MISMO parser.
  */
-import { createSerializer, parseAsStringLiteral } from "nuqs/server"
+import {
+  createLoader,
+  createSerializer,
+  parseAsStringLiteral,
+} from "nuqs/server"
 
 export const SECCIONES = [
   "comercial",
@@ -102,6 +106,9 @@ export const parseAsSeccion =
   parseAsStringLiteral(SECCIONES).withDefault(SECCION_POR_DEFECTO)
 
 export const parsersSeccion = { seccion: parseAsSeccion }
+
+/** Lectura de `?seccion=` en la página (servidor). */
+export const cargarSeccion = createLoader(parsersSeccion)
 
 const serializar = createSerializer(parsersSeccion)
 

@@ -5,12 +5,7 @@
  * se reemplazan por `Database["public"]["Functions"][…]["Returns"]`.
  * PostgREST entrega `numeric` como número o como texto: todo pasa por `numero`.
  */
-import type {
-  FilaDesglose,
-  FilaMezcla,
-  MediosEnRiesgo,
-  Plataforma,
-} from "./tipos"
+import type { FilaMezcla, MediosEnRiesgo, Plataforma } from "./tipos"
 
 type Numerico = number | string | null | undefined
 
@@ -24,17 +19,6 @@ export interface FilaMezclaRpc {
   alcance?: Numerico
   participacion_gmv?: Numerico
   cpm_efectivo: Numerico
-}
-
-/** `top_zonas(p_nivel, p_metrica, p_desde, p_hasta, p_limite)`. */
-export interface FilaTopZonasRpc {
-  codigo: string
-  nombre: string
-  valor: Numerico
-  valor_anterior: Numerico
-  participacion?: Numerico
-  variacion?: Numerico
-  rank?: Numerico
 }
 
 /** `salud_medios(p_desde, p_hasta)`. */
@@ -71,17 +55,10 @@ export function mezclaDesdeRpc(filas: readonly FilaMezclaRpc[]): FilaMezcla[] {
   }))
 }
 
-/** Desglose por zona o plataforma para la causa de la regla 1. */
-export function desgloseDesdeTopZonas(
-  filas: readonly FilaTopZonasRpc[]
-): FilaDesglose[] {
-  return filas.map((fila) => ({
-    clave: fila.codigo,
-    nombre: fila.nombre,
-    valor: numero(fila.valor) ?? 0,
-    valorAnterior: numero(fila.valor_anterior) ?? 0,
-  }))
-}
+// El desglose por zona de la regla 1 NO se adapta desde `top_zonas`: su
+// `valor_anterior` compara siempre con los N días previos, y el panel compara
+// con el periodo alineado (docs/kpis.md §0.1). Se arma con dos lecturas, una
+// por periodo: `desgloseDeZonas` (dashboard/admin/datos.ts).
 
 export const SEGMENTO_EN_RIESGO = "en_riesgo"
 

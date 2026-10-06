@@ -13,11 +13,12 @@ import {
   filtroDeOpciones,
 } from "@/components/data-table/estado-url"
 import { generarInsights } from "@/features/dashboard/insights/motor"
-import {
-  CONFIG_INSIGHTS_POR_DEFECTO,
-  type FilaDesglose,
+import type {
+  ConfigInsights,
+  FilaDesglose,
 } from "@/features/dashboard/insights/tipos"
 import type { HojaExcel } from "@/lib/export/excel"
+import { formatearNumero } from "@/lib/format"
 
 import type { ColumnaReporte } from "../columnas"
 import {
@@ -33,11 +34,13 @@ import {
   textoAnteriorIndicador,
   textoValorIndicador,
   textoVariacionIndicador,
+  variacionRelativa,
 } from "../indicadores"
 import type { FacetaReporte } from "../tabla"
 import type {
   ContenidoReporte,
   DatosResumen,
+  FilaZona,
   NotaDefinicion,
   VistaReporte,
 } from "../tipos"
@@ -105,6 +108,45 @@ const AREA_DE: Readonly<Record<ClaveAdmin, AreaKpi>> = {
   anunciantes_activos: "red",
 }
 
+type ValorZona = Pick<FilaZona, "codigo" | "nombre" | "valor" | "participacion">
+
+/**
+ * Ranking por zona con el comparativo del reporte. `top_zonas` compara
+ * siempre con los N días previos; el reporte, con el periodo alineado
+ * (este mes contra los mismos días del anterior, docs/kpis.md §0.1). Por eso
+ * el valor anterior sale de una segunda lectura con ese periodo y no de la
+ * RPC. Una zona que solo tuvo valor antes entra en cero: explica una caída.
+ */
+export function zonasComparadas(
+  actuales: readonly ValorZona[],
+  anteriores: readonly ValorZona[]
+): FilaZona[] {
+  const previo = new Map(anteriores.map((zona) => [zona.codigo, zona.valor]))
+  const presentes = new Set(actuales.map((zona) => zona.codigo))
+  const delPeriodo = actuales.map((zona): FilaZona => {
+    const valorAnterior = previo.get(zona.codigo) ?? 0
+    return {
+      codigo: zona.codigo,
+      nombre: zona.nombre,
+      valor: zona.valor,
+      participacion: zona.participacion,
+      valorAnterior,
+      variacion: variacionRelativa(zona.valor, valorAnterior),
+    }
+  })
+  const soloAntes = anteriores
+    .filter((zona) => zona.valor !== 0 && !presentes.has(zona.codigo))
+    .map((zona): FilaZona => ({
+      codigo: zona.codigo,
+      nombre: zona.nombre,
+      valor: 0,
+      participacion: 0,
+      valorAnterior: zona.valor,
+      variacion: variacionRelativa(0, zona.valor),
+    }))
+  return [...delPeriodo, ...soloAntes]
+}
+
 function ordenarPorCatalogo(kpis: readonly FilaKpi[]): FilaKpi[] {
   const posicion = (clave: string) => {
     const indice = (CLAVES_KPIS_ADMIN as readonly string[]).indexOf(clave)
@@ -127,9 +169,7 @@ export type FilaIndicadorResumen = {
   queMide: string
 }
 
-export function filasResumen(
-  datos: DatosResumen
-): FilaIndicadorResumen[] {
+export function filasResumen(datos: DatosResumen): FilaIndicadorResumen[] {
   return ordenarPorCatalogo(datos.kpis).map((fila, indice) => {
     const ind = indicadorDesdeFila(fila, datos.contexto.nMinimo)
     return {
@@ -137,7 +177,8 @@ export function filasResumen(
       orden: indice + 1,
       area: AREA_DE[fila.kpi as ClaveAdmin] ?? "operacion",
       indicador: ind.titulo,
-      valor: textoValorIndicador(ind),
+      // La muestra va en su propia columna: aquí no se repite.
+      valor: textoValorIndicador(ind, { conMuestra: false }),
       anterior: textoAnteriorIndicador(ind),
       variacion: textoVariacionIndicador(ind),
       n: ind.definicion?.exigeMuestra ? ind.n : null,
@@ -173,21 +214,26 @@ export const columnasResumen: readonly ColumnaReporte<FilaIndicadorResumen>[] =
       valor: (f) => ETIQUETAS_AREA[f.area],
       ordenable: true,
       ocultarBajo: "xl",
+      // En el PDF vertical el ancho es para las cifras y la definición.
+      enPdf: false,
     },
     {
       id: "valor",
+      cifras: true,
       titulo: "Periodo actual",
       tipo: "texto",
       valor: (f) => f.valor,
     },
     {
       id: "anterior",
+      cifras: true,
       titulo: "Periodo anterior",
       tipo: "texto",
       valor: (f) => f.anterior,
     },
     {
       id: "variacion",
+      cifras: true,
       titulo: "Variación",
       tipo: "texto",
       valor: (f) => f.variacion,
@@ -205,6 +251,7 @@ export const columnasResumen: readonly ColumnaReporte<FilaIndicadorResumen>[] =
       tipo: "texto",
       valor: (f) => f.queMide,
       buscable: true,
+      envolver: true,
       ocultarBajo: "xl",
       tarjeta: "oculta",
     },
@@ -233,7 +280,13 @@ function indicadoresCabecera(datos: DatosResumen): IndicadorReporte[] {
   return KPIS_CABECERA.flatMap((clave) => {
     const fila = porClave.get(clave)
     return fila
-      ? [indicadorDesdeFila(fila, datos.contexto.nMinimo, ICONOS[clave] ?? null)]
+      ? [
+          indicadorDesdeFila(
+            fila,
+            datos.contexto.nMinimo,
+            ICONOS[clave] ?? null
+          ),
+        ]
       : []
   })
 }
@@ -255,7 +308,9 @@ function graficoTendencia(datos: DatosResumen): EspecGrafico {
     etiquetas: datos.serie.map((p) =>
       etiquetaPeriodo(p.periodo, datos.granularidad)
     ),
-    series: [{ id: "gmv_verificado", nombre: "GMV verificado", valores: actual }],
+    series: [
+      { id: "gmv_verificado", nombre: "GMV verificado", valores: actual },
+    ],
     anterior: { nombre: "Periodo anterior", valores: anterior },
     formato: "cop",
     vacio:
@@ -295,11 +350,14 @@ function graficoPlataformas(datos: DatosResumen): EspecGrafico {
 
 function graficoZonas(datos: DatosResumen): EspecGrafico | null {
   if (!datos.zonas) return null
-  const elementos = datos.zonas.map((zona) => ({
-    id: zona.codigo,
-    nombre: zona.nombre,
-    valor: zona.valor,
-  }))
+  // Las zonas que solo vendieron en el periodo anterior no entran al ranking.
+  const elementos = datos.zonas
+    .filter((zona) => zona.valor > 0)
+    .map((zona) => ({
+      id: zona.codigo,
+      nombre: zona.nombre,
+      valor: zona.valor,
+    }))
   return {
     id: "gmv-departamentos",
     tipo: "ranking",
@@ -351,10 +409,7 @@ export function vistaResumen(datos: DatosResumen): VistaReporte {
       gmv: fila.gmv,
       cpmEfectivo: fila.cpm,
     })),
-    config: {
-      ...CONFIG_INSIGHTS_POR_DEFECTO,
-      nMinimo: datos.contexto.nMinimo,
-    },
+    config: datos.config,
   })
 
   return {
@@ -379,7 +434,11 @@ function hojasResumen(datos: DatosResumen): HojaExcel[] {
         { titulo: "GMV verificado", formato: "cop", totalizar: true },
         { titulo: "Comisión", formato: "cop", totalizar: true },
         { titulo: "Negocios cerrados", formato: "numero", totalizar: true },
-        { titulo: "GMV verificado (periodo anterior)", formato: "cop", totalizar: true },
+        {
+          titulo: "GMV verificado (periodo anterior)",
+          formato: "cop",
+          totalizar: true,
+        },
       ],
       filas: datos.serie.map((punto, i) => [
         punto.periodo,
@@ -418,7 +477,9 @@ function hojasResumen(datos: DatosResumen): HojaExcel[] {
   if (datos.zonas) {
     hojas.push({
       nombre: "Departamentos",
-      titulo: "Departamentos con más GMV comprometido",
+      titulo: "GMV comprometido por departamento",
+      descripcion:
+        "Departamentos con negocios aceptados en el periodo o en el de comparación, según la ubicación del medio.",
       columnas: [
         { titulo: "Departamento" },
         { titulo: "GMV comprometido", formato: "cop" },
@@ -438,8 +499,18 @@ function hojasResumen(datos: DatosResumen): HojaExcel[] {
   return hojas
 }
 
-export function notasResumen(nMinimo: number): NotaDefinicion[] {
-  const tasas = (["take_rate", "tasa_llenado", "tasa_aceptacion", "tasa_cumplimiento"] as const)
+export function notasResumen(
+  nMinimo: number,
+  config: Pick<ConfigInsights, "diasActividad" | "diasRiesgoSinAceptar">
+): NotaDefinicion[] {
+  const tasas = (
+    [
+      "take_rate",
+      "tasa_llenado",
+      "tasa_aceptacion",
+      "tasa_cumplimiento",
+    ] as const
+  )
     .map((clave) => definicionKpi(clave))
     .flatMap((definicion) =>
       definicion
@@ -457,8 +528,7 @@ export function notasResumen(nMinimo: number): NotaDefinicion[] {
     NOTA_ALCANCE,
     {
       termino: "Medios en riesgo",
-      explicacion:
-        "Medios verificados que estuvieron activos en los últimos 90 días pero no aceptan ofertas desde hace más de 30, contados al cierre del periodo.",
+      explicacion: `Medios verificados que estuvieron activos en los últimos ${formatearNumero(config.diasActividad)} días pero no aceptan ofertas desde hace más de ${formatearNumero(config.diasRiesgoSinAceptar)}, contados al cierre del periodo.`,
     },
     notaComparacion(),
     notaMuestra(nMinimo),
@@ -476,6 +546,6 @@ export function contenidoResumen(datos: DatosResumen): ContenidoReporte {
       "Los 16 indicadores del tablero con su valor en el periodo anterior y la variación."
     ),
     hojas: hojasResumen(datos),
-    notas: notasResumen(datos.contexto.nMinimo),
+    notas: notasResumen(datos.contexto.nMinimo, datos.config),
   }
 }

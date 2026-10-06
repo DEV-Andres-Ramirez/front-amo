@@ -80,7 +80,7 @@ export function saludar(
   return nombrePila ? `${saludo}, ${nombrePila}` : saludo
 }
 
-/** "Miércoles, 1 de octubre" (Bogotá). */
+/** "Jueves, 1 de octubre" (Bogotá). */
 export function fechaDeHoy(ahora: Date): string {
   const texto = fechaBogota.format(ahora)
   return texto.charAt(0).toLocaleUpperCase("es-CO") + texto.slice(1)

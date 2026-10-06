@@ -16,8 +16,12 @@ describe("expresiones del coroplético", () => {
   it("el rayado de «sin datos» se apaga en el mapa mundial y en modo calor", () => {
     const base = { calor: false, foco: "ninguno" as const, rayar: true }
     expect(pinturaSinDatos("oscuro", base)["fill-opacity"]).not.toBe(0)
-    expect(pinturaSinDatos("oscuro", { ...base, rayar: false })["fill-opacity"]).toBe(0)
-    expect(pinturaSinDatos("oscuro", { ...base, calor: true })["fill-opacity"]).toBe(0)
+    expect(
+      pinturaSinDatos("oscuro", { ...base, rayar: false })["fill-opacity"]
+    ).toBe(0)
+    expect(
+      pinturaSinDatos("oscuro", { ...base, calor: true })["fill-opacity"]
+    ).toBe(0)
   })
 
   it("las capas no reciben la luz ni el tema monocromo del mapa base", () => {
@@ -29,7 +33,9 @@ describe("expresiones del coroplético", () => {
     expect(relleno["fill-emissive-strength"]).toBe(1)
     expect(relleno["fill-color-use-theme"]).toBe("none")
     expect(
-      pinturaCirculos("claro", { calor: true, foco: "ninguno" })["circle-emissive-strength"]
+      pinturaCirculos("claro", { calor: true, foco: "ninguno" })[
+        "circle-emissive-strength"
+      ]
     ).toBe(1)
   })
 
@@ -49,7 +55,10 @@ describe("expresiones del coroplético", () => {
 
   it("la animación sin duración escribe el destino y borra lo que sale", () => {
     const escribir = vi.fn()
-    const actuales = new Map([["05", "#111111"], ["08", "#222222"]])
+    const actuales = new Map([
+      ["05", "#111111"],
+      ["08", "#222222"],
+    ])
     animarColores({
       actuales,
       destino: new Map([["05", "#AAAAAA"]]),
@@ -65,7 +74,11 @@ describe("expresiones del coroplético", () => {
 
 describe("utilidades del mapa", () => {
   it("el patrón rayado repite rayas diagonales opacas sobre fondo transparente", () => {
-    const patron = crearPatronRayado("#FF0000", { lado: 6, periodo: 3, grosor: 1 })
+    const patron = crearPatronRayado("#FF0000", {
+      lado: 6,
+      periodo: 3,
+      grosor: 1,
+    })
     expect(patron.data).toHaveLength(6 * 6 * 4)
     // (0,0) raya; (1,0) vacío.
     expect([...patron.data.slice(0, 4)]).toEqual([255, 0, 0, 255])
@@ -85,7 +98,9 @@ describe("utilidades del mapa", () => {
 
   it("solo un error sin fuente ni tesela (el estilo) impide iniciar el mapa", () => {
     expect(esErrorFatalMapa({ error: new Error("Unauthorized") })).toBe(true)
-    expect(esErrorFatalMapa({ error: new Error(""), sourceId: "composite" })).toBe(false)
+    expect(
+      esErrorFatalMapa({ error: new Error(""), sourceId: "composite" })
+    ).toBe(false)
     expect(esErrorFatalMapa({ error: new Error(""), tile: {} })).toBe(false)
   })
 
@@ -98,8 +113,12 @@ describe("utilidades del mapa", () => {
     )
     expect(mensajeErrorMapa(token)).toMatch(/rechazó la credencial/)
     expect(mensajeErrorMapa({ status: 403 })).toMatch(/rechazó la credencial/)
-    expect(mensajeErrorMapa(new Error("Failed to initialize WebGL"))).toMatch(/WebGL/)
-    const generico = mensajeErrorMapa(new Error("NetworkError when attempting to fetch"))
+    expect(mensajeErrorMapa(new Error("Failed to initialize WebGL"))).toMatch(
+      /WebGL/
+    )
+    const generico = mensajeErrorMapa(
+      new Error("NetworkError when attempting to fetch")
+    )
     expect(generico).toMatch(/Revisa tu conexión/)
     expect(generico).not.toMatch(/NetworkError/)
     expect(mensajeErrorMapa(undefined)).toBe(generico)

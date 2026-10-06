@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils"
 
 import type { MetricaGeo } from "../metricas"
 import type { EstadoNivel } from "../niveles"
-import { AccionesMapa, MenuAccionesMapa, type OpcionesVista } from "./controles-mapa"
+import {
+  AccionesMapa,
+  MenuAccionesMapa,
+  type OpcionesVista,
+} from "./controles-mapa"
 import { CLASE_PANEL } from "./lienzo"
 import { BotonSubirNivel, MigasMapa } from "./migas-mapa"
 import { SelectorMetrica } from "./selector-metrica"
@@ -68,7 +72,13 @@ export function EncabezadoMapa({
   className?: string
 }) {
   return (
-    <div className={cn(CLASE_PANEL, "relative flex flex-col gap-1.5 px-3.5 pt-3 pb-2.5", className)}>
+    <div
+      className={cn(
+        CLASE_PANEL,
+        "relative flex flex-col gap-1.5 px-3.5 pt-3 pb-2.5",
+        className
+      )}
+    >
       <div className="flex min-h-7 items-center gap-2 pl-1.5">
         <h1 className="text-[0.9375rem] leading-tight font-bold">
           Explorador geográfico
@@ -81,7 +91,12 @@ export function EncabezadoMapa({
           className="-my-1 -mr-1.5 ml-auto"
         />
       </div>
-      <MigasMapa estado={estado} onIr={onIr} conSubir={false} className="-ml-0.5" />
+      <MigasMapa
+        estado={estado}
+        onIr={onIr}
+        conSubir={false}
+        className="-ml-0.5"
+      />
       <BarraProgreso activa={cargando} />
     </div>
   )
@@ -134,10 +149,17 @@ export function BarraCompacta({
   className,
 }: PropsBarraMapa & { className?: string }) {
   return (
-    <div className={cn(CLASE_PANEL, "relative flex flex-col gap-2 p-2", className)}>
+    <div
+      className={cn(CLASE_PANEL, "relative flex flex-col gap-2 p-2", className)}
+    >
       <h1 className="sr-only">Explorador geográfico</h1>
       <div className="flex items-center gap-1">
-        <MigasMapa estado={estado} onIr={onIr} compacto className="min-w-0 flex-1 pl-0.5" />
+        <MigasMapa
+          estado={estado}
+          onIr={onIr}
+          compacto
+          className="min-w-0 flex-1 pl-0.5"
+        />
         {simulado ? <InsigniaSimulado compacta /> : null}
         <MenuAccionesMapa opciones={opciones} />
       </div>
@@ -148,7 +170,12 @@ export function BarraCompacta({
           onCambiar={onMetrica}
           className="min-w-0 flex-1"
         />
-        <SelectorPeriodo rango={rango} onCambiar={onRango} compacto />
+        <SelectorPeriodo
+          rango={rango}
+          onCambiar={onRango}
+          compacto
+          className="max-w-[60%] shrink-0"
+        />
       </div>
       <BarraProgreso activa={cargando} />
     </div>

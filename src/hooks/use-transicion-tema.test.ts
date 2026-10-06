@@ -51,7 +51,7 @@ describe("useTransicionTema", () => {
     const finished = new Promise<void>((resolver) => (finalizar = resolver))
     const startViewTransition = vi.fn((actualizar: () => void) => {
       actualizar()
-      return { finished }
+      return { finished, ready: Promise.resolve() }
     })
     instalarStartViewTransition(startViewTransition)
 
@@ -71,6 +71,34 @@ describe("useTransicionTema", () => {
       await finished
     })
     expect(raiz).not.toHaveAttribute("data-transicion")
+  })
+
+  it("si el navegador aborta la transición, limpia y no deja rechazos sin capturar", async () => {
+    const aborto = new DOMException(
+      "Transition was aborted because of invalid state: Viewport size changed",
+      "InvalidStateError"
+    )
+    const sinCapturar = vi.fn()
+    process.on("unhandledRejection", sinCapturar)
+    instalarStartViewTransition((actualizar: () => void) => {
+      actualizar()
+      return {
+        ready: Promise.reject(aborto),
+        finished: Promise.reject(aborto),
+      }
+    })
+
+    const { result } = renderHook(() => useTransicionTema())
+    await act(async () => {
+      result.current.cambiarTema("light", { clientX: 10, clientY: 10 })
+      // Los rechazos sin manejador se notifican tras vaciar las microtareas.
+      await new Promise((resolver) => setTimeout(resolver, 0))
+    })
+    process.off("unhandledRejection", sinCapturar)
+
+    expect(setTheme).toHaveBeenCalledWith("light")
+    expect(raiz).not.toHaveAttribute("data-transicion")
+    expect(sinCapturar).not.toHaveBeenCalled()
   })
 
   it("respeta prefers-reduced-motion", () => {

@@ -28,6 +28,7 @@ import { COLOR_SIN_DATOS, type TemaMapa } from "@/lib/geo/escalas"
 import type { Posicion } from "@/lib/geo/tipos"
 
 import { animarColores } from "./animacion-colores"
+import { encuadreDeZona } from "./area-libre"
 import { esErrorFatalMapa, mensajeErrorMapa } from "./error-mapa"
 import {
   COLORES_MAPA,
@@ -537,23 +538,33 @@ export default function MapaCoropletico({
   }, [listo, encuadre, encuadrar, claveMargen, margen, reducido])
 
   // La zona seleccionada (desde el ranking, por ejemplo) se trae a la vista
-  // si quedó fuera del área libre de paneles. Solo al cambiar de zona: si
-  // luego la persona mueve el mapa, no se la devuelve.
+  // si quedó fuera del área libre de paneles: la cámara se corre lo justo,
+  // sin recentrar (el resto del mapa sigue siendo el contexto). Solo al
+  // cambiar de zona: si luego la persona mueve el mapa, no se la devuelve.
   const claveEnfoque = enfoque ? `${enfoque[0]},${enfoque[1]}` : null
   const traerALaVista = useEffectEvent(() => {
     const mapa = refMapa.current?.getMap()
     if (!mapa || !enfoque) return
-    const { x, y } = mapa.project([enfoque[0], enfoque[1]])
     const { clientWidth: ancho, clientHeight: alto } = mapa.getContainer()
-    const visible =
-      x >= margen.left &&
-      x <= ancho - margen.right &&
-      y >= margen.top &&
-      y <= alto - margen.bottom
-    if (visible) return
+    // Los márgenes aún en pantalla: el efecto anterior apenas empezó a
+    // deslizarlos (abrir el detalle) y esta animación reemplaza a esa.
+    const previo = mapa.getPadding()
+    const encuadreZona = encuadreDeZona(
+      mapa.project([enfoque[0], enfoque[1]]),
+      { ancho, alto },
+      {
+        top: previo.top ?? 0,
+        bottom: previo.bottom ?? 0,
+        left: previo.left ?? 0,
+        right: previo.right ?? 0,
+      },
+      margen
+    )
+    if (!encuadreZona) return
     mapa.easeTo({
       center: [enfoque[0], enfoque[1]],
       padding: margen,
+      offset: encuadreZona.offset,
       duration: reducido ? 0 : DURACION_MARGEN_MS * 1.4,
       essential: true,
     })
@@ -635,7 +646,8 @@ export default function MapaCoropletico({
     [puntos]
   )
   const pesoMaximo = useMemo(
-    () => (puntos ?? []).reduce((maximo, [, , peso]) => Math.max(maximo, peso), 0),
+    () =>
+      (puntos ?? []).reduce((maximo, [, , peso]) => Math.max(maximo, peso), 0),
     [puntos]
   )
   const datosCirculos = useMemo(

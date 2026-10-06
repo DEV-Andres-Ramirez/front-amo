@@ -9,6 +9,8 @@ import {
   TriangleAlert,
 } from "lucide-react"
 
+import type { Route } from "next"
+
 import { EstadoVacio } from "@/components/feedback/estado-vacio"
 import {
   formatearCOPCompacto,
@@ -19,8 +21,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import { TarjetaPanel } from "../../components/tarjeta-panel"
-import type { FilaSalud, SegmentoSalud } from "../datos"
-import type { MedioEnRiesgo } from "../queries"
+import type { FilaSalud, MedioEnRiesgo, SegmentoSalud } from "../datos"
 
 interface EstiloSegmento {
   etiqueta: string
@@ -116,23 +117,40 @@ export function SaludMedios({
   segmentos,
   base,
   enRiesgo,
+  periodoVigente = true,
+  enlaceRiesgo,
   ahora,
   className,
 }: {
   segmentos: readonly FilaSalud[]
   base: number | null
+  /** Medios en riesgo HOY (`medios_en_riesgo`), por GMV en juego. */
   enRiesgo: readonly MedioEnRiesgo[]
+  /**
+   * ¿El periodo termina hoy? Los segmentos son del cierre del periodo y la
+   * lista, de hoy: si no coinciden, la lista se rotula «hoy» y no lleva el
+   * GMV en juego del segmento (es de otra fecha).
+   */
+  periodoVigente?: boolean
+  /** Con `medios.ver`: la lista de medios en riesgo. */
+  enlaceRiesgo?: Route
   ahora: Date
   className?: string
 }) {
   const sinMedios = segmentos.every((fila) => fila.cantidad === 0)
   const riesgo = segmentos.find((fila) => fila.segmento === "en_riesgo")
+  const hayRiesgo = (riesgo?.cantidad ?? 0) > 0 || enRiesgo.length > 0
   return (
     <TarjetaPanel
       titulo="Salud de los medios"
       descripcion="Estado del inventario al cierre del periodo."
       icono={HeartPulse}
       className={className}
+      enlace={
+        enlaceRiesgo && hayRiesgo
+          ? { href: enlaceRiesgo, texto: "Ver medios en riesgo" }
+          : undefined
+      }
       pie={
         base !== null && !sinMedios
           ? `Porcentajes sobre ${formatearNumero(base)} medios verificados o suspendidos; un medio puede estar en varios grupos.`
@@ -149,7 +167,10 @@ export function SaludMedios({
         />
       ) : (
         <div className="flex flex-col gap-5">
-          <ul className="flex flex-col gap-3.5" aria-label="Segmentos de medios">
+          <ul
+            className="flex flex-col gap-3.5"
+            aria-label="Segmentos de medios"
+          >
             {segmentos.map((fila) => (
               <FilaSegmento key={fila.segmento} fila={fila} />
             ))}
@@ -158,9 +179,11 @@ export function SaludMedios({
             <div className="flex flex-col gap-2 rounded-lg border border-warning/25 bg-warning/5 p-3">
               <p className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-semibold text-warning">
-                  En riesgo con más GMV
+                  {periodoVigente
+                    ? "En riesgo con más GMV"
+                    : "En riesgo hoy, con más GMV"}
                 </span>
-                {riesgo && riesgo.gmvEnJuego > 0 ? (
+                {periodoVigente && riesgo && riesgo.gmvEnJuego > 0 ? (
                   <span className="cifras text-muted-foreground">
                     {formatearCOPCompacto(riesgo.gmvEnJuego)} en juego
                   </span>
@@ -173,7 +196,9 @@ export function SaludMedios({
                     className="flex items-baseline justify-between gap-3 text-[0.8125rem]"
                   >
                     <span className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium">{medio.nombre}</span>
+                      <span className="truncate font-medium">
+                        {medio.nombre}
+                      </span>
                       <span className="truncate text-[0.6875rem] text-muted-foreground">
                         {[
                           medio.departamento,

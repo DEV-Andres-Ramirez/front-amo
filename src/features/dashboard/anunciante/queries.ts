@@ -9,6 +9,7 @@ import { filasKpi } from "../kpi"
 import { clientePanel, fallar } from "../servidor"
 import {
   ESTADOS_PENDIENTES,
+  etiquetaMunicipio,
   type FacturaPendiente,
   type FilaDesempeno,
 } from "./datos"
@@ -58,7 +59,10 @@ export const desempenoAnunciante = cache(
     if (error) fallar("consultar el desempeño de tus campañas", error)
     return data.map((fila) => ({
       clave: fila.clave,
-      nombre: fila.nombre ?? fila.clave,
+      nombre:
+        dimension === "municipio" && fila.nombre
+          ? etiquetaMunicipio(fila.nombre)
+          : (fila.nombre ?? fila.clave),
       asignaciones: n(fila.asignaciones),
       gmv: n(fila.gmv),
       alcance: n(fila.alcance),

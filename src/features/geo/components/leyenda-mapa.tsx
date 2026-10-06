@@ -6,7 +6,7 @@ import type { CSSProperties } from "react"
 import type { EscalaCoropletica, TemaMapa } from "@/lib/geo/escalas"
 import { cn } from "@/lib/utils"
 
-import { formatearValorGeo, unidadGeo } from "../formato"
+import { describirCalorVacio, formatearValorGeo, unidadGeo } from "../formato"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
 import { CLASE_PANEL } from "./lienzo"
 
@@ -40,6 +40,10 @@ interface LeyendaMapaProps {
   className?: string
 }
 
+/** Caracteres que caben bajo una clase de la leyenda (2,25 rem y 2,75 rem de ancho). */
+const ETIQUETA_COMPACTA = 5
+const ETIQUETA_AMPLIA = 6
+
 const ESTILO_RAYADO: CSSProperties = {
   backgroundImage:
     "repeating-linear-gradient(45deg, color-mix(in oklab, var(--foreground) 22%, transparent) 0 2px, transparent 2px 6px)",
@@ -71,14 +75,25 @@ export function LeyendaMapa({
   const mostrarUnidad =
     unidad !== "" &&
     unidad.toLowerCase() !== definicion.tituloCorto.toLowerCase()
-  const alternar = (clase: FocoLeyenda) => onFijar(fijado === clase ? null : clase)
+  const alternar = (clase: FocoLeyenda) =>
+    onFijar(fijado === clase ? null : clase)
+  const etiquetas = escala.leyenda.map((clase) =>
+    formatearValorGeo(clase.desde, metrica, { compacto: true, por100k })
+  )
+  // Una etiqueta larga ("$102,1 M") no cabe bajo su clase: se rotula una de
+  // cada dos y cada rótulo puede ocupar el hueco de su vecina. El rango exacto
+  // de todas sigue en su nombre accesible y en su `title`.
+  const rotularAlternas = etiquetas.some(
+    (etiqueta) =>
+      etiqueta.length > (compacta ? ETIQUETA_COMPACTA : ETIQUETA_AMPLIA)
+  )
 
   if (calor) {
     return (
       <LeyendaCalor
         calor={calor}
         tema={tema}
-        titulo={definicion.tituloCorto}
+        metrica={metrica}
         compacta={compacta}
         className={className}
       />
@@ -107,10 +122,11 @@ export function LeyendaMapa({
         <div className="flex gap-0.5">
           {escala.leyenda.map((clase, indice) => {
             const activa = foco === indice || fijado === indice
+            const rotulada = !rotularAlternas || indice % 2 === 0
             const rango =
               clase.hasta === null
-                ? `${formatearValorGeo(clase.desde, metrica, { compacto: true, por100k })} o más`
-                : `${formatearValorGeo(clase.desde, metrica, { compacto: true, por100k })} a ${formatearValorGeo(clase.hasta, metrica, { compacto: true, por100k })}`
+                ? `${etiquetas[indice]} o más`
+                : `${etiquetas[indice]} a ${formatearValorGeo(clase.hasta, metrica, { compacto: true, por100k })}`
             return (
               <button
                 key={`${clase.color}-${indice}`}
@@ -136,11 +152,14 @@ export function LeyendaMapa({
                   )}
                   style={{ backgroundColor: clase.color }}
                 />
-                <span className="cifras text-[0.625rem] leading-none text-muted-foreground group-hover:text-foreground">
-                  {formatearValorGeo(clase.desde, metrica, {
-                    compacto: true,
-                    por100k,
-                  })}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "text-[0.625rem] leading-none cifras whitespace-nowrap text-muted-foreground group-hover:text-foreground",
+                    !rotulada && "invisible"
+                  )}
+                >
+                  {etiquetas[indice]}
                 </span>
               </button>
             )
@@ -186,17 +205,21 @@ const DEGRADADO_CALOR: Readonly<Record<TemaMapa, string>> = {
 function LeyendaCalor({
   calor,
   tema,
-  titulo,
+  metrica,
   compacta,
   className,
 }: {
   calor: CalorLeyenda
   tema: TemaMapa
-  titulo: string
+  metrica: MetricaGeo
   compacta: boolean
   className?: string
 }) {
   const conPuntos = calor.estado === "listo"
+  const mensaje =
+    calor.estado === "vacio"
+      ? describirCalorVacio(metrica)
+      : (MENSAJE_CALOR[calor.estado] ?? calor.nota)
   return (
     <div
       className={cn(
@@ -207,9 +230,12 @@ function LeyendaCalor({
       )}
     >
       <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-        Densidad · {titulo}
+        Densidad · {DEFINICIONES_METRICAS[metrica].tituloCorto}
         {calor.estado === "cargando" ? (
-          <LoaderCircle aria-hidden className="size-3 animate-spin text-primary" />
+          <LoaderCircle
+            aria-hidden
+            className="size-3 animate-spin text-primary"
+          />
         ) : null}
       </p>
       <div
@@ -227,8 +253,11 @@ function LeyendaCalor({
           <span>Más</span>
         </div>
       ) : null}
-      <p role="status" className="text-[0.6875rem] leading-snug text-muted-foreground">
-        {MENSAJE_CALOR[calor.estado] ?? calor.nota}
+      <p
+        role="status"
+        className="text-[0.6875rem] leading-snug text-muted-foreground"
+      >
+        {mensaje}
       </p>
       {calor.estado === "error" ? (
         <button
@@ -246,6 +275,5 @@ function LeyendaCalor({
 
 const MENSAJE_CALOR: Partial<Record<CalorLeyenda["estado"], string>> = {
   cargando: "Leyendo las ubicaciones del periodo…",
-  vacio: "Ningún registro del periodo trae coordenadas: se muestra el mapa por zonas.",
   error: "No pudimos leer las ubicaciones. El mapa por zonas sigue disponible.",
 }

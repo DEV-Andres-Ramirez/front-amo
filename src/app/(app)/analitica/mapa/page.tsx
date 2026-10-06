@@ -8,9 +8,14 @@ import { ExploradorGeo } from "@/features/geo/components/explorador-geo"
 import { LimiteErrorMapa } from "@/features/geo/components/limite-error-mapa"
 import { urlGeometria } from "@/features/geo/encuadre"
 import { cargarEstadoMapa } from "@/features/geo/estado-url"
-import { METRICAS_GEO, metricaPermitida } from "@/features/geo/metricas"
+import {
+  calorPermitido,
+  METRICAS_GEO,
+  metricaPermitida,
+} from "@/features/geo/metricas"
 import { normalizarEstadoNivel } from "@/features/geo/niveles"
 import { requerirPermiso, tieneAlgunPermiso } from "@/lib/auth/dal"
+import type { ClavePermiso } from "@/lib/auth/permisos"
 import { envCliente } from "@/lib/env"
 
 export const metadata: Metadata = {
@@ -29,10 +34,13 @@ export default async function PaginaMapa({
   searchParams,
 }: PageProps<"/analitica/mapa">) {
   const usuario = await requerirPermiso("analitica.mapa")
+  const tienePermiso = (permiso: ClavePermiso) =>
+    tieneAlgunPermiso(usuario, [permiso])
   const metricasPermitidas = METRICAS_GEO.filter((metrica) =>
-    metricaPermitida(metrica, (permiso) =>
-      tieneAlgunPermiso(usuario, [permiso])
-    )
+    metricaPermitida(metrica, tienePermiso)
+  )
+  const metricasCalor = METRICAS_GEO.filter((metrica) =>
+    calorPermitido(metrica, tienePermiso)
   )
 
   // Adelanta la conexión con Mapbox y los polígonos del nivel que se abrirá.
@@ -51,6 +59,7 @@ export default async function PaginaMapa({
             token={envCliente.NEXT_PUBLIC_MAPBOX_TOKEN}
             estilo={envCliente.NEXT_PUBLIC_MAPBOX_STYLE}
             metricasPermitidas={metricasPermitidas}
+            metricasCalor={metricasCalor}
           />
         </Suspense>
       </LimiteErrorMapa>

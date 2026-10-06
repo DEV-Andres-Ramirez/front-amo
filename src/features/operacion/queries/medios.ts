@@ -31,11 +31,11 @@ import {
   catalogos,
   clienteSolicitud,
   configuracionOperacion,
+  departamentoJuntoAMunicipio,
   enLotes,
   fallar,
   leerPagina,
   leerTodo,
-  nombreDepartamento,
   nombreMunicipio,
   nombrePais,
   SIN_COINCIDENCIAS,
@@ -55,7 +55,6 @@ type FilaMedioBd = Pick<
   | "n_cumplimiento"
   | "calificacion_promedio"
   | "created_at"
-  | "es_demo"
 > & {
   cuentas: Pick<
     Tablas["cuentas_sociales"]["Row"],
@@ -70,7 +69,7 @@ type FilaMedioBd = Pick<
 
 const SELECCION_LISTADO = `
   id, nombre, tipo, estado, nivel_verificacion, municipio_codigo, departamento_codigo,
-  tasa_cumplimiento, n_cumplimiento, calificacion_promedio, created_at, es_demo,
+  tasa_cumplimiento, n_cumplimiento, calificacion_promedio, created_at,
   cuentas:cuentas_sociales ( id, plataforma, handle, seguidores_verificados, verificada, franja_id, deleted_at )
 `
 
@@ -139,17 +138,22 @@ async function gmvVerificadoPorMedio(
   const supabase = await clienteSolicitud()
   const gmv = new Map<string, number>()
   for (const lote of enLotes(ids)) {
-    const filas = await leerTodo("calcular el GMV de los medios", (desde, hasta) =>
-      supabase
-        .from("asignaciones")
-        .select("id, medio_id, monto_bruto")
-        .in("medio_id", lote)
-        .in("estado", [...ESTADOS_CUMPLIDOS])
-        .order("id")
-        .range(desde, hasta)
+    const filas = await leerTodo(
+      "calcular el GMV de los medios",
+      (desde, hasta) =>
+        supabase
+          .from("asignaciones")
+          .select("id, medio_id, monto_bruto")
+          .in("medio_id", lote)
+          .in("estado", [...ESTADOS_CUMPLIDOS])
+          .order("id")
+          .range(desde, hasta)
     )
     for (const fila of filas) {
-      gmv.set(fila.medio_id, (gmv.get(fila.medio_id) ?? 0) + (fila.monto_bruto ?? 0))
+      gmv.set(
+        fila.medio_id,
+        (gmv.get(fila.medio_id) ?? 0) + (fila.monto_bruto ?? 0)
+      )
     }
   }
   return gmv
@@ -183,7 +187,8 @@ export async function listarMedios(
         .is("deleted_at", null)
         .is("cuentas.deleted_at", null)
       if (patron) consulta = consulta.ilike("nombre_normalizado", patron)
-      if (estado.estado.length > 0) consulta = consulta.in("estado", estado.estado)
+      if (estado.estado.length > 0)
+        consulta = consulta.in("estado", estado.estado)
       if (estado.nivel.length > 0) {
         consulta = consulta.in("nivel_verificacion", estado.nivel.map(Number))
       }
@@ -229,14 +234,15 @@ export async function listarMedios(
       estado: fila.estado,
       nivel: fila.nivel_verificacion,
       municipio: nombreMunicipio(fila.municipio_codigo),
-      departamento: nombreDepartamento(fila.departamento_codigo),
+      departamento: departamentoJuntoAMunicipio(fila.departamento_codigo, {
+        corto: true,
+      }),
       cuentas: cuentasCompactas(fila.cuentas, franjas),
       tasaCumplimiento: fila.tasa_cumplimiento,
       nCumplimiento: fila.n_cumplimiento,
       calificacion: fila.calificacion_promedio,
       gmvVerificado: gmv ? (gmv.get(fila.id) ?? 0) : null,
       creadoAt: fila.created_at,
-      esDemo: fila.es_demo,
     })),
   }
 }
@@ -248,7 +254,9 @@ export async function resumenMedios(): Promise<ResumenMedios> {
     leerTodo("resumir los medios", (desde, hasta) =>
       supabase
         .from("medios")
-        .select("id, estado, nivel_verificacion, tasa_cumplimiento, n_cumplimiento")
+        .select(
+          "id, estado, nivel_verificacion, tasa_cumplimiento, n_cumplimiento"
+        )
         .is("deleted_at", null)
         .order("id")
         .range(desde, hasta)
@@ -321,7 +329,7 @@ export const obtenerMedio = cache(
       municipioCodigo: fila.municipio_codigo,
       municipio: nombreMunicipio(fila.municipio_codigo),
       departamentoCodigo: fila.departamento_codigo,
-      departamento: nombreDepartamento(fila.departamento_codigo),
+      departamento: departamentoJuntoAMunicipio(fila.departamento_codigo),
       lon: fila.lon,
       lat: fila.lat,
       descripcionAudiencia: fila.descripcion_audiencia,
@@ -354,7 +362,9 @@ export const nivelesVerificacion = cache(
     const supabase = await clienteSolicitud()
     const { data, error } = await supabase
       .from("niveles_verificacion")
-      .select("nivel, nombre, tope_anual, porcentaje_alerta, porcentaje_bloqueo")
+      .select(
+        "nivel, nombre, tope_anual, porcentaje_alerta, porcentaje_bloqueo"
+      )
       .order("nivel")
     if (error) fallar("leer los niveles de verificación", error)
     return new Map(
@@ -474,11 +484,16 @@ export interface PerfilAudiencia {
   pertinencia: PertinenciaGeografica[]
 }
 
-export async function perfilAudiencia(medioId: string): Promise<PerfilAudiencia> {
+export async function perfilAudiencia(
+  medioId: string
+): Promise<PerfilAudiencia> {
   const supabase = await clienteSolicitud()
   const [categorias, audiencia, pertinencia, { categorias: nombres }] =
     await Promise.all([
-      supabase.from("medio_categorias").select("categoria_id").eq("medio_id", medioId),
+      supabase
+        .from("medio_categorias")
+        .select("categoria_id")
+        .eq("medio_id", medioId),
       supabase
         .from("medio_audiencia_paises")
         .select("pais_iso2, porcentaje, fuente")
@@ -491,9 +506,11 @@ export async function perfilAudiencia(medioId: string): Promise<PerfilAudiencia>
         .order("multiplicador", { ascending: false }),
       catalogos(),
     ])
-  if (categorias.error) fallar("leer las categorías del medio", categorias.error)
+  if (categorias.error)
+    fallar("leer las categorías del medio", categorias.error)
   if (audiencia.error) fallar("leer la audiencia del medio", audiencia.error)
-  if (pertinencia.error) fallar("leer la pertinencia geográfica", pertinencia.error)
+  if (pertinencia.error)
+    fallar("leer la pertinencia geográfica", pertinencia.error)
 
   return {
     categorias: categorias.data
@@ -508,7 +525,8 @@ export async function perfilAudiencia(medioId: string): Promise<PerfilAudiencia>
     })),
     pertinencia: pertinencia.data.map((fila) => ({
       municipioCodigo: fila.municipio_codigo,
-      municipio: nombreMunicipio(fila.municipio_codigo) ?? fila.municipio_codigo,
+      municipio:
+        nombreMunicipio(fila.municipio_codigo) ?? fila.municipio_codigo,
       departamentoCodigo: fila.municipio_codigo.slice(0, 2),
       multiplicador: fila.multiplicador,
       notas: fila.notas,

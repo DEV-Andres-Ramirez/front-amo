@@ -5,7 +5,11 @@
  */
 import type { ClavePermiso } from "@/lib/auth/permisos"
 
-export const NIVELES_GEO = ["internacional", "nacional", "departamental"] as const
+export const NIVELES_GEO = [
+  "internacional",
+  "nacional",
+  "departamental",
+] as const
 export type NivelGeo = (typeof NIVELES_GEO)[number]
 
 /** Nivel de la RPC `geo_metricas(p_nivel, …)` que corresponde a cada nivel del mapa. */
@@ -51,6 +55,11 @@ export interface DefinicionMetrica {
   readonly conPuntos: boolean
   /** Permiso adicional a `analitica.mapa` para consultarla. */
   readonly permisoExtra?: ClavePermiso
+  /**
+   * Permiso para leer sus puntos del modo calor, que salen de la tabla con la
+   * RLS del usuario (sin él, la lectura volvería vacía y el calor mentiría).
+   */
+  readonly permisoCalor?: ClavePermiso
 }
 
 const NIVELES_COLOMBIA: readonly NivelGeo[] = ["nacional", "departamental"]
@@ -70,6 +79,7 @@ export const DEFINICIONES_METRICAS: Readonly<
     foto: true,
     niveles: NIVELES_COLOMBIA,
     conPuntos: true,
+    permisoCalor: "medios.ver",
   },
   gmv: {
     clave: "gmv",
@@ -217,7 +227,9 @@ export function resolverMetrica(
   const disponibles = metricasDelNivel(nivel, permitidas)
   if (solicitada && disponibles.includes(solicitada)) return solicitada
   const porDefecto = METRICA_POR_DEFECTO[nivel]
-  return disponibles.includes(porDefecto) ? porDefecto : (disponibles[0] ?? null)
+  return disponibles.includes(porDefecto)
+    ? porDefecto
+    : (disponibles[0] ?? null)
 }
 
 /** "Por 100 mil habitantes" solo en el nivel nacional (población DANE por departamento). */
@@ -228,4 +240,17 @@ export function admitePor100k(nivel: NivelGeo, metrica: MetricaGeo): boolean {
 /** Mapa de calor solo con coordenadas reales, nunca con agregados por zona. */
 export function admiteCalor(metrica: MetricaGeo): boolean {
   return DEFINICIONES_METRICAS[metrica].conPuntos
+}
+
+/** ¿El usuario puede ver los puntos del modo calor de la métrica? */
+export function calorPermitido(
+  metrica: MetricaGeo,
+  tienePermiso: VerificadorPermiso
+): boolean {
+  const { permisoCalor } = DEFINICIONES_METRICAS[metrica]
+  return (
+    admiteCalor(metrica) &&
+    metricaPermitida(metrica, tienePermiso) &&
+    (!permisoCalor || tienePermiso(permisoCalor))
+  )
 }

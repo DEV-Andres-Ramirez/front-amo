@@ -22,6 +22,7 @@ import {
   SECUENCIAL,
   tintaSobre,
 } from "./paleta"
+import { construirTemaGraficos } from "./tema"
 
 const SUPERFICIE: Readonly<Record<ModoTema, string>> = {
   claro: "#ffffff",
@@ -33,19 +34,36 @@ const CSS = readFileSync(
   "utf8"
 )
 
-/** `--chart-1..8` del bloque de un tema en globals.css. */
-function tokensChart(selector: ":root" | ".dark"): string[] {
+type SelectorTema = ":root" | ".dark"
+
+const SELECTOR: Readonly<Record<ModoTema, SelectorTema>> = {
+  claro: ":root",
+  oscuro: ".dark",
+}
+
+/** Declaraciones del bloque de un tema en globals.css. */
+function bloqueTema(selector: SelectorTema): string {
   const escapado = selector.replace(".", "\\.")
   const bloque = new RegExp(`^${escapado} \\{([\\s\\S]*?)^\\}`, "m").exec(
     CSS
   )?.[1]
   expect(bloque, `bloque ${selector} en globals.css`).toBeDefined()
-  return Array.from({ length: 8 }, (_, i) => {
-    const valor = new RegExp(`--chart-${i + 1}:\\s*(#[0-9a-f]{6})`, "i").exec(
-      bloque ?? ""
-    )?.[1]
-    return valor?.toLowerCase() ?? ""
-  })
+  return bloque ?? ""
+}
+
+/** Valor HEX de un token (`--muted`) en el bloque de un tema. */
+function token(selector: SelectorTema, nombre: string): string {
+  const valor = new RegExp(`${nombre}:\\s*(#[0-9a-f]{6})`, "i").exec(
+    bloqueTema(selector)
+  )?.[1]
+  return valor?.toLowerCase() ?? ""
+}
+
+/** `--chart-1..8` del bloque de un tema en globals.css. */
+function tokensChart(selector: SelectorTema): string[] {
+  return Array.from({ length: 8 }, (_, i) =>
+    token(selector, `--chart-${i + 1}`)
+  )
 }
 
 function monotona(colores: readonly string[], sentido: "sube" | "baja") {
@@ -63,6 +81,53 @@ describe("paletas de datos", () => {
   it("la categórica refleja los tokens --chart-* de cada tema", () => {
     expect(CATEGORICA.claro).toEqual(tokensChart(":root"))
     expect(CATEGORICA.oscuro).toEqual(tokensChart(".dark"))
+  })
+
+  it.each(["claro", "oscuro"] as const)(
+    "el tema sin lector (%s) refleja los tokens neutros y semánticos de globals.css",
+    (modo) => {
+      // El servidor y la hidratación pintan con estas constantes: si un token
+      // cambia en el CSS y aquí no, el primer render deja de coincidir.
+      const tema = construirTemaGraficos({ modo })
+      const selector = SELECTOR[modo]
+      expect({
+        superficie: tema.superficie,
+        texto: tema.texto,
+        textoSecundario: tema.textoSecundario,
+        eje: tema.eje,
+        vacio: tema.vacio,
+        primario: tema.primario,
+        exito: tema.exito,
+        aviso: tema.aviso,
+        peligro: tema.peligro,
+      }).toEqual({
+        superficie: token(selector, "--card"),
+        texto: token(selector, "--foreground"),
+        textoSecundario: token(selector, "--muted-foreground"),
+        eje: token(selector, "--border"),
+        vacio: token(selector, "--muted"),
+        primario: token(selector, "--primary"),
+        exito: token(selector, "--success"),
+        aviso: token(selector, "--warning"),
+        peligro: token(selector, "--destructive"),
+      })
+    }
+  )
+
+  it("en oscuro `--muted` se distingue de popover, card y fondo y sostiene el texto (AA)", () => {
+    const muted = token(".dark", "--muted")
+    for (const superficie of ["--popover", "--card", "--background"]) {
+      expect(
+        contraste(muted, token(".dark", superficie)),
+        `--muted sobre ${superficie}`
+      ).toBeGreaterThanOrEqual(1.08)
+    }
+    for (const texto of ["--foreground", "--muted-foreground", "--primary"]) {
+      expect(
+        contraste(token(".dark", texto), muted),
+        `${texto} sobre --muted`
+      ).toBeGreaterThanOrEqual(4.5)
+    }
   })
 
   it("todas las paletas son HEX (Chart.js no entiende oklch)", () => {

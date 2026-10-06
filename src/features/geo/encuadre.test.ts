@@ -24,16 +24,20 @@ describe("encuadre y capas por nivel", () => {
       { nivel: "internacional", departamento: null },
       800
     )
-    expect(encuadre).toEqual({ tipo: "centro", centro: CENTRO_COLOMBIA, zoom: zoomGlobo(800) })
+    expect(encuadre).toEqual({
+      tipo: "centro",
+      centro: CENTRO_COLOMBIA,
+      zoom: zoomGlobo(800),
+    })
     expect(zoomGlobo(320)).toBeLessThan(zoomGlobo(1200))
     expect(zoomGlobo(0)).toBeGreaterThan(0)
     expect(zoomGlobo(10_000)).toBeLessThanOrEqual(2)
   })
 
   it("nacional encuadra Colombia y departamental el bbox precalculado", () => {
-    expect(encuadreDelNivel({ nivel: "nacional", departamento: null }, 900)).toEqual(
-      { tipo: "limites", bbox: BBOX_COLOMBIA }
-    )
+    expect(
+      encuadreDelNivel({ nivel: "nacional", departamento: null }, 900)
+    ).toEqual({ tipo: "limites", bbox: BBOX_COLOMBIA })
     const antioquia = encuadreDelNivel(
       { nivel: "departamental", departamento: "05" },
       900
@@ -51,9 +55,9 @@ describe("encuadre y capas por nivel", () => {
     expect(urlGeometria({ nivel: "departamental", departamento: "05" })).toBe(
       "/data/geo/municipios/05.json"
     )
-    expect(claveAmbito({ nivel: "departamental", departamento: "05" })).not.toBe(
-      claveAmbito({ nivel: "departamental", departamento: "08" })
-    )
+    expect(
+      claveAmbito({ nivel: "departamental", departamento: "05" })
+    ).not.toBe(claveAmbito({ nivel: "departamental", departamento: "08" }))
   })
 
   it("solo los países sin polígono (y una vez) van como círculos", () => {
@@ -67,9 +71,11 @@ describe("encuadre y capas por nivel", () => {
       valorPor100k: null,
     })
     expect(
-      centrosSinPoligono("internacional", [fila("AW"), fila("AW"), fila("CO")]).map(
-        (c) => c.codigo
-      )
+      centrosSinPoligono("internacional", [
+        fila("AW"),
+        fila("AW"),
+        fila("CO"),
+      ]).map((c) => c.codigo)
     ).toEqual(["AW"])
     expect(centrosSinPoligono("nacional", [fila("AW")])).toEqual([])
   })

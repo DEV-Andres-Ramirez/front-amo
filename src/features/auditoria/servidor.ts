@@ -2,11 +2,9 @@ import "server-only"
 
 import { cache } from "react"
 
+import { registrarEvento } from "@/lib/auth/registro"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
 import { obtenerPais } from "@/lib/geo/catalogo"
-import { crearClienteAdmin } from "@/lib/supabase/admin"
-import { obtenerContextoSolicitud } from "@/lib/supabase/contexto"
-import { argumentosRpc } from "@/lib/supabase/rpc"
 import { crearClienteServidor } from "@/lib/supabase/server"
 import type { Json } from "@/types/database.types"
 
@@ -163,34 +161,15 @@ export function nombrePais(iso2: string): string | null {
  * Se registra en el servidor ANTES de entregar los datos: la exportación
  * queda auditada aunque el navegador no llegue a generar el archivo.
  */
-export async function registrarExportacion(
+export function registrarExportacion(
   actor: UsuarioSesion,
   entidad: "bitacora" | "accesos",
   metadatos: Record<string, Json>
 ): Promise<boolean> {
-  try {
-    const [admin, solicitud] = await Promise.all([
-      crearClienteAdmin({ actorId: actor.id }),
-      obtenerContextoSolicitud(),
-    ])
-    const { error } = await admin.rpc(
-      "registrar_evento_srv",
-      argumentosRpc<"registrar_evento_srv">({
-        p_actor_id: actor.id,
-        p_accion: "EXPORTAR",
-        p_entidad: entidad,
-        p_entidad_id: null,
-        p_metadatos: metadatos,
-        p_ip: solicitud.ip,
-        p_pais: solicitud.pais,
-        p_ciudad: solicitud.ciudad,
-        p_ua: solicitud.userAgent,
-      })
-    )
-    if (error) throw error
-    return true
-  } catch (error) {
-    informar(`registrar_evento_srv(EXPORTAR ${entidad})`, error)
-    return false
-  }
+  return registrarEvento({
+    actorId: actor.id,
+    accion: "EXPORTAR",
+    entidad,
+    metadatos,
+  })
 }

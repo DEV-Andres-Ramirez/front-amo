@@ -2,10 +2,11 @@ import "server-only"
 
 import type { CeldaActividad } from "@/components/charts/datos"
 import type { FilaKpi } from "@/components/kpi/tipos"
+import { configAnalitica } from "@/features/dashboard/servidor"
+import { leerTodo } from "@/features/operacion/queries/comun"
 import { tieneAlgunPermiso } from "@/lib/auth/dal"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
 import { diasEnRango, serializarFecha } from "@/lib/fechas"
-import { formatearFecha } from "@/lib/format"
 import { argumentosRpc } from "@/lib/supabase/rpc"
 import { crearClienteServidor } from "@/lib/supabase/server"
 
@@ -16,22 +17,17 @@ import { nombrePlataforma } from "./definiciones/comun"
 import { totalesCumplimiento } from "./definiciones/cumplimiento-medios"
 import { totalesDesempeno } from "./definiciones/desempeno-campanas"
 import { totalesFinanzas } from "./definiciones/finanzas"
+import { zonasComparadas } from "./definiciones/resumen-ejecutivo"
 import { totalesAccesos } from "./definiciones/usuarios-accesos"
 import {
   argumentosComparacion,
   argumentosPeriodo,
-  describirFiltros,
+  contextoDatos,
   type FiltrosReporte,
   type NombresFiltros,
-  textoComparacion,
 } from "./filtros"
 import { granularidadPara } from "./graficos"
-import {
-  leer,
-  nMinimoTasas,
-  numero,
-  numeroONulo,
-} from "./servidor"
+import { leer, numero, numeroONulo } from "./servidor"
 import type {
   ContextoDatos,
   DatosCartera,
@@ -59,6 +55,12 @@ import type {
  * Consultas de los reportes (una por reporte) con el cliente del usuario: las
  * RPC exigen sus permisos y la RLS limita las filas. Cada una devuelve el
  * conjunto completo y normalizado que comparten la página y la exportación.
+ *
+ * La API entrega como máximo 1.000 filas por respuesta: las RPC cuyo detalle
+ * crece con el negocio (campañas, medios, usuarios, anunciantes) se leen con
+ * `leerTodo`, por tramos, para que los totales nunca salgan de un detalle
+ * recortado. Las acotadas por catálogo o por el periodo (16 indicadores,
+ * 33 departamentos, 168 horas…) se leen de una vez.
  */
 
 type Cliente = Awaited<ReturnType<typeof crearClienteServidor>>
@@ -68,23 +70,9 @@ async function contexto(
   filtros: FiltrosReporte,
   nombres: NombresFiltros = {}
 ): Promise<ContextoDatos> {
-  const reporte = REPORTES[slug]
-  const usaCorte = reporte.filtros.includes("corte")
-  return {
-    filtros: describirFiltros(reporte, filtros, nombres),
-    comparacion: !reporte.comparativo
-      ? null
-      : usaCorte
-        ? `frente al corte del ${formatearFecha(filtros.corteAnterior, "largo")}`
-        : textoComparacion(filtros),
-    nMinimo: await nMinimoTasas(),
-    periodo: usaCorte
-      ? null
-      : {
-          desde: serializarFecha(filtros.rango.desde),
-          hasta: serializarFecha(filtros.rango.hasta),
-        },
-  }
+  // `analitica.n_minimo_tasas`: el mismo umbral que aplican las RPC y el panel de Inicio.
+  const { nMinimo } = await configAnalitica()
+  return contextoDatos(REPORTES[slug], filtros, nMinimo, nombres)
 }
 
 // ── Resumen ejecutivo ────────────────────────────────────────────────────────
@@ -132,11 +120,16 @@ async function serieGmv(
   }))
 }
 
+const TOP_MUNICIPIOS = 10
+/** Todos los departamentos (33): el desglose completo explica las variaciones. */
+const TODOS_LOS_DEPARTAMENTOS = 40
+
 async function topZonas(
   supabase: Cliente,
   nivel: "departamento" | "municipio",
   metrica: "gmv" | "medios",
-  rango: FiltrosReporte["rango"]
+  rango: FiltrosReporte["rango"],
+  limite: number
 ): Promise<FilaZona[]> {
   const filas = await leer(
     "leer el ranking por zona",
@@ -144,7 +137,7 @@ async function topZonas(
       p_nivel: nivel,
       p_metrica: metrica,
       ...argumentosPeriodo(rango),
-      p_limite: 10,
+      p_limite: limite,
     })
   )
   return filas.map((fila) => ({
@@ -164,7 +157,28 @@ async function cargarResumen(
   const supabase = await crearClienteServidor()
   const granularidad = granularidadPara(diasEnRango(filtros.rango))
   const conRanking = tieneAlgunPermiso(usuario, ["analitica.global"])
-  const [kpis, serie, serieAnterior, mezcla, zonas, ctx] = await Promise.all([
+  // `top_zonas` compara siempre con los N días previos; el reporte, con el
+  // periodo alineado (docs/kpis.md §0.1): se lee cada periodo por separado.
+  const gmvPorDepartamento = (rango: FiltrosReporte["rango"]) =>
+    conRanking
+      ? topZonas(
+          supabase,
+          "departamento",
+          "gmv",
+          rango,
+          TODOS_LOS_DEPARTAMENTOS
+        )
+      : Promise.resolve(null)
+  const [
+    kpis,
+    serie,
+    serieAnterior,
+    mezcla,
+    zonas,
+    zonasAnteriores,
+    ctx,
+    config,
+  ] = await Promise.all([
     leer(
       "leer el resumen ejecutivo",
       supabase.rpc("reporte_resumen_ejecutivo", argumentosComparacion(filtros))
@@ -175,30 +189,29 @@ async function cargarResumen(
       "leer la mezcla por plataforma",
       supabase.rpc("mezcla_plataformas", argumentosPeriodo(filtros.rango))
     ),
-    conRanking
-      ? topZonas(supabase, "departamento", "gmv", filtros.rango)
-      : Promise.resolve(null),
+    gmvPorDepartamento(filtros.rango),
+    gmvPorDepartamento(filtros.anterior),
     contexto("resumen-ejecutivo", filtros),
+    configAnalitica(),
   ])
   return {
     contexto: ctx,
+    config,
     kpis: kpis.map(filaKpi),
     granularidad,
     serie,
     serieAnterior,
-    mezcla: mezcla.map(
-      (fila): FilaMezcla => ({
-        plataforma: fila.plataforma,
-        formatoClave: fila.formato_clave,
-        formatoNombre: fila.formato_nombre,
-        asignaciones: numero(fila.asignaciones),
-        gmv: numero(fila.gmv),
-        alcance: numero(fila.alcance),
-        participacion: numeroONulo(fila.participacion_gmv),
-        cpm: numeroONulo(fila.cpm_efectivo),
-      })
-    ),
-    zonas,
+    mezcla: mezcla.map((fila): FilaMezcla => ({
+      plataforma: fila.plataforma,
+      formatoClave: fila.formato_clave,
+      formatoNombre: fila.formato_nombre,
+      asignaciones: numero(fila.asignaciones),
+      gmv: numero(fila.gmv),
+      alcance: numero(fila.alcance),
+      participacion: numeroONulo(fila.participacion_gmv),
+      cpm: numeroONulo(fila.cpm_efectivo),
+    })),
+    zonas: zonas ? zonasComparadas(zonas, zonasAnteriores ?? []) : null,
   }
 }
 
@@ -259,7 +272,13 @@ async function cargarCobertura(
       dep ? cobertura(supabase, filtros.rango, dep) : Promise.resolve(null),
       dep ? cobertura(supabase, filtros.anterior, dep) : Promise.resolve(null),
       conTop
-        ? topZonas(supabase, "municipio", "medios", filtros.rango)
+        ? topZonas(
+            supabase,
+            "municipio",
+            "medios",
+            filtros.rango,
+            TOP_MUNICIPIOS
+          )
         : Promise.resolve(null),
       contexto("cobertura-territorial", filtros),
     ])
@@ -283,9 +302,10 @@ async function usuariosAccesos(
   supabase: Cliente,
   rango: FiltrosReporte["rango"]
 ): Promise<FilaUsuarioAcceso[]> {
-  const filas = await leer(
-    "leer los usuarios y accesos",
-    supabase.rpc("reporte_usuarios_accesos", argumentosPeriodo(rango))
+  const filas = await leerTodo("leer los usuarios y accesos", (desde, hasta) =>
+    supabase
+      .rpc("reporte_usuarios_accesos", argumentosPeriodo(rango))
+      .range(desde, hasta)
   )
   return filas.map((fila) => ({
     id: fila.usuario_id,
@@ -323,13 +343,11 @@ async function cargarUsuariosAccesos(
     filas,
     totales: totalesAccesos(filas),
     anterior: totalesAccesos(anteriores),
-    actividad: actividad.map(
-      (celda): CeldaActividad => ({
-        diaSemana: numero(celda.dia_semana),
-        hora: numero(celda.hora),
-        cantidad: numero(celda.cantidad),
-      })
-    ),
+    actividad: actividad.map((celda): CeldaActividad => ({
+      diaSemana: numero(celda.dia_semana),
+      hora: numero(celda.hora),
+      cantidad: numero(celda.cantidad),
+    })),
   }
 }
 
@@ -340,15 +358,18 @@ async function campanas(
   rango: FiltrosReporte["rango"],
   anunciante: string | null
 ): Promise<FilaCampana[]> {
-  const filas = await leer(
+  const filas = await leerTodo(
     "leer el desempeño de las campañas",
-    supabase.rpc(
-      "reporte_desempeno_campanas",
-      argumentosRpc<"reporte_desempeno_campanas">({
-        ...argumentosPeriodo(rango),
-        p_anunciante_id: anunciante,
-      })
-    )
+    (desde, hasta) =>
+      supabase
+        .rpc(
+          "reporte_desempeno_campanas",
+          argumentosRpc<"reporte_desempeno_campanas">({
+            ...argumentosPeriodo(rango),
+            p_anunciante_id: anunciante,
+          })
+        )
+        .range(desde, hasta)
   )
   return filas.map((fila) => ({
     id: fila.campana_id,
@@ -432,6 +453,7 @@ async function cargarDesempeno(
     contexto: await contexto("desempeno-campanas", filtros, {
       anunciante: nombre,
     }),
+    unAnunciante: Boolean(usuario.anuncianteId) || anunciante !== null,
     filas,
     totales: totalesDesempeno(filas),
     anterior: totalesDesempeno(anteriores),
@@ -446,15 +468,18 @@ async function cumplimiento(
   rango: FiltrosReporte["rango"],
   departamento: string | null
 ): Promise<FilaCumplimiento[]> {
-  const filas = await leer(
+  const filas = await leerTodo(
     "leer el cumplimiento de los medios",
-    supabase.rpc(
-      "reporte_cumplimiento_medios",
-      argumentosRpc<"reporte_cumplimiento_medios">({
-        ...argumentosPeriodo(rango),
-        p_departamento: departamento,
-      })
-    )
+    (desde, hasta) =>
+      supabase
+        .rpc(
+          "reporte_cumplimiento_medios",
+          argumentosRpc<"reporte_cumplimiento_medios">({
+            ...argumentosPeriodo(rango),
+            p_departamento: departamento,
+          })
+        )
+        .range(desde, hasta)
   )
   return filas.map((fila) => ({
     id: fila.medio_id,
@@ -498,12 +523,13 @@ async function finanzas(
   rango: FiltrosReporte["rango"],
   agrupacion: FiltrosReporte["agrupacion"]
 ): Promise<FilaFinanzas[]> {
-  const filas = await leer(
-    "leer el reporte financiero",
-    supabase.rpc("reporte_finanzas", {
-      ...argumentosPeriodo(rango),
-      p_agrupacion: agrupacion,
-    })
+  const filas = await leerTodo("leer el reporte financiero", (desde, hasta) =>
+    supabase
+      .rpc("reporte_finanzas", {
+        ...argumentosPeriodo(rango),
+        p_agrupacion: agrupacion,
+      })
+      .range(desde, hasta)
   )
   return filas.map((fila) => ({
     id: fila.grupo_id,
@@ -524,9 +550,15 @@ async function anunciantesDelSector(
   supabase: Cliente,
   sector: string
 ): Promise<Set<string>> {
-  const filas = await leer(
+  const filas = await leerTodo(
     "leer los anunciantes del sector",
-    supabase.from("anunciantes").select("id").eq("sector_id", sector)
+    (desde, hasta) =>
+      supabase
+        .from("anunciantes")
+        .select("id")
+        .eq("sector_id", sector)
+        .order("id")
+        .range(desde, hasta)
   )
   return new Set(filas.map((fila) => fila.id))
 }
@@ -581,9 +613,10 @@ async function cargarFinanzas(filtros: FiltrosReporte): Promise<DatosFinanzas> {
 // ── Cartera ──────────────────────────────────────────────────────────────────
 
 async function cartera(supabase: Cliente, corte: Date): Promise<FilaCartera[]> {
-  const filas = await leer(
-    "leer la cartera",
-    supabase.rpc("reporte_cartera", { p_corte: serializarFecha(corte) })
+  const filas = await leerTodo("leer la cartera", (desde, hasta) =>
+    supabase
+      .rpc("reporte_cartera", { p_corte: serializarFecha(corte) })
+      .range(desde, hasta)
   )
   return filas.map((fila) => ({
     id: fila.anunciante_id,
@@ -642,5 +675,3 @@ export function cargarDatosReporte<S extends SlugReporte>(
   const cargar: Cargadores[S] = CARGADORES[slug]
   return cargar(filtros, usuario)
 }
-
-export { opcionesAnunciantes, opcionesSectores } from "./servidor"

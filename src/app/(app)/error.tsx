@@ -1,11 +1,10 @@
 "use client"
 
 import { House } from "lucide-react"
-import Link from "next/link"
 
 import { EstadoError } from "@/components/feedback/estado-error"
 import { ContenedorPagina } from "@/components/layout/contenedor-pagina"
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { RUTA_INICIO } from "@/lib/auth/navegacion"
 
 interface ErrorAplicacionProps {
@@ -29,14 +28,10 @@ export default function ErrorAplicacion({
         digest={error.digest}
         className="rounded-2xl border bg-card/40 py-12"
       >
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href={RUTA_INICIO} />}
-        >
+        <EnlaceBoton variant="outline" href={RUTA_INICIO}>
           <House data-icon="inline-start" aria-hidden />
           Ir al inicio
-        </Button>
+        </EnlaceBoton>
       </EstadoError>
     </ContenedorPagina>
   )

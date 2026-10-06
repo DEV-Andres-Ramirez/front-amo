@@ -10,6 +10,8 @@
  * 4. Escritura con el cliente del USUARIO (JWT + cabecera de contexto
  *    confiable): la BD vuelve a exigir `roles.gestionar`, sesión viva y AAL2
  *    (RLS), y sus triggers aplican las guardas y auditan con el actor real.
+ *    La matriz de permisos es la excepción: se guarda de forma atómica con
+ *    `guardar_permisos_rol_srv` (solo `service_role`, revalida actor y sesión).
  * 5. `refresh()` para que la página muestre el cambio en la misma respuesta.
  *
  * Los errores esperados se devuelven como `ResultadoAccion` (nunca se lanzan).
@@ -18,6 +20,7 @@ import "server-only"
 
 import { refresh } from "next/cache"
 
+import { contextoDelActor } from "@/lib/auth/contexto-actor"
 import { requerirPermiso } from "@/lib/auth/dal"
 import { MENSAJE_INESPERADO } from "@/features/usuarios/errores"
 import { PERMISOS } from "@/lib/auth/permisos"
@@ -217,10 +220,13 @@ export async function editarRol(
 export type PermisosGuardados = { agregados: number; quitados: number }
 
 /**
- * Aplica el diff de la matriz: primero retira y luego otorga (si lo segundo
- * fallara, el rol queda con menos acceso, nunca con más). Cada fila pasa por
- * `fn_guardar_rol_permisos` (rol de sistema, rol propio, anti-escalada) y se
- * audita con el actor.
+ * Aplica el diff de la matriz con `guardar_permisos_rol_srv`: retira y otorga
+ * en UNA transacción (todo o nada; antes eran dos peticiones y un fallo de la
+ * segunda dejaba el rol a medias). La BD revalida actor, sesión y todas las
+ * guardas (rol de sistema, rol propio, anti-escalada, permiso aplicable al
+ * tipo de rol) antes de tocar una fila, y audita cada cambio con el actor.
+ * Devuelve las filas que cambiaron de verdad: otorgar un permiso ya otorgado
+ * o retirar uno ausente no cuenta.
  */
 export async function guardarPermisosRol(
   entrada: EntradaPermisosRol
@@ -230,6 +236,8 @@ export async function guardarPermisosRol(
   if (!validacion.success) return desdeErrorZod(validacion.error)
   const { rolId, agregar, quitar } = validacion.data
 
+  // Las mismas reglas que aplica la BD, antes, para responder nombrando todos
+  // los permisos en español (la BD solo informa el primero que infringe).
   if (rolId === actor.rol.id) {
     return fallo("No puedes cambiar los permisos de tu propio rol.")
   }
@@ -245,8 +253,6 @@ export async function guardarPermisosRol(
     const rol = await leerRol(supabase, rolId)
     if (!rol) return fallo(ROL_INEXISTENTE)
     if (rol.es_sistema) return fallo(ROL_SISTEMA)
-    // La BD no distingue el tipo del rol: un permiso interno en un rol externo
-    // le abriría datos de toda la plataforma (ver `esAplicable`).
     const ajenos = noAplicables(rol.tipo, agregar)
     if (ajenos.length > 0) {
       return fallo(
@@ -254,33 +260,25 @@ export async function guardarPermisosRol(
       )
     }
 
-    if (quitar.length > 0) {
-      const { error } = await supabase
-        .from("rol_permisos")
-        .delete()
-        .eq("rol_id", rolId)
-        .in("permiso_clave", quitar)
-      if (error) return falloBd("retirar permisos", error)
-    }
-    if (agregar.length > 0) {
-      // Idempotente: si otra persona ya lo otorgó, no es un error.
-      const { error } = await supabase.from("rol_permisos").upsert(
-        agregar.map((clave) => ({ rol_id: rolId, permiso_clave: clave })),
-        { onConflict: "rol_id,permiso_clave", ignoreDuplicates: true }
-      )
-      if (error) {
-        if (quitar.length > 0) refresh()
-        const resultado = falloBd("otorgar permisos", error)
-        return quitar.length > 0
-          ? fallo(
-              `Se retiraron los permisos quitados, pero no se pudieron otorgar los nuevos. ${resultado.error}`
-            )
-          : resultado
+    const contexto = await contextoDelActor(actor)
+    const { data, error } = await contexto.admin.rpc(
+      "guardar_permisos_rol_srv",
+      {
+        p_rol_id: rolId,
+        p_agregar: agregar,
+        p_quitar: quitar,
+        p_actor_id: contexto.actorId,
+        p_session_id: contexto.sessionId,
       }
-    }
+    )
+    if (error) return falloBd("guardar permisos", error)
 
     refresh()
-    return exito({ agregados: agregar.length, quitados: quitar.length })
+    const cambios = data[0]
+    return exito({
+      agregados: cambios?.agregados ?? 0,
+      quitados: cambios?.quitados ?? 0,
+    })
   } catch (error) {
     return falloInesperado("guardarPermisosRol", error)
   }

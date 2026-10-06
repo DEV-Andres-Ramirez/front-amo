@@ -20,8 +20,16 @@ export interface ErrorInterpretado {
 export const SIN_PERMISO =
   "No tienes permiso para este cambio o tu sesión necesita verificarse de nuevo. Vuelve a ingresar si el problema continúa."
 
+/** Edición en línea: la página ya muestra el valor vigente y basta reintentar. */
 export const CAMBIO_CONCURRENTE =
   "Otra persona cambió este dato mientras lo editabas. Revisa el valor actual y vuelve a intentarlo."
+
+/** Formularios y confirmaciones: lo abierto quedó desactualizado y hay que reabrirlo. */
+export const REGISTRO_DESACTUALIZADO =
+  "Otra persona cambió este registro mientras lo tenías abierto. Ciérralo, revisa los datos actuales y vuelve a intentarlo."
+
+export const REGISTRO_INEXISTENTE =
+  "El registro ya no está disponible: pudo eliminarlo otra persona. Cierra y continúa con la lista actualizada."
 
 const MENSAJES_NEGOCIO: Readonly<Record<string, string>> = {
   AMO_NO_AUTORIZADO: SIN_PERMISO,
@@ -97,7 +105,7 @@ const RESTRICCIONES: readonly (ErrorInterpretado & { nombre: string })[] = [
   },
   {
     nombre: "comisiones_excepcion_porcentaje_chk",
-    mensaje: "La comisión debe estar entre 0 % y 50 %.",
+    mensaje: "La comisión debe estar entre 0% y 50%.",
     campo: "porcentaje",
   },
   {
@@ -111,6 +119,16 @@ const RESTRICCIONES: readonly (ErrorInterpretado & { nombre: string })[] = [
     campo: "motivo",
   },
   {
+    nombre: "comisiones_excepcion_anunciante_id_fkey",
+    mensaje: "Ese anunciante ya no existe. Elige otro de la lista.",
+    campo: "objetivoId",
+  },
+  {
+    nombre: "comisiones_excepcion_campana_id_fkey",
+    mensaje: "Esa campaña ya no existe. Elige otra de la lista.",
+    campo: "objetivoId",
+  },
+  {
     nombre: "asignacion_montos_comision_excepcion_id_fkey",
     mensaje:
       "Esta excepción ya se aplicó a asignaciones: no se puede eliminar. Finalízala para que no se use más.",
@@ -118,7 +136,8 @@ const RESTRICCIONES: readonly (ErrorInterpretado & { nombre: string })[] = [
   // Niveles de verificación
   {
     nombre: "niveles_verificacion_porcentajes_chk",
-    mensaje: "La alerta debe llegar antes (o a la vez) que el bloqueo, y ninguno puede pasar del 100 %.",
+    mensaje:
+      "La alerta debe llegar antes (o a la vez) que el bloqueo, y ninguno puede pasar del 100%.",
     campo: "porcentajeAlerta",
   },
   {

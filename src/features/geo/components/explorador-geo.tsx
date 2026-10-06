@@ -20,20 +20,20 @@ import {
 import type { FocoMapa } from "@/components/maps/expresiones"
 import { MapaDinamico } from "@/components/maps/mapa-dinamico"
 import type { ApiMapa, MargenMapa } from "@/components/maps/tipos"
-import { TooltipFlotante, posicionTooltip } from "@/components/maps/tooltip-flotante"
+import {
+  TooltipFlotante,
+  posicionTooltip,
+} from "@/components/maps/tooltip-flotante"
 import { useTemaMapa } from "@/components/maps/use-tema-mapa"
 import { Button } from "@/components/ui/button"
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer"
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { rangoDesdePreset } from "@/lib/fechas"
 import { cn } from "@/lib/utils"
 
 import { crearDiscriminadorClic, type DiscriminadorClic } from "../clic"
 import {
   ErrorConsultaGeo,
+  esSesionVencida,
   precargarGeometria,
   precargarMetricasMapa,
   useDetalleZona,
@@ -72,11 +72,18 @@ import { CoachmarkMapa } from "./coachmark-mapa"
 import { ContenidoTooltip } from "./contenido-tooltip"
 import { ControlesZoom, type OpcionesVista } from "./controles-mapa"
 import type { DatosDetalle } from "./detalle-zona"
-import { type CalorLeyenda, type FocoLeyenda, LeyendaMapa } from "./leyenda-mapa"
-import { CLASE_LIENZO, CLASE_PANEL } from "./lienzo"
+import {
+  type CalorLeyenda,
+  type FocoLeyenda,
+  LeyendaMapa,
+} from "./leyenda-mapa"
+import { altoHojaDetalle, CLASE_LIENZO, CLASE_PANEL } from "./lienzo"
 import { HojaDetalle, PanelDetalleLateral } from "./panel-detalle"
 import { PanelRanking } from "./panel-ranking"
-import { type CalorExplorador, useDatosExplorador } from "./use-datos-explorador"
+import {
+  type CalorExplorador,
+  useDatosExplorador,
+} from "./use-datos-explorador"
 import {
   disposicionPara,
   useFocoTrasCambioDeNivel,
@@ -91,6 +98,8 @@ export interface ExploradorGeoProps {
   readonly estilo: string
   /** Métricas que el usuario puede consultar (según sus permisos). */
   readonly metricasPermitidas: readonly MetricaGeo[]
+  /** Métricas cuyo modo calor puede ver (puntos leídos con su RLS). */
+  readonly metricasCalor: readonly MetricaGeo[]
 }
 
 /** Valor atado al ámbito (nivel + departamento): al cambiar de nivel se descarta solo. */
@@ -106,20 +115,37 @@ function enAmbito<T>(estado: EnAmbito<T> | null, ambito: string): T | null {
 /**
  * Área libre de paneles para la cámara. Escritorio: ranking (21 rem) a la
  * izquierda y, con una zona seleccionada, el detalle (22 rem) a la derecha.
- * Móvil: barra arriba y, con detalle, la hoja inferior (≈ mitad del alto).
+ * Móvil: barra arriba y, con detalle, la hoja inferior (`altoHojaDetalle`).
  */
 const MARGEN_AMPLIO: MargenMapa = { top: 84, bottom: 44, left: 376, right: 48 }
 const MARGEN_DETALLE_AMPLIO = 400
-const MARGEN_COMPACTO: MargenMapa = { top: 136, bottom: 88, left: 24, right: 24 }
-const FRACCION_HOJA_DETALLE = 0.52
+const MARGEN_COMPACTO: MargenMapa = {
+  top: 136,
+  bottom: 88,
+  left: 24,
+  right: 24,
+}
+/** Aire entre la zona seleccionada y el borde de la hoja de detalle. */
+const HOLGURA_HOJA_DETALLE_PX = 16
 const ANCHO_PANEL_RANKING_PX = 336 + 32
 
-function margenDelMapa(amplia: boolean, conDetalle: boolean, alto: number): MargenMapa {
+function margenDelMapa(
+  amplia: boolean,
+  conDetalle: boolean,
+  alto: number,
+  pantallaCompleta: boolean
+): MargenMapa {
   if (amplia) {
-    return conDetalle ? { ...MARGEN_AMPLIO, right: MARGEN_DETALLE_AMPLIO } : MARGEN_AMPLIO
+    return conDetalle
+      ? { ...MARGEN_AMPLIO, right: MARGEN_DETALLE_AMPLIO }
+      : MARGEN_AMPLIO
   }
   return conDetalle
-    ? { ...MARGEN_COMPACTO, bottom: Math.round(alto * FRACCION_HOJA_DETALLE) }
+    ? {
+        ...MARGEN_COMPACTO,
+        bottom:
+          altoHojaDetalle(alto, pantallaCompleta) + HOLGURA_HOJA_DETALLE_PX,
+      }
     : MARGEN_COMPACTO
 }
 
@@ -144,7 +170,9 @@ function calorDeLeyenda(calor: CalorExplorador): CalorLeyenda | null {
 function nombreDelAmbito(estado: EstadoNivel): string {
   if (estado.nivel === "internacional") return "Mundo"
   if (estado.nivel === "nacional") return "Colombia"
-  return departamentoPorCodigo(estado.departamento)?.nombreCorto ?? "Departamento"
+  return (
+    departamentoPorCodigo(estado.departamento)?.nombreCorto ?? "Departamento"
+  )
 }
 
 function focoDelMapa(foco: FocoLeyenda): FocoMapa {
@@ -163,7 +191,14 @@ function leyendaExportacion(
     etiqueta: `${formatearValorGeo(clase.desde, metrica, { compacto: true, por100k })}${clase.hasta === null ? " o más" : ""}`,
   }))
   return rayada && vista.sinDatos > 0
-    ? [...clases, { color: vista.escala.colorSinDatos, etiqueta: "Sin datos", rayado: true }]
+    ? [
+        ...clases,
+        {
+          color: vista.escala.colorSinDatos,
+          etiqueta: "Sin datos",
+          rayado: true,
+        },
+      ]
     : clases
 }
 
@@ -176,6 +211,7 @@ export function ExploradorGeo({
   token,
   estilo,
   metricasPermitidas,
+  metricasCalor,
 }: ExploradorGeoProps) {
   const raiz = useRef<HTMLDivElement>(null)
   const refTooltip = useRef<HTMLDivElement>(null)
@@ -188,7 +224,7 @@ export function ExploradorGeo({
   const tema = useTemaMapa()
   const pantalla = usePantallaCompleta()
 
-  const explorador = useEstadoExplorador(metricasPermitidas)
+  const explorador = useEstadoExplorador(metricasPermitidas, metricasCalor)
   const { nivel: estado, rango } = explorador
   const ambito = claveAmbito(estado)
   useFocoTrasCambioDeNivel(raiz, ambito)
@@ -202,8 +238,11 @@ export function ExploradorGeo({
     origen: "mapa" | "ranking"
   }> | null>(null)
   const claveLeyenda = `${ambito}|${metricaVista}|${explorador.por100k}`
-  const [focoLeyenda, setFocoLeyenda] = useState<EnAmbito<FocoLeyenda> | null>(null)
-  const [fijadoLeyenda, setFijadoLeyenda] = useState<EnAmbito<FocoLeyenda> | null>(null)
+  const [focoLeyenda, setFocoLeyenda] = useState<EnAmbito<FocoLeyenda> | null>(
+    null
+  )
+  const [fijadoLeyenda, setFijadoLeyenda] =
+    useState<EnAmbito<FocoLeyenda> | null>(null)
   const [rankingAbierto, setRankingAbierto] = useState(false)
   const [mapaListo, setMapaListo] = useState(false)
   const [errorMapa, setErrorMapa] = useState<string | null>(null)
@@ -213,7 +252,8 @@ export function ExploradorGeo({
   const seleccionado = enAmbito(seleccion, ambito)
   const hoverActual = enAmbito(hover, ambito)
   const resaltado = hoverActual?.codigo ?? null
-  const foco = enAmbito(focoLeyenda, claveLeyenda) ?? enAmbito(fijadoLeyenda, claveLeyenda)
+  const foco =
+    enAmbito(focoLeyenda, claveLeyenda) ?? enAmbito(fijadoLeyenda, claveLeyenda)
 
   // ── Acciones ──────────────────────────────────────────────────────────────
   const seleccionar = (codigo: string | null) =>
@@ -283,23 +323,31 @@ export function ExploradorGeo({
 
   // ── Derivados para el mapa ────────────────────────────────────────────────
   const destacados = useMemo(
-    () => (vista && typeof foco === "number" ? codigosDeClase(vista, foco) : undefined),
+    () =>
+      vista && typeof foco === "number"
+        ? codigosDeClase(vista, foco)
+        : undefined,
     [vista, foco]
   )
-  const colores = useMemo(() => vista?.colores ?? new Map<string, string>(), [vista])
+  const colores = useMemo(
+    () => vista?.colores ?? new Map<string, string>(),
+    [vista]
+  )
   const rayarSinDatos = estado.nivel !== "internacional" && vista !== null
   const encuadre = useMemo(
     () =>
-      encuadreDelNivel(
-        estado,
-        amplia ? ancho - ANCHO_PANEL_RANKING_PX : ancho
-      ),
+      encuadreDelNivel(estado, amplia ? ancho - ANCHO_PANEL_RANKING_PX : ancho),
     [estado, amplia, ancho]
   )
   const puntos = datos.calor.respuesta?.puntos ?? null
   const calorVisible = datos.calor.activo && !!puntos?.length
   const calorLeyenda = calorDeLeyenda(datos.calor)
-  const margen = margenDelMapa(amplia, seleccionado !== null, alto)
+  const margen = margenDelMapa(
+    amplia,
+    seleccionado !== null,
+    alto,
+    pantalla.activa
+  )
   const enfoque = seleccionado ? datos.centroZona(seleccionado) : null
   const tipoZona = TIPO_ZONA[estado.nivel]
   const metricasNivel = metricasDelNivel(estado.nivel, metricasPermitidas)
@@ -330,7 +378,12 @@ export function ExploradorGeo({
         mapa: lienzo,
         titulo: `${definicion.titulo} · ${lugar}`,
         subtitulo: `Por ${tipoZona.plural}${explorador.por100k ? " · por 100 mil habitantes" : ""} · ${formatearPeriodo(rango.desde, rango.hasta)}`,
-        leyenda: leyendaExportacion(vista, metricaVista, explorador.por100k, rayarSinDatos),
+        leyenda: leyendaExportacion(
+          vista,
+          metricaVista,
+          explorador.por100k,
+          rayarSinDatos
+        ),
         tema,
         escala: window.devicePixelRatio || 1,
       })
@@ -341,7 +394,16 @@ export function ExploradorGeo({
     } finally {
       setExportando(false)
     }
-  }, [vista, metricaVista, estado, tipoZona, explorador.por100k, rango, rayarSinDatos, tema])
+  }, [
+    vista,
+    metricaVista,
+    estado,
+    tipoZona,
+    explorador.por100k,
+    rango,
+    rayarSinDatos,
+    tema,
+  ])
 
   const opcionesVista: OpcionesVista = {
     admitePor100k: explorador.admitePor100k,
@@ -398,7 +460,9 @@ export function ExploradorGeo({
     resaltado,
     puedeExplorar: (codigo: string) => puedeExplorar(estado, codigo),
     onResaltar: (codigo: string | null) =>
-      setHover(codigo ? { ambito, valor: { codigo, origen: "ranking" } } : null),
+      setHover(
+        codigo ? { ambito, valor: { codigo, origen: "ranking" } } : null
+      ),
     onSeleccionar: (codigo: string) => {
       seleccionar(codigo)
       setRankingAbierto(false)
@@ -422,10 +486,21 @@ export function ExploradorGeo({
     cargando: datos.cargando && mapaListo,
   } as const
 
-  const sinDatos = vista !== null && vista.ranking.conDatos === 0 && !datos.cargando
+  // Con una zona seleccionada, su detalle ya lo dice (y el aviso la taparía).
+  const sinDatos =
+    vista !== null &&
+    vista.ranking.conDatos === 0 &&
+    !datos.cargando &&
+    seleccionado === null
   const errorDatos = datos.error
+  const esFoto =
+    metricaVista !== null && DEFINICIONES_METRICAS[metricaVista].foto
+  // Sin datos por zona ni puntos de calor, el aviso central ya lo dice todo.
   const leyenda =
-    vista && metricaVista && (vista.ranking.conDatos > 0 || calorLeyenda) ? (
+    vista &&
+    metricaVista &&
+    (vista.ranking.conDatos > 0 ||
+      (calorLeyenda !== null && calorLeyenda.estado !== "vacio")) ? (
       <LeyendaMapa
         escala={vista.escala}
         tema={tema}
@@ -463,14 +538,19 @@ export function ExploradorGeo({
   ) : errorDatos ? (
     <AvisoErrorDatos
       mensaje={errorDatos.message}
-      pista={errorDatos instanceof ErrorConsultaGeo ? errorDatos.pista : undefined}
+      pista={
+        errorDatos instanceof ErrorConsultaGeo ? errorDatos.pista : undefined
+      }
+      sesionVencida={esSesionVencida(errorDatos)}
       onReintentar={datos.reintentar}
     />
   ) : sinDatos ? (
     <AvisoSinDatos
       zonaSingular={tipoZona.singular}
+      foto={esFoto}
       onAmpliar={
-        rango.preset === "esteAno"
+        // Una foto al cierre (medios, audiencia) no crece al ampliar el periodo.
+        esFoto || rango.preset === "esteAno"
           ? null
           : () => explorador.cambiarRango(rangoDesdePreset("esteAno"))
       }
@@ -505,7 +585,12 @@ export function ExploradorGeo({
             <HerramientasMapa {...propsBarra} />
           </div>
           <div className="flex min-h-0 flex-1 items-start gap-3">
-            <div className={cn(CLASE_PANEL, "flex h-full w-[21rem] shrink-0 flex-col")}>
+            <div
+              className={cn(
+                CLASE_PANEL,
+                "flex h-full w-[21rem] shrink-0 flex-col"
+              )}
+            >
               <PanelRanking {...propsRanking} className="flex-1" />
             </div>
             <div className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-3">
@@ -537,7 +622,10 @@ export function ExploradorGeo({
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between gap-3 p-3">
           <div className="flex flex-col items-center gap-3">
             <BarraCompacta {...propsBarra} className="w-full max-w-xl" />
-            <CoachmarkMapa habilitado={mapaListo && mapaUsable} tactil={!punteroFino} />
+            <CoachmarkMapa
+              habilitado={mapaListo && mapaUsable}
+              tactil={!punteroFino}
+            />
           </div>
           {/* Bajo la hoja de detalle: oculto también para el tabulador (`inert`). */}
           <div
@@ -556,7 +644,10 @@ export function ExploradorGeo({
                   size="icon"
                   onClick={() => apiMapa.current?.recentrar()}
                   aria-label="Volver al encuadre"
-                  className={cn(CLASE_PANEL, "size-10 rounded-xl text-muted-foreground")}
+                  className={cn(
+                    CLASE_PANEL,
+                    "size-10 rounded-xl text-muted-foreground"
+                  )}
                 >
                   <LocateFixed aria-hidden />
                 </Button>
@@ -564,9 +655,16 @@ export function ExploradorGeo({
               <Button
                 variant="ghost"
                 onClick={() => setRankingAbierto(true)}
-                className={cn(CLASE_PANEL, "h-10 gap-2 rounded-xl px-3.5 font-medium")}
+                className={cn(
+                  CLASE_PANEL,
+                  "h-10 gap-2 rounded-xl px-3.5 font-medium"
+                )}
               >
-                <ListOrdered data-icon="inline-start" aria-hidden className="text-primary" />
+                <ListOrdered
+                  data-icon="inline-start"
+                  aria-hidden
+                  className="text-primary"
+                />
                 Ranking
               </Button>
             </div>
@@ -580,7 +678,10 @@ export function ExploradorGeo({
               <DrawerTitle className="sr-only">
                 Ranking de {tipoZona.plural}
               </DrawerTitle>
-              <PanelRanking {...propsRanking} className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom)]" />
+              <PanelRanking
+                {...propsRanking}
+                className="min-h-0 flex-1 pb-[env(safe-area-inset-bottom)]"
+              />
             </DrawerContent>
           </Drawer>
           <HojaDetalle datos={datosDetalle} {...accionesDetalle} />
@@ -610,7 +711,9 @@ export function ExploradorGeo({
           destacados={destacados}
           etiqueta={`Mapa de ${nombreDelAmbito(estado)} por ${tipoZona.plural}: ${DEFINICIONES_METRICAS[metricaVista].titulo}. El ranking contiene los mismos datos.`}
           onZonaHover={(codigo) =>
-            setHover(codigo ? { ambito, valor: { codigo, origen: "mapa" } } : null)
+            setHover(
+              codigo ? { ambito, valor: { codigo, origen: "mapa" } } : null
+            )
           }
           onPuntero={moverTooltip}
           onZonaClic={(codigo, puntero) =>

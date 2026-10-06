@@ -69,14 +69,57 @@ describe("vista del mapa", () => {
     expect(resultado.colores.get("E")).toBe(PALETAS_SECUENCIALES.oscuro[4])
     expect(resultado.conteos.reduce((a, b) => a + b, 0)).toBe(5)
     for (const [codigo, clase] of resultado.claseDe) {
-      expect(resultado.colores.get(codigo)).toBe(resultado.escala.colores[clase])
+      expect(resultado.colores.get(codigo)).toBe(
+        resultado.escala.colores[clase]
+      )
     }
     expect(resultado.escala.colorSinDatos).toBe(COLOR_SIN_DATOS.oscuro)
     expect([...codigosDeClase(resultado, 4)]).toEqual(["E"])
   })
 
+  it("una métrica aditiva con todo en cero se presenta sin datos: sin colores ni puestos", () => {
+    const resultado = vista(UNIVERSO.map(({ codigo }) => fila(codigo, 0)))
+    expect(resultado.sinActividad).toBe(true)
+    expect(resultado.ranking.conDatos).toBe(0)
+    expect(resultado.ranking.total).toBe(0)
+    expect(resultado.colores.size).toBe(0)
+    expect(resultado.conteos).toEqual([])
+    expect(resultado.ranking.filas.every((f) => f.posicion === null)).toBe(true)
+    expect(resultado.ranking.filas.every((f) => f.participacion === null)).toBe(
+      true
+    )
+    // Los ceros se conservan: el detalle muestra "0", no "Sin datos".
+    expect(resultado.porCodigo.get("A")?.valor).toBe(0)
+  })
+
+  it("con alguna zona activa, los ceros son datos y entran en la escala", () => {
+    const resultado = vista([fila("A", 0), fila("B", 0), fila("C", 4)])
+    expect(resultado.sinActividad).toBe(false)
+    expect(resultado.ranking.conDatos).toBe(3)
+    expect(resultado.colores.has("A")).toBe(true)
+  })
+
+  it("una tasa en cero sí es un dato (0 % de cumplimiento)", () => {
+    const resultado = construirVistaMapa({
+      filas: [
+        { ...fila("A", 0), n: 25 },
+        { ...fila("B", 0), n: 40 },
+      ],
+      universo: UNIVERSO,
+      incluirSinDatos: false,
+      aditiva: false,
+      por100k: false,
+      tema: "claro",
+    })
+    expect(resultado.sinActividad).toBe(false)
+    expect(resultado.ranking.conDatos).toBe(2)
+  })
+
   it("dibuja círculos proporcionales para zonas sin polígono y fijos para las diminutas", () => {
-    const resultado = vista([fila("A", 100), fila("AW", 25), fila("88", 3)], false)
+    const resultado = vista(
+      [fila("A", 100), fila("AW", 25), fila("88", 3)],
+      false
+    )
     const { circulos, radios } = circulosDeVista(
       resultado,
       [

@@ -32,7 +32,7 @@ describe("formatearEje", () => {
   it("usa marcas compactas y redondeadas", () => {
     expect(plano(formatearEje(12_000_000, "cop"))).toBe("$12 M")
     expect(formatearEje(9_999, "numero")).toBe("9.999")
-    expect(plano(formatearEje(25_000, "numero"))).toBe("25 k")
+    expect(plano(formatearEje(25_000, "numero"))).toBe("25 mil")
     expect(formatearEje(0.4, "porcentaje")).toBe("40%")
   })
 })

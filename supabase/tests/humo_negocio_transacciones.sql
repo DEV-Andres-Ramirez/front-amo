@@ -6,6 +6,11 @@
 -- Se ejecuta como owner (MCP execute_sql o psql) dentro de una transacción que SIEMPRE se revierte.
 -- Cada prueba deja `true` si pasa o un texto con lo observado si falla.
 begin;
+-- Límite del lado del servidor: la suite retira los datos demo dentro de la transacción (unos 15 s con el juego demo
+-- actual) y mientras tanto los mantiene bloqueados. Si no termina a tiempo (p. ej. espera a otra transacción), se
+-- cancela y revierte en vez de seguir viva cuando el cliente (MCP) ya dejó de esperar. No ejecutar en paralelo con
+-- otra suite que también purgue.
+set local statement_timeout = '45s';
 
 do $humo$
 declare
@@ -68,6 +73,11 @@ declare
 begin
   -- ── Preparación (owner, modo_carga para fijar estados de partida) ───────────────────────────────────
   perform set_config('amo.modo_carga', 'on', true);
+  -- La suite compara valores de toda la plataforma (estimador c7, invariantes de contadores m1–m4): los datos demo
+  -- que traiga la BD se retiran dentro de esta transacción con la purga de la propia BD; el rollback los restaura.
+  perform set_config('amo.purga', 'on', true);
+  perform private.purgar_demo();
+  perform set_config('amo.purga', '', true);
   insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at)
   select u, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', e, now(), now(), now()
   from (values (u_adm, 'humo7.admin@amo.test'), (u_fin, 'humo7.finanzas@amo.test'), (u_ana, 'humo7.ana@amo.test'),
@@ -107,6 +117,10 @@ begin
     (s_adm1, u_adm, now(), now(), 'aal1'), (s_adm, u_adm, now(), now(), 'aal2'), (s_fin, u_fin, now(), now(), 'aal2'),
     (s_ana, u_ana, now(), now(), 'aal1'), (s_anb, u_anb, now(), now(), 'aal1'), (s_mea, u_mea, now(), now(), 'aal1'),
     (s_meb, u_meb, now(), now(), 'aal1'), (s_mec, u_mec, now(), now(), 'aal1'), (s_med, u_med, now(), now(), 'aal1');
+  -- La suite liquida sin retenciones configuradas (así deja la BD la semilla de migraciones: monto_retenciones = 0) y
+  -- la BD puede traer tarifas de retención en la fuente y de ReteICA (datos demo): se retiran en esta transacción.
+  delete from public.reteica_municipal;
+  delete from public.retenciones_config;
   perform set_config('amo.modo_carga', '', true);
   c_adm1 := jsonb_build_object('sub', u_adm, 'role', 'authenticated', 'aal', 'aal1', 'session_id', s_adm1)::text;
   c_adm := jsonb_build_object('sub', u_adm, 'role', 'authenticated', 'aal', 'aal2', 'session_id', s_adm)::text;
@@ -882,6 +896,9 @@ begin
          from public.asignaciones where id = a_a)
     and (select retenciones_aplicadas is null and monto_neto is null from public.asignacion_montos where asignacion_id = a_a)
     and (select estado = 'ANULADO' from public.documentos_soporte where liquidacion_id = liq1));
+  -- Solo hay una resolución DIAN activa por tipo y la BD puede traer las suyas (datos demo): se desactivan dentro de
+  -- esta transacción para probar primero «sin resolución» (i7) y numerar después desde 1 con las de la prueba (i8, j1).
+  update public.resoluciones_dian set activa = false where activa;
   perform set_config('request.jwt.claims', c_srv, true);
   execute 'set local role service_role';
   liq2 := public.generar_liquidacion_srv(me_a, private.hoy() - 14, private.hoy(), u_adm, s_adm);

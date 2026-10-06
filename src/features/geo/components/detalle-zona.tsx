@@ -1,9 +1,23 @@
 "use client"
 
-import { ArrowRight, ChartNoAxesColumn, Info, X } from "lucide-react"
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  ChartNoAxesColumn,
+  Info,
+  Sparkles,
+  X,
+} from "lucide-react"
 
 import { EstadoError } from "@/components/feedback/estado-error"
 import { Esqueleto } from "@/components/feedback/esqueletos"
+import {
+  type PresentacionDelta,
+  presentarDelta,
+  type TonoDelta,
+} from "@/components/kpi/delta"
+import type { UnidadKpi } from "@/components/kpi/tipos"
 import { BarrasSerie } from "@/components/maps/barras-serie"
 import {
   type FormatoNumero,
@@ -13,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 import type { FilaRanking } from "../agregacion"
+import { esSesionVencida } from "../consultas-cliente"
 import { departamentoPorCodigo } from "../departamentos"
 import {
   etiquetaCubeta,
@@ -21,18 +36,24 @@ import {
   TITULO_SERIE,
   unidadGeo,
 } from "../formato"
-import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
+import {
+  DEFINICIONES_METRICAS,
+  type MetricaGeo,
+  type UnidadMetrica,
+} from "../metricas"
 import {
   DEPARTAMENTOS_SIN_DESCENSO,
   type EstadoNivel,
   TIPO_ZONA,
 } from "../niveles"
 import type {
+  KpiZona,
   MotivoSinSerie,
   RespuestaDetalleGeo,
   SerieZona,
   TopZona,
 } from "../tipos"
+import { BotonReingreso, MENSAJE_REINGRESO } from "./avisos-mapa"
 import { ICONOS_METRICA } from "./iconos-metrica"
 
 export interface DatosDetalle {
@@ -56,10 +77,7 @@ interface AccionesDetalle {
   onReintentar: () => void
 }
 
-function contextoZona(
-  codigo: string,
-  estado: EstadoNivel
-): string {
+function contextoZona(codigo: string, estado: EstadoNivel): string {
   const tipo = TIPO_ZONA[estado.nivel].singular
   if (estado.nivel === "nacional") {
     const departamento = departamentoPorCodigo(codigo)
@@ -93,18 +111,101 @@ function notaSinDescenso(codigo: string, estado: EstadoNivel): string | null {
     : "El archipiélago se analiza completo (San Andrés y Providencia)."
 }
 
+const UNIDAD_KPI: Readonly<Record<UnidadMetrica, UnidadKpi>> = {
+  conteo: "conteo",
+  cop: "COP",
+  personas: "personas",
+  porcentaje: "%",
+}
+
+/** Más accesos o más audiencia en el exterior no son, por sí solos, mejores ni peores. */
+const SIN_SENTIDO: ReadonlySet<MetricaGeo> = new Set(["accesos", "audiencia"])
+
+const TONOS_DELTA: Readonly<Record<TonoDelta, string>> = {
+  positivo: "bg-success/10 text-success",
+  negativo: "bg-destructive/10 text-destructive",
+  neutro: "bg-foreground/8 text-muted-foreground",
+}
+
+function IconoDelta({ delta }: { delta: PresentacionDelta }) {
+  if (delta.tipo === "nuevo") return <Sparkles aria-hidden className="size-3" />
+  switch (delta.tendencia) {
+    case "sube":
+      return <ArrowUpRight aria-hidden className="size-3.5" />
+    case "baja":
+      return <ArrowDownRight aria-hidden className="size-3.5" />
+    case "estable":
+      return <ArrowRight aria-hidden className="size-3.5" />
+  }
+}
+
+/**
+ * Variación de la zona frente al periodo anterior de igual duración. Sin
+ * comparativo (fotos actuales, tasas sin muestra) no se muestra nada.
+ */
+function Comparativo({
+  kpi,
+  atenuado,
+}: {
+  kpi: KpiZona | undefined
+  /** El detalle visible es el anterior mientras llega el nuevo. */
+  atenuado: boolean
+}) {
+  // `typeof`: una respuesta en caché de una versión anterior no trae el campo.
+  if (!kpi || kpi.valor === null || typeof kpi.anterior !== "number")
+    return null
+  const delta = presentarDelta({
+    valor: kpi.valor,
+    valorAnterior: kpi.anterior,
+    variacion: kpi.variacion,
+    unidad: UNIDAD_KPI[DEFINICIONES_METRICAS[kpi.metrica].unidad],
+    sentido: SIN_SENTIDO.has(kpi.metrica) ? "neutro" : "mayor",
+  })
+  if (delta.tipo === "sin-comparativo") return null
+  return (
+    <p
+      className={cn(
+        "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground transition-opacity duration-200",
+        atenuado && "opacity-60"
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold cifras",
+          TONOS_DELTA[delta.tono]
+        )}
+      >
+        <IconoDelta delta={delta} />
+        {delta.texto}
+      </span>
+      <span aria-hidden>
+        {delta.tipo === "nuevo"
+          ? "sin actividad en el periodo anterior"
+          : "frente al periodo anterior"}
+      </span>
+      <span className="sr-only">{delta.descripcion}</span>
+    </p>
+  )
+}
+
 function ValorPrincipal({
   fila,
   metrica,
   por100k,
   totalZonas,
-  zonaPlural,
+  tipoZona,
+  kpi,
+  cargando,
 }: {
   fila: FilaRanking | null
   metrica: MetricaGeo
   por100k: boolean
   totalZonas: number
-  zonaPlural: string
+  tipoZona: { singular: string; plural: string }
+  /** KPI de la métrica en el detalle (trae el comparativo). */
+  kpi: KpiZona | undefined
+  cargando: boolean
 }) {
   const definicion = DEFINICIONES_METRICAS[metrica]
   const valor = fila?.valor ?? null
@@ -134,15 +235,20 @@ function ValorPrincipal({
           ) : null}
         </p>
       )}
-      <p className="cifras text-xs text-muted-foreground">
+      <p className="text-xs cifras text-muted-foreground">
         {fila?.posicion
-          ? `Puesto ${fila.posicion} de ${totalZonas} ${zonaPlural}`
-          : `Sin puesto en el ranking`}
+          ? `Puesto ${fila.posicion} de ${totalZonas} ${tipoZona.plural}`
+          : valor === 0
+            ? definicion.foto
+              ? `Ningún ${tipoZona.singular.toLowerCase()} la registra al cierre del periodo`
+              : `Ningún ${tipoZona.singular.toLowerCase()} tuvo actividad en el periodo`
+            : "Sin puesto en el ranking"}
         {fila?.participacion !== null && fila?.participacion !== undefined
           ? ` · ${formatearParticipacion(fila.participacion)} del total`
           : ""}
         {!definicion.aditiva && fila?.n ? ` · n = ${fila.n}` : ""}
       </p>
+      <Comparativo kpi={kpi} atenuado={cargando} />
     </div>
   )
 }
@@ -158,10 +264,10 @@ const SIN_SERIE: Readonly<Record<MotivoSinSerie, string>> = {
 function notaSerie(serie: SerieZona): string | null {
   const notas: string[] = []
   if (serie.puntos.some((punto) => punto.parcial)) {
-    notas.push("Las barras tenues cubren periodos incompletos")
+    notas.push("Las barras de borde punteado cubren periodos incompletos")
   }
   if (serie.puntos.some((punto) => punto.valor === null)) {
-    notas.push("la línea punteada indica muestra insuficiente")
+    notas.push("la raya en la base indica muestra insuficiente")
   }
   if (notas.length === 0) return null
   const texto = notas.join("; ")
@@ -213,7 +319,10 @@ function Kpis({
   const otras = detalle.kpis.filter((kpi) => kpi.metrica !== metrica)
   if (otras.length === 0) return null
   return (
-    <section aria-label="Otras métricas de la zona" className="flex flex-col gap-2">
+    <section
+      aria-label="Otras métricas de la zona"
+      className="flex flex-col gap-2"
+    >
       <h3 className="text-[0.6875rem] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
         Otras métricas
       </h3>
@@ -232,10 +341,14 @@ function Kpis({
                 <Icono aria-hidden className="size-3 text-primary" />
                 {DEFINICIONES_METRICAS[kpi.metrica].tituloCorto}
               </span>
-              <span className="cifras truncate text-sm font-semibold">
-                {kpi.valor === null && !DEFINICIONES_METRICAS[kpi.metrica].aditiva && kpi.n
+              <span className="truncate text-sm font-semibold cifras">
+                {kpi.valor === null &&
+                !DEFINICIONES_METRICAS[kpi.metrica].aditiva &&
+                kpi.n
                   ? `n = ${kpi.n}`
-                  : formatearValorGeo(kpi.valor, kpi.metrica, { compacto: true })}
+                  : formatearValorGeo(kpi.valor, kpi.metrica, {
+                      compacto: true,
+                    })}
               </span>
             </button>
           )
@@ -255,20 +368,27 @@ function Destacados({ top }: { top: TopZona | null }) {
           {top.titulo}
         </h3>
         {top.descripcion ? (
-          <p className="text-[0.6875rem] text-muted-foreground">{top.descripcion}</p>
+          <p className="text-[0.6875rem] text-muted-foreground">
+            {top.descripcion}
+          </p>
         ) : null}
       </div>
       <ol className="flex flex-col gap-2">
         {top.filas.map((fila, indice) => (
-          <li key={`${fila.codigo ?? fila.nombre}-${indice}`} className="flex flex-col gap-1">
+          <li
+            key={`${fila.codigo ?? fila.nombre}-${indice}`}
+            className="flex flex-col gap-1"
+          >
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className="flex min-w-0 items-baseline gap-1.5">
-                <span className="cifras text-muted-foreground">{indice + 1}.</span>
+                <span className="cifras text-muted-foreground">
+                  {indice + 1}.
+                </span>
                 <span className="truncate font-medium" title={fila.nombre}>
                   {fila.nombre}
                 </span>
               </span>
-              <span className="cifras shrink-0 text-muted-foreground">
+              <span className="shrink-0 cifras text-muted-foreground">
                 {formatearValorGeo(fila.valor, top.metrica, { compacto: true })}
                 {fila.detalle ? (
                   <span className="ml-1.5 text-[0.6875rem] text-muted-foreground/80">
@@ -277,7 +397,10 @@ function Destacados({ top }: { top: TopZona | null }) {
                 ) : null}
               </span>
             </div>
-            <span aria-hidden className="h-1 overflow-hidden rounded-full bg-foreground/6">
+            <span
+              aria-hidden
+              className="h-1 overflow-hidden rounded-full bg-foreground/6"
+            >
               <span
                 className="block h-full rounded-full bg-primary/70"
                 style={{
@@ -357,7 +480,7 @@ export function CuerpoDetalle({
   AccionesDetalle,
   "onCambiarMetrica" | "onReintentar"
 >) {
-  const zonaPlural = TIPO_ZONA[datos.estado.nivel].plural
+  const sesionVencida = esSesionVencida(datos.error)
   return (
     <div className="flex flex-col gap-5">
       <ValorPrincipal
@@ -365,16 +488,26 @@ export function CuerpoDetalle({
         metrica={datos.metrica}
         por100k={datos.por100k}
         totalZonas={datos.totalZonas}
-        zonaPlural={zonaPlural}
+        tipoZona={TIPO_ZONA[datos.estado.nivel]}
+        kpi={
+          datos.error
+            ? undefined
+            : datos.detalle?.kpis.find((kpi) => kpi.metrica === datos.metrica)
+        }
+        cargando={datos.cargando}
       />
       {datos.error ? (
         <EstadoError
           compacto
-          titulo="No pudimos cargar el detalle"
-          descripcion={datos.error.message}
-          onReintentar={onReintentar}
+          titulo={
+            sesionVencida ? "Tu sesión terminó" : "No pudimos cargar el detalle"
+          }
+          descripcion={sesionVencida ? MENSAJE_REINGRESO : datos.error.message}
+          onReintentar={sesionVencida ? undefined : onReintentar}
           className="rounded-xl bg-foreground/4"
-        />
+        >
+          {sesionVencida ? <BotonReingreso /> : null}
+        </EstadoError>
       ) : datos.detalle ? (
         <div
           className={cn(
@@ -382,7 +515,12 @@ export function CuerpoDetalle({
             datos.cargando && "opacity-60"
           )}
         >
-          <Serie detalle={datos.detalle} metrica={datos.metrica} />
+          {/* Con la métrica de SU consulta: al cambiar de métrica, el detalle
+              visible puede ir un paso atrás o adelante del mapa. */}
+          <Serie
+            detalle={datos.detalle}
+            metrica={datos.detalle.consulta.metrica}
+          />
           <Kpis
             detalle={datos.detalle}
             metrica={datos.metrica}
@@ -409,7 +547,11 @@ export function PieDetalle({
   const nota = notaSinDescenso(datos.codigo, datos.estado)
   if (datos.explorable) {
     return (
-      <Button onClick={onExplorar} size="lg" className="h-10 w-full rounded-xl text-sm">
+      <Button
+        onClick={onExplorar}
+        size="lg"
+        className="h-10 w-full rounded-xl text-sm"
+      >
         Explorar {datos.nombre}
         <ArrowRight data-icon="inline-end" aria-hidden />
       </Button>

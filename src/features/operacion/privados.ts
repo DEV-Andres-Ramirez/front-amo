@@ -5,10 +5,7 @@
  * `REVELAR_DATO` en la bitácora con los campos pedidos. Los valores cifrados
  * (documento y datos de pago completos) nunca se piden: solo sus resúmenes.
  */
-import {
-  METODOS_PAGO,
-  TIPOS_DOCUMENTO_IDENTIDAD,
-} from "./estados"
+import { METODOS_PAGO, TIPOS_DOCUMENTO_IDENTIDAD } from "./estados"
 
 type Entidad = "medio" | "anunciante"
 type Grupo = "contacto" | "pago"
@@ -51,11 +48,27 @@ export const GRUPOS_PRIVADOS: Readonly<
           catalogo: TIPOS_DOCUMENTO_IDENTIDAD,
         },
         { campo: "numero_documento_resumen", etiqueta: "Documento" },
-        { campo: "metodo_pago", etiqueta: "Método de pago", catalogo: METODOS_PAGO },
+        {
+          campo: "metodo_pago",
+          etiqueta: "Método de pago",
+          catalogo: METODOS_PAGO,
+        },
         { campo: "datos_pago_resumen", etiqueta: "Cuenta de pago" },
-        { campo: "es_declarante", etiqueta: "Declarante de renta", booleano: true },
-        { campo: "obligado_facturar", etiqueta: "Obligado a facturar", booleano: true },
-        { campo: "responsable_iva", etiqueta: "Responsable de IVA", booleano: true },
+        {
+          campo: "es_declarante",
+          etiqueta: "Declarante de renta",
+          booleano: true,
+        },
+        {
+          campo: "obligado_facturar",
+          etiqueta: "Obligado a facturar",
+          booleano: true,
+        },
+        {
+          campo: "responsable_iva",
+          etiqueta: "Responsable de IVA",
+          booleano: true,
+        },
       ],
     },
   },
@@ -86,7 +99,10 @@ export interface DatoRevelado {
   valor: string | null
 }
 
-function presentarValor(definicion: DefinicionCampo, valor: unknown): string | null {
+function presentarValor(
+  definicion: DefinicionCampo,
+  valor: unknown
+): string | null {
   if (valor === null || valor === undefined || valor === "") return null
   if (definicion.booleano) return valor === true ? "Sí" : "No"
   const texto = String(valor)

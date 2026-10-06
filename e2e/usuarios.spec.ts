@@ -1,17 +1,18 @@
-import { expect, type Locator, type Page, test } from "@playwright/test"
-
 import { generarContrasena } from "../scripts/bootstrap/contrasena"
 import {
-  asegurarTotp,
   clienteComoSuperadmin,
-  codigoTotpEstable,
   type CuentaE2E,
-  emailDe,
-  prepararCuenta,
 } from "../scripts/bootstrap/provision-e2e"
 import type { ClienteSupabase } from "../scripts/bootstrap/supabase"
-import { PASO_TOTP_SEGUNDOS } from "../scripts/bootstrap/totp"
 import { credenciales, entorno, ingresar } from "./utilidades/cuentas"
+import {
+  abrirSesionMfa,
+  type CookiesSesion,
+  prepararCuentaMfa,
+  usarSesion,
+} from "./utilidades/mfa"
+import { expect, type Locator, type Page, test } from "./utilidades/prueba"
+import { PROYECTO_CON_CUENTAS } from "./utilidades/proyectos"
 
 /**
  * Módulo de Usuarios contra `pnpm build && pnpm start` y el Supabase real.
@@ -34,13 +35,6 @@ const GESTOR: CuentaE2E = {
 }
 
 const PREFIJO_CREADOS = "e2e.usuarios."
-const PROYECTO_CON_CUENTAS = "escritorio"
-
-interface CredencialesGestor {
-  email: string
-  password: string
-  secreto: string
-}
 
 async function borrarCreados(servicio: ClienteSupabase): Promise<void> {
   const { data, error } = await servicio
@@ -58,31 +52,6 @@ async function borrarCreados(servicio: ClienteSupabase): Promise<void> {
         `No se pudo borrar un usuario de prueba: ${errorBorrado.message}`
       )
   }
-}
-
-let ultimoPasoTotp = Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-
-/** Código de un periodo TOTP posterior al último usado (Supabase no acepta repetirlo). */
-async function codigoNuevo(secreto: string): Promise<string> {
-  const pasoActual = () => Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-  while (pasoActual() <= ultimoPasoTotp) {
-    await new Promise((resolver) => setTimeout(resolver, 1000))
-  }
-  const codigo = await codigoTotpEstable(secreto)
-  ultimoPasoTotp = pasoActual()
-  return codigo
-}
-
-async function ingresarComoGestor(
-  page: Page,
-  gestor: CredencialesGestor
-): Promise<void> {
-  await ingresar(page, gestor)
-  await expect(page).toHaveURL(/\/mfa\/verificar/)
-  await page
-    .getByLabel("Código de verificación")
-    .fill(await codigoNuevo(gestor.secreto))
-  await expect(page).toHaveURL(/\/inicio$/)
 }
 
 async function elegirOpcion(
@@ -106,7 +75,7 @@ async function buscar(page: Page, texto: string): Promise<void> {
 test.describe("administración de usuarios", () => {
   test.describe.configure({ mode: "serial", timeout: 150_000 })
 
-  let gestor: CredencialesGestor
+  let sesionGestor: CookiesSesion
   let servicio: ClienteSupabase
   const sufijo = Date.now().toString(36)
   const invitado = {
@@ -119,7 +88,7 @@ test.describe("administración de usuarios", () => {
   }
 
   // Playwright exige desestructurar los fixtures aunque no se usen.
-  test.beforeAll(async ({}, info) => {
+  test.beforeAll(async ({ browser }, info) => {
     info.skip(
       info.project.name !== PROYECTO_CON_CUENTAS,
       "Cuenta compartida y datos reales: esta suite corre solo en el proyecto de escritorio."
@@ -127,18 +96,12 @@ test.describe("administración de usuarios", () => {
     info.setTimeout(90_000)
     servicio = await clienteComoSuperadmin(entorno)
     await borrarCreados(servicio)
-    const email = emailDe(GESTOR)
-    const password = generarContrasena()
-    const usuarioId = await prepararCuenta(servicio, GESTOR, password)
-    const secreto = await asegurarTotp(
-      entorno,
-      servicio,
-      usuarioId,
-      { email, password },
-      undefined
+    const gestor = await prepararCuentaMfa(servicio, GESTOR)
+    sesionGestor = await abrirSesionMfa(
+      browser,
+      info.project.use.baseURL,
+      gestor
     )
-    ultimoPasoTotp = Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-    gestor = { email, password, secreto }
   })
 
   test.afterAll(async ({}, info) => {
@@ -149,7 +112,7 @@ test.describe("administración de usuarios", () => {
   test("crea con enlace, lo encuentra, edita su rol y suspende/reactiva otra cuenta", async ({
     page,
   }) => {
-    await ingresarComoGestor(page, gestor)
+    await usarSesion(page, sesionGestor)
     await page.goto("/administracion/usuarios")
     await expect(
       page.getByRole("heading", { level: 1, name: "Usuarios" })
@@ -307,7 +270,7 @@ test.describe("administración de usuarios", () => {
       throw new Error(`No se pudo simular el registro: ${error.message}`)
     const idExterno = data.user.id
 
-    await ingresarComoGestor(page, gestor)
+    await usarSesion(page, sesionGestor)
     await page.goto(`/administracion/usuarios/${idExterno}`)
     await expect(
       page.getByRole("heading", { level: 1, name: /externo/ })

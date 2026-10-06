@@ -32,8 +32,9 @@ export function versionVigente<T extends VersionBase>(
           v.vigenteDesde !== null &&
           new Date(v.vigenteDesde).getTime() <= ahora.getTime()
       )
-      .sort((a, b) => (b.vigenteDesde ?? "").localeCompare(a.vigenteDesde ?? ""))[0] ??
-    null
+      .sort((a, b) =>
+        (b.vigenteDesde ?? "").localeCompare(a.vigenteDesde ?? "")
+      )[0] ?? null
   )
 }
 
@@ -71,12 +72,16 @@ export function ordenarVersiones<T extends VersionBase>(
     .sort(
       (a, b) =>
         ORDEN_ESTADO[a.estado] - ORDEN_ESTADO[b.estado] ||
-        (b.vigenteDesde ?? b.creadaAt).localeCompare(a.vigenteDesde ?? a.creadaAt)
+        (b.vigenteDesde ?? b.creadaAt).localeCompare(
+          a.vigenteDesde ?? a.creadaAt
+        )
     )
 }
 
 /** "1.2" → "1.3" · "2" → "3" · "v1" → "v2"; sin versiones → "1.0". */
-export function siguienteVersion(versiones: readonly { version: string }[]): string {
+export function siguienteVersion(
+  versiones: readonly { version: string }[]
+): string {
   const ultima = [...versiones]
     .map((v) => v.version)
     .sort((a, b) => b.localeCompare(a, "es-CO", { numeric: true }))[0]

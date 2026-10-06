@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHIVO GENERADO — no editar a mano.
 // Origen: Supabase generate_typescript_types (proyecto zygfqfvqwfvhbirmjojp, esquema public),
-// última migración aplicada: 20261001053648_roles_permisos_aplicables.
+// última migración aplicada: 20261005233015_configuracion_claves_publicas (12a–12c solo tocan `private`
+// y triggers, y la de integración solo datos: el contenido no cambia desde 20261005171106_roles_guardar_permisos).
 // Regenerar con `pnpm db:types` (scripts/db/generar-tipos.ts; requiere `supabase login`).
 // ─────────────────────────────────────────────────────────────────────────────
 export type Json =
@@ -3648,6 +3649,28 @@ export type Database = {
           reproducciones: number
         }[]
       }
+      detalle_zona_geo: {
+        Args: {
+          p_codigo: string
+          p_desde: string
+          p_hasta: string
+          p_nivel: string
+        }
+        Returns: {
+          clave: string
+          detalle: string
+          n: number
+          nombre: string
+          orden: number
+          periodo: string
+          seccion: string
+          unidad: string
+          valor: number
+          valor_anterior: number
+          valor_por_100k: number
+          variacion: number
+        }[]
+      }
       editar_privado_srv: {
         Args: {
           p_actor_id: string
@@ -3733,6 +3756,19 @@ export type Database = {
           poblacion: number
           valor: number
           valor_por_100k: number
+        }[]
+      }
+      guardar_permisos_rol_srv: {
+        Args: {
+          p_actor_id: string
+          p_agregar: string[]
+          p_quitar: string[]
+          p_rol_id: string
+          p_session_id: string
+        }
+        Returns: {
+          agregados: number
+          quitados: number
         }[]
       }
       kpis_admin: {
@@ -3973,6 +4009,19 @@ export type Database = {
           tipo: string
           titulo: string
           url: string
+        }[]
+      }
+      mis_sesiones: {
+        Args: never
+        Returns: {
+          aal: string
+          creada_at: string
+          es_actual: boolean
+          id: string
+          ip: string
+          refrescada_at: string
+          ultima_actividad_at: string
+          user_agent: string
         }[]
       }
       notificaciones_no_leidas: { Args: never; Returns: number }

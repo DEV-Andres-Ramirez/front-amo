@@ -4,9 +4,14 @@
  * engagement y la explicación en lenguaje llano de las alertas de integridad
  * que calcula la BD (`trg_metricas_b_alertas`, docs/modelo-datos.md §3.6).
  */
-import { formatearCompacto, formatearNumero } from "@/lib/format"
+import { formatearNumero } from "@/lib/format"
 
-import { CORTES, type Corte, type EstadoValidacion, type Plataforma } from "./estados"
+import {
+  CORTES,
+  type Corte,
+  type EstadoValidacion,
+  type Plataforma,
+} from "./estados"
 
 export interface DetalleAlertas {
   medianaHistorica: number | null
@@ -58,9 +63,9 @@ export function engagement(
 }
 
 /** Cortes en el orden en que ocurren (24 h → 72 h → 7 días → personalizado). */
-export function ordenarCortes<T extends Pick<CorteMetrica, "corte" | "fechaCorte">>(
-  cortes: readonly T[]
-): T[] {
+export function ordenarCortes<
+  T extends Pick<CorteMetrica, "corte" | "fechaCorte">,
+>(cortes: readonly T[]): T[] {
   return [...cortes].sort(
     (a, b) =>
       CORTES[a.corte].orden - CORTES[b.corte].orden ||
@@ -104,7 +109,7 @@ export function describirAlertas(
   if (corte.alertaMultiplo) {
     const limite =
       detalle.multiplo !== null && detalle.seguidores !== null
-        ? ` (límite: ${formatearNumero(detalle.multiplo, 1)} × ${formatearCompacto(detalle.seguidores)} seguidores)`
+        ? ` (límite: ${formatearNumero(detalle.multiplo, 1)} × ${formatearNumero(detalle.seguidores)} seguidores)`
         : ""
     motivos.push(
       `El alcance reportado supera lo esperable para sus seguidores${limite}.`
@@ -113,7 +118,7 @@ export function describirAlertas(
   if (corte.alertaDesviacion) {
     const referencia =
       detalle.medianaHistorica !== null
-        ? ` (mediana de sus publicaciones aprobadas: ${formatearCompacto(detalle.medianaHistorica)}${
+        ? ` (mediana de sus publicaciones aprobadas: ${formatearNumero(detalle.medianaHistorica)}${
             detalle.factor !== null
               ? `; se alerta fuera de ${formatearNumero(detalle.factor, 1)} ×`
               : ""

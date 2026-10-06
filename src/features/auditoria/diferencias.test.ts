@@ -35,6 +35,30 @@ describe("etiquetaCampo", () => {
     expect(etiquetaCampo("medio_id")).toBe("Medio")
     expect(etiquetaCampo("fecha_publicacion")).toBe("Fecha publicación")
   })
+
+  it("nombra en español las columnas de configuración", () => {
+    expect(
+      [
+        "es_publica",
+        "maximo",
+        "minimo",
+        "modulo",
+        "pendiente_validacion",
+        "base_minima_uvt",
+        "anio",
+      ].map(etiquetaCampo)
+    ).toEqual([
+      "Visible para todos los usuarios",
+      "Máximo",
+      "Mínimo",
+      "Módulo",
+      "Pendiente de validación",
+      "Base mínima (UVT)",
+      "Año",
+    ])
+    // Sin etiqueta propia, el respaldo conserva la ortografía.
+    expect(etiquetaCampo("numero_cuenta")).toBe("Número cuenta")
+  })
 })
 
 describe("presentarValor", () => {

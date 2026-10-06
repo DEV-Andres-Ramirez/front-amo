@@ -28,7 +28,9 @@ import {
   tablaExportable,
 } from "./comun"
 
-export function totalesFinanzas(filas: readonly FilaFinanzas[]): TotalesFinanzas {
+export function totalesFinanzas(
+  filas: readonly FilaFinanzas[]
+): TotalesFinanzas {
   const gmvVerificado = sumar(filas, (f) => f.gmvVerificado)
   const comision = sumar(filas, (f) => f.comision)
   return {
@@ -112,7 +114,11 @@ export function columnasFinanzas(
     },
     {
       id: "cartera",
-      titulo: agrupacion === "mes" ? "Cartera al cierre del mes" : "Cartera al cierre",
+      tituloCorto: "Cartera",
+      titulo:
+        agrupacion === "mes"
+          ? "Cartera al cierre del mes"
+          : "Cartera al cierre",
       tipo: "cop",
       valor: (f) => f.cartera,
       ordenable: true,
@@ -121,12 +127,12 @@ export function columnasFinanzas(
     },
     {
       id: "pagadoMedios",
+      ocultaPorDefecto: true,
       titulo: "Pagado a medios",
       tipo: "cop",
       valor: (f) => f.pagadoMedios,
       ordenable: true,
       totalizar: true,
-      ocultarBajo: "xl",
     },
   ]
 }
@@ -152,7 +158,8 @@ export const estadoTablaFinanzas = definirEstadoTabla({
 // ── Vista ────────────────────────────────────────────────────────────────────
 
 const DEFINICION_FACTURADO = definicionPropia("Facturado", "COP", "mayor", {
-  definicion: "Total de las facturas emitidas en el periodo (sin borradores ni anuladas).",
+  definicion:
+    "Total de las facturas emitidas en el periodo (sin borradores ni anuladas).",
   calculo: "Suma del total de cada factura emitida.",
   ancla: "Fecha de emisión",
 })
@@ -163,16 +170,23 @@ const DEFINICION_RECAUDADO = definicionPropia("Recaudado", "COP", "mayor", {
   ancla: "Fecha de pago",
 })
 
-const DEFINICION_CARTERA = definicionPropia("Cartera al cierre", "COP", "menor", {
-  definicion:
-    "Saldo pendiente de las facturas emitidas hasta el último día del periodo.",
-  calculo: "Total facturado menos lo pagado, por factura, al cierre.",
-  ancla: "Último día del periodo (foto)",
-})
+const DEFINICION_CARTERA = definicionPropia(
+  "Cartera al cierre",
+  "COP",
+  "menor",
+  {
+    definicion:
+      "Saldo pendiente de las facturas emitidas hasta el último día del periodo.",
+    calculo: "Total facturado menos lo pagado, por factura, al cierre.",
+    ancla: "Último día del periodo (foto)",
+  }
+)
 
 const DEFINICION_PAGADO = definicionPropia("Pagado a medios", "COP", "neutro", {
-  definicion: "Valor neto transferido a los medios por asignaciones pagadas en el periodo.",
-  calculo: "Suma del neto (después de retenciones) de las asignaciones pagadas.",
+  definicion:
+    "Valor neto transferido a los medios por asignaciones pagadas en el periodo.",
+  calculo:
+    "Suma del neto (después de retenciones) de las asignaciones pagadas.",
   ancla: "Fecha de pago",
 })
 
@@ -356,8 +370,16 @@ function graficoCobro(datos: DatosFinanzas): EspecGrafico {
     ancho: "completo",
     categorias: meses.map((f) => f.grupo),
     series: [
-      { id: "facturado", nombre: "Facturado", valores: meses.map((f) => f.facturado) },
-      { id: "recaudado", nombre: "Recaudado", valores: meses.map((f) => f.recaudado) },
+      {
+        id: "facturado",
+        nombre: "Facturado",
+        valores: meses.map((f) => f.facturado),
+      },
+      {
+        id: "recaudado",
+        nombre: "Recaudado",
+        valores: meses.map((f) => f.recaudado),
+      },
     ],
     formato: "cop",
     nombreCategoria: "Mes",
@@ -406,7 +428,9 @@ function hojasFinanzas(datos: DatosFinanzas): HojaExcel[] {
   ]
   return hojas
     .filter(([, agrupacion]) => agrupacion !== datos.agrupacion)
-    .map(([nombre, agrupacion, filas]) => hojaFinanzas(nombre, agrupacion, filas))
+    .map(([nombre, agrupacion, filas]) =>
+      hojaFinanzas(nombre, agrupacion, filas)
+    )
 }
 
 export const NOTAS_FINANZAS: readonly NotaDefinicion[] = [

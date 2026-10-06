@@ -26,27 +26,42 @@ function suscribir(aviso: () => void): () => void {
   }
 }
 
-/** Instantánea primitiva (estable entre lecturas): "oscuro|0". */
-function instantanea(): string {
-  const modo: ModoTema = document.documentElement.classList.contains("dark")
+function modoDelDocumento(): ModoTema {
+  return document.documentElement.classList.contains("dark")
     ? "oscuro"
     : "claro"
+}
+
+/** Instantánea primitiva (estable entre lecturas): "oscuro|0". */
+function instantanea(): string {
   const reducido = window.matchMedia(CONSULTA_MOVIMIENTO).matches
-  return [modo, reducido ? "1" : "0"].join(SEPARADOR)
+  return [modoDelDocumento(), reducido ? "1" : "0"].join(SEPARADOR)
 }
 
 /** El tema principal es el oscuro: es el que se asume al renderizar en servidor. */
 const instantaneaServidor = () => ["oscuro", "0"].join(SEPARADOR)
 
-function temaDelDocumento(clave: string): TemaGraficos {
+/**
+ * Tema de una instantánea. Los tokens del documento solo se leen cuando son
+ * los del modo pedido: al hidratar, React repite la instantánea del servidor
+ * (oscuro) aunque `<html>` ya esté en claro; leer ahí los tokens claros daría
+ * un primer render distinto al del servidor (aviso de hidratación) y, peor,
+ * React no corregiría después los estilos en línea porque para él no
+ * cambiaron. Con las constantes —espejo de globals.css— el primer render es
+ * idéntico en ambos lados y el siguiente ya pinta el tema real.
+ */
+export function temaDeInstantanea(clave: string): TemaGraficos {
   const [modo, reducido] = clave.split(SEPARADOR) as [ModoTema, string]
-  if (typeof document === "undefined") return construirTemaGraficos({ modo })
+  const reducirMovimiento = reducido === "1"
+  if (typeof document === "undefined" || modoDelDocumento() !== modo) {
+    return construirTemaGraficos({ modo, reducirMovimiento })
+  }
   const estilos = getComputedStyle(document.documentElement)
   return construirTemaGraficos({
     modo,
     leer: (variable) => estilos.getPropertyValue(variable),
     fuente: estilos.getPropertyValue("--font-geist-sans"),
-    reducirMovimiento: reducido === "1",
+    reducirMovimiento,
   })
 }
 
@@ -92,7 +107,7 @@ export function useTemaGraficos(): TemaGraficos {
   )
   const forzado = use(ContextoTemaForzado)
   return useMemo(
-    () => (forzado ? temaForzado(forzado) : temaDelDocumento(clave)),
+    () => (forzado ? temaForzado(forzado) : temaDeInstantanea(clave)),
     [clave, forzado]
   )
 }

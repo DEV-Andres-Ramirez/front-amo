@@ -47,6 +47,20 @@ export async function ingresar(
   await page.getByRole("button", { name: "Ingresar" }).click()
 }
 
+/**
+ * Nombre accesible del encabezado de Inicio: el panel saluda según la hora de
+ * Bogotá («Buenos días, Ana»). Se aceptan los tres saludos para que la prueba
+ * no dependa de la hora ni falle al cruzar un cambio de franja.
+ */
+export function saludoDe(nombre: string): RegExp {
+  const literal = nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return new RegExp(`^(?:Buenos días|Buenas tardes|Buenas noches), ${literal}$`)
+}
+
+/** Saludo de Inicio para cualquier persona (cuentas demo: su nombre lo fija la semilla). */
+export const CUALQUIER_SALUDO =
+  /^(?:Buenos días|Buenas tardes|Buenas noches), \p{L}+$/u
+
 let ultimoPasoTotp = -1
 
 /**

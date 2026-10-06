@@ -35,7 +35,8 @@ export function normalizarEstadoNivel(
   departamento: string | null | undefined
 ): EstadoNivel {
   if (nivel !== "departamental") return { nivel, departamento: null }
-  if (!departamento || !departamentoPorCodigo(departamento)) return ESTADO_INICIAL
+  if (!departamento || !departamentoPorCodigo(departamento))
+    return ESTADO_INICIAL
   if (DEPARTAMENTOS_SIN_DESCENSO.has(departamento)) return ESTADO_INICIAL
   return { nivel, departamento }
 }

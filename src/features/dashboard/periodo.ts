@@ -63,7 +63,11 @@ export function rangoPanel(
   return rangoDesdePreset(porDefecto, ahora)
 }
 
-/** Periodo consultado y su comparativo, listos para las RPC ('YYYY-MM-DD'). */
+/**
+ * Periodo consultado y su comparativo, listos para las RPC ('YYYY-MM-DD'). El
+ * comparativo va siempre explícito (docs/kpis.md §0.1: los meses se comparan
+ * contra sus homólogos, no contra los N días previos).
+ */
 export interface PeriodoPanel {
   rango: RangoFechas
   anterior: RangoFechas
@@ -92,20 +96,6 @@ export function periodoPanel(
   }
 }
 
-/**
- * Argumentos de las RPC que devuelven `kpi_fila`: el comparativo va explícito
- * (docs/kpis.md §0.1: los meses se comparan contra sus homólogos, no contra
- * los N días previos).
- */
-export function argumentosKpi(periodo: PeriodoPanel) {
-  return {
-    p_desde: periodo.desde,
-    p_hasta: periodo.hasta,
-    p_desde_ant: periodo.desdeAnterior,
-    p_hasta_ant: periodo.hastaAnterior,
-  }
-}
-
 export type Granularidad = "dia" | "semana" | "mes"
 
 /** Días hasta un mes; semanas hasta un semestre; meses en adelante. */
@@ -119,10 +109,18 @@ const nombreMes = new Intl.DateTimeFormat("es-CO", {
   timeZone: ZONA,
   month: "long",
 })
+const mesCorto = new Intl.DateTimeFormat("es-CO", {
+  timeZone: ZONA,
+  month: "short",
+})
 
-/** Texto corto bajo cada variación de las tarjetas KPI. */
+/**
+ * Texto bajo cada variación de las tarjetas KPI. Corto a propósito: junto al
+ * sparkline, en media columna a 390 px, caben dos líneas de unos 11
+ * caracteres (las fechas exactas del comparativo van bajo el selector).
+ */
 export function etiquetaComparacionCorta(rango: RangoFechas): string {
-  const mesAnterior = nombreMes.format(periodoAnterior(rango).desde)
+  const anterior = periodoAnterior(rango).desde
   switch (rango.preset) {
     case "hoy":
       return "vs. ayer"
@@ -131,15 +129,33 @@ export function etiquetaComparacionCorta(rango: RangoFechas): string {
     case "ultimos30":
       return "vs. 30 días previos"
     case "esteMes":
-      return `vs. mismos días de ${mesAnterior}`
+      // "sept." → "sept": es-CO añade el punto al mes abreviado.
+      return `vs. ${mesCorto.format(anterior).replace(/\.$/, "")} a la fecha`
     case "mesAnterior":
-      return `vs. ${mesAnterior}`
+      return `vs. ${nombreMes.format(anterior)}`
+    case "esteTrimestre":
+      return "vs. trim. anterior"
+    case "esteAno":
+      return "vs. año pasado"
+    case "personalizado":
+      return "vs. periodo anterior"
+  }
+}
+
+/**
+ * La misma comparación con todas sus palabras, para donde hay sitio (la cifra
+ * principal del medio): "vs. mismos días de septiembre".
+ */
+export function etiquetaComparacionAmplia(rango: RangoFechas): string {
+  switch (rango.preset) {
+    case "esteMes":
+      return `vs. mismos días de ${nombreMes.format(periodoAnterior(rango).desde)}`
     case "esteTrimestre":
       return "vs. trimestre anterior"
     case "esteAno":
       return "vs. mismo tramo del año pasado"
-    case "personalizado":
-      return "vs. periodo anterior"
+    default:
+      return etiquetaComparacionCorta(rango)
   }
 }
 

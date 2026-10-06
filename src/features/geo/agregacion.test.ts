@@ -97,7 +97,13 @@ describe("ranking", () => {
   it("ordena de mayor a menor, comparte puesto en empates y deja sin dato al final", () => {
     const ranking = construirRanking(
       agruparPorGeometria(
-        [fila("A", 5), fila("B", null), fila("C", 9), fila("D", 5), fila("E", 1)],
+        [
+          fila("A", 5),
+          fila("B", null),
+          fila("C", 9),
+          fila("D", 5),
+          fila("E", 1),
+        ],
         CONTEOS
       ),
       CONTEOS

@@ -12,6 +12,7 @@ import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
 import { Esqueleto } from "@/components/feedback/esqueletos"
+import { EnlaceBotonExterno } from "@/components/layout/enlace-boton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -100,15 +101,14 @@ function BloqueQr({ datos }: { datos: EnrolamientoMfa }) {
             Google Authenticator, Microsoft Authenticator, 1Password u otra.
             ¿Sin cámara? Escribe la clave.
           </p>
-          <Button
+          <EnlaceBotonExterno
             variant="link"
             className="h-auto self-center px-0 sm:hidden"
-            nativeButton={false}
-            render={<a href={datos.uri} />}
+            href={datos.uri}
           >
             <ExternalLink aria-hidden data-icon="inline-start" />
             Abrir en la app
-          </Button>
+          </EnlaceBotonExterno>
         </div>
       </div>
       <ClaveManual secreto={datos.secreto} />

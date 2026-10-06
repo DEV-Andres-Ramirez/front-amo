@@ -1,13 +1,22 @@
 /**
  * Cuentas de prueba E2E (las usan `scripts/bootstrap/usuarios-e2e.ts` y
  * `e2e/*.spec.ts`). Son perfiles `es_demo` en correos `@amo.test` (dominio
- * reservado: nunca recibe correo). Los cambios de rol y estado se atribuyen al
- * superadministrador (`x-amo-actor` con contexto confiable): los triggers
- * guardianes no permiten gestionar perfiles sin un actor identificado.
+ * reservado: nunca recibe correo). Los cambios de rol y organización se
+ * atribuyen al superadministrador (`x-amo-actor` con contexto confiable): los
+ * triggers guardianes no permiten gestionar perfiles sin un actor identificado.
+ * El estado nunca se escribe con UPDATE (AMO_ESTADO_SOLO_VIA_TRANSICION): la
+ * activación va por `activar_perfil_srv` y la restauración de una cuenta
+ * suspendida o desactivada, por `transicionar_srv` con un operador temporal.
  */
+import { type EstadoPerfil, transicionesParaRestaurar } from "./estado-perfil"
+import { enrolarTotpEnSesion } from "./mfa"
+import { conOperadorTemporal } from "./operador-temporal"
+import { organizacionDe, type RolCuentaPrueba } from "./organizacion"
 import {
+  activarPerfil,
   actualizarPerfil,
   buscarUsuarioPorEmail,
+  cargarEntorno,
   type ClienteSupabase,
   crearClientePublico,
   crearClienteServicio,
@@ -16,18 +25,16 @@ import {
   idDeRol,
   rutaConfirmacion,
 } from "./supabase"
-import { codigoTotp, segundosRestantesTotp } from "./totp"
 
-/**
- * Organización ficticia de los anunciantes E2E: un perfil ANUNCIANTE activo
- * exige `anunciante_id`. La tabla `anunciantes` llega en la migración 6, que
- * debe sembrar este id (es_demo) antes de crear la FK de `perfiles.anunciante_id`.
- */
-export const ANUNCIANTE_E2E_ID = "e2e00000-0000-4000-8000-00000000a001"
+export { codigoTotpEstable } from "./mfa"
+
+export { ANUNCIANTE_E2E_ID } from "./organizacion"
 
 export interface CuentaE2E {
   clave: string
-  rol: "SUPERADMIN" | "ADMIN" | "ANUNCIANTE"
+  rol: RolCuentaPrueba
+  /** Medio al que pertenece una cuenta de rol MEDIO (obligatorio para ese rol). */
+  medioId?: string
   nombre: string
   emailPorDefecto: string
   /** Variables de `.env.local` con el correo y la contraseña. */
@@ -104,7 +111,7 @@ export async function clienteComoSuperadmin(
     perfil.estado !== "ACTIVO"
   ) {
     throw new ErrorBootstrap(
-      "No hay un superadministrador activo: ejecuta primero `pnpm bootstrap:superadmin`."
+      "No hay un superadministrador activo: ejecuta `pnpm bootstrap:superadmin` y confirma el enlace."
     )
   }
   return crearClienteServicio(entorno, superadmin.id)
@@ -117,10 +124,12 @@ async function asegurarUsuario(
   password: string
 ): Promise<string> {
   const email = emailDe(cuenta)
+  // `ban_duration: "none"` levanta el bloqueo de Auth que deja una suspensión.
   const atributos = {
     password,
     email_confirm: true,
     app_metadata: { rol: cuenta.rol },
+    ban_duration: "none",
   }
   const existente = await buscarUsuarioPorEmail(servicio, email)
   const { data, error } = existente
@@ -132,23 +141,83 @@ async function asegurarUsuario(
   return data.user.id
 }
 
+const MOTIVO_RESTAURACION = "Restauración de la cuenta de prueba E2E"
+
+async function estadoDe(
+  servicio: ClienteSupabase,
+  usuarioId: string
+): Promise<EstadoPerfil> {
+  const { data, error } = await servicio
+    .from("perfiles")
+    .select("estado")
+    .eq("id", usuarioId)
+    .single()
+  if (error) {
+    throw new ErrorBootstrap(`No se encontró el perfil: ${error.message}`)
+  }
+  return data.estado
+}
+
+/**
+ * Devuelve una cuenta suspendida o desactivada a ACTIVO o INVITADO con
+ * `transicionar_srv` (motivo obligatorio). Solo carga el entorno en este caso
+ * poco frecuente: el operador temporal necesita la clave publicable.
+ */
+async function restaurarEstado(
+  servicio: ClienteSupabase,
+  usuarioId: string,
+  estado: EstadoPerfil
+): Promise<void> {
+  const destinos = transicionesParaRestaurar(estado)
+  if (destinos.length === 0) return
+  await conOperadorTemporal(cargarEntorno(), servicio, async (operador) => {
+    for (const hacia of destinos) {
+      const { error } = await servicio.rpc("transicionar_srv", {
+        p_entidad: "perfiles",
+        p_id: usuarioId,
+        p_hacia: hacia,
+        p_actor_id: operador.usuarioId,
+        p_session_id: operador.sesionId,
+        p_motivo: MOTIVO_RESTAURACION,
+      })
+      if (error) {
+        throw new ErrorBootstrap(
+          `No se pudo restaurar la cuenta (${estado} → ${hacia}): ${error.message}${error.details ? ` (${error.details})` : ""}`
+        )
+      }
+    }
+  })
+}
+
+/**
+ * Restaura el estado si hace falta, fija rol y organización (sin tocar
+ * `estado`) y activa la cuenta si quedó INVITADA. Restaurar va primero porque
+ * DESACTIVADO → INVITADO vuelve a exigir el cambio de contraseña.
+ */
 async function asegurarPerfil(
   servicio: ClienteSupabase,
   usuarioId: string,
   cuenta: CuentaE2E
 ): Promise<void> {
+  await restaurarEstado(
+    servicio,
+    usuarioId,
+    await estadoDe(servicio, usuarioId)
+  )
   await actualizarPerfil(servicio, usuarioId, {
     nombre: cuenta.nombre,
     rol_id: await idDeRol(servicio, cuenta.rol),
-    anunciante_id: cuenta.rol === "ANUNCIANTE" ? ANUNCIANTE_E2E_ID : null,
-    estado: "ACTIVO",
-    activado_at: new Date().toISOString(),
+    ...organizacionDe(cuenta),
     debe_cambiar_password: cuenta.debeCambiarPassword,
     es_demo: true,
   })
+  await activarPerfil(servicio, usuarioId)
 }
 
-/** Deja la cuenta como la esperan las pruebas: contraseña, rol, estado y cambio obligatorio. */
+/**
+ * Deja la cuenta como la esperan las pruebas: contraseña, rol, organización,
+ * cambio obligatorio y estado ACTIVO (por transición, nunca con UPDATE).
+ */
 export async function prepararCuenta(
   servicio: ClienteSupabase,
   cuenta: CuentaE2E,
@@ -201,16 +270,6 @@ async function borrarFactores(
   }
 }
 
-/** Espera al siguiente código si al vigente le quedan pocos segundos. */
-export async function codigoTotpEstable(secreto: string): Promise<string> {
-  if (segundosRestantesTotp() < 4) {
-    await new Promise((resolver) =>
-      setTimeout(resolver, segundosRestantesTotp() * 1000 + 250)
-    )
-  }
-  return codigoTotp(secreto)
-}
-
 /**
  * Enrola y verifica un TOTP como lo haría el usuario (ingreso con contraseña
  * + `mfa.enroll` + `challengeAndVerify`) y devuelve la clave base32.
@@ -225,27 +284,9 @@ async function enrolarTotp(
   if (ingreso.error) {
     throw new ErrorBootstrap(`No se pudo ingresar: ${ingreso.error.message}`)
   }
-
-  const { data, error } = await publico.auth.mfa.enroll({
-    factorType: "totp",
-    friendlyName: "AMO E2E",
-    issuer: "AMO",
-  })
-  if (error) {
-    throw new ErrorBootstrap(`No se pudo enrolar el TOTP: ${error.message}`)
-  }
-
-  const verificacion = await publico.auth.mfa.challengeAndVerify({
-    factorId: data.id,
-    code: await codigoTotpEstable(data.totp.secret),
-  })
-  if (verificacion.error) {
-    throw new ErrorBootstrap(
-      `No se pudo verificar el TOTP: ${verificacion.error.message}`
-    )
-  }
+  const secreto = await enrolarTotpEnSesion(publico, "AMO E2E")
   await publico.auth.signOut({ scope: "local" })
-  return data.totp.secret
+  return secreto
 }
 
 /**

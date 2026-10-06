@@ -4,7 +4,12 @@
  * historial de una celda y resumen para el encabezado de la sección.
  */
 import type { Formato, Franja, Plataforma, Tarifa } from "./tipos"
-import { type EstadoVigencia, estadoVigencia } from "./vigencias"
+import {
+  type EstadoVigencia,
+  estadoVigencia,
+  inicioPreset,
+  type PresetInicio,
+} from "./vigencias"
 
 export const ORDEN_PLATAFORMAS: readonly Plataforma[] = [
   "INSTAGRAM",
@@ -125,8 +130,33 @@ export function historialCelda(
   franjaId: string,
   ahora: Date = new Date()
 ): (Tarifa & { estado: EstadoVigencia })[] {
-  return (versionesPorCelda(tarifas).get(claveCelda(formatoId, franjaId)) ?? []).map(
-    (tarifa) => ({ ...tarifa, estado: estadoTarifa(tarifa, ahora) })
+  return (
+    versionesPorCelda(tarifas).get(claveCelda(formatoId, franjaId)) ?? []
+  ).map((tarifa) => ({ ...tarifa, estado: estadoTarifa(tarifa, ahora) }))
+}
+
+/**
+ * Versiones para la lista «Todas las versiones»: la más reciente primero y, a
+ * igual fecha de inicio (la semilla empieza toda el mismo día), en el mismo
+ * orden de la matriz: plataforma, formato y franja.
+ */
+export function ordenarVersiones(
+  tarifas: readonly Tarifa[],
+  formatos: readonly Formato[],
+  franjas: readonly Franja[]
+): Tarifa[] {
+  const ordenFormato = new Map(formatos.map((f) => [f.id, f.orden]))
+  const ordenFranja = new Map(franjas.map((f) => [f.id, f.orden]))
+  const posicion = (mapa: Map<string, number>, id: string) =>
+    mapa.get(id) ?? Number.MAX_SAFE_INTEGER
+  return [...tarifas].sort(
+    (a, b) =>
+      b.vigenteDesde.localeCompare(a.vigenteDesde) ||
+      ORDEN_PLATAFORMAS.indexOf(a.plataforma) -
+        ORDEN_PLATAFORMAS.indexOf(b.plataforma) ||
+      posicion(ordenFormato, a.formatoId) -
+        posicion(ordenFormato, b.formatoId) ||
+      posicion(ordenFranja, a.franjaId) - posicion(ordenFranja, b.franjaId)
   )
 }
 
@@ -182,4 +212,51 @@ export function tarifasPendientes(
       (t) => t.pendienteValidacion && estadoTarifa(t, ahora) !== "FINALIZADA"
     )
     .map((t) => t.id)
+}
+
+/**
+ * Inicio de la última versión programada de una celda: una nueva vigencia
+ * debe empezar DESPUÉS (`programar_tarifa` rechaza una que empiece en esa
+ * fecha o antes; para reemplazarla hay que cancelarla). `null` sin programadas.
+ */
+export function inicioUltimaProgramada(
+  versiones: readonly Tarifa[],
+  ahora: Date = new Date()
+): string | null {
+  return (
+    versiones
+      .filter((t) => estadoTarifa(t, ahora) === "PROGRAMADA")
+      .map((t) => t.vigenteDesde)
+      .sort()
+      .at(-1) ?? null
+  )
+}
+
+/** ¿Una vigencia que empiece en `desde` es programable en esta celda? */
+export function inicioProgramable(
+  desde: Date,
+  versiones: readonly Tarifa[],
+  ahora: Date = new Date()
+): boolean {
+  if (desde.getTime() <= ahora.getTime()) return false
+  const ultima = inicioUltimaProgramada(versiones, ahora)
+  return ultima === null || desde.getTime() > new Date(ultima).getTime()
+}
+
+const PRESETS_SUGERIDOS: readonly PresetInicio[] = ["manana", "lunes", "mes"]
+
+/**
+ * Inicio con el que abre el formulario: el primer preset que la celda admite
+ * (con una tarifa ya programada, los anteriores a ella no sirven) o, si
+ * ninguno sirve, una fecha elegida a mano.
+ */
+export function inicioSugerido(
+  versiones: readonly Tarifa[],
+  ahora: Date = new Date()
+): PresetInicio | "fecha" {
+  return (
+    PRESETS_SUGERIDOS.find((preset) =>
+      inicioProgramable(inicioPreset(preset, ahora), versiones, ahora)
+    ) ?? "fecha"
+  )
 }

@@ -15,7 +15,13 @@ import {
   obtenerMunicipio,
   obtenerPais,
 } from "@/lib/geo/catalogo"
-import { diasEnRango, parsearFecha, rangoPersonalizado } from "@/lib/fechas"
+import {
+  diasEnRango,
+  parsearFecha,
+  periodoAnterior,
+  rangoPersonalizado,
+  serializarFecha,
+} from "@/lib/fechas"
 import type { Departamento, Municipio } from "@/lib/geo/tipos"
 
 import { tasaPonderada } from "./agregacion"
@@ -29,6 +35,7 @@ import type {
   ConsultaMapaGeo,
   FilaMetricaGeo,
   FilaTopZona,
+  KpiZona,
   ProveedorMetricasGeo,
   PuntoGeo,
   RespuestaDetalleGeo,
@@ -80,7 +87,8 @@ function factorPeriodo(
 ): number {
   if (DEFINICIONES_METRICAS[metrica].foto) return 1
   const ruido =
-    0.88 + 0.24 * azar(`periodo|${metrica}|${zona}|${periodo.desde}|${periodo.hasta}`)
+    0.88 +
+    0.24 * azar(`periodo|${metrica}|${zona}|${periodo.desde}|${periodo.hasta}`)
   return (periodo.dias / 30) * ruido
 }
 
@@ -102,7 +110,7 @@ function baseDepartamento(d: Departamento, metrica: MetricaGeo): number {
     case "asignaciones":
       return asignaciones
     case "gmv":
-      return Math.round(asignaciones * (380_000 + 260_000 * r) / 1000) * 1000
+      return Math.round((asignaciones * (380_000 + 260_000 * r)) / 1000) * 1000
     case "alcance":
       return Math.round(asignaciones * (9_000 + 22_000 * r))
     case "campanas":
@@ -173,9 +181,13 @@ function valoresMunicipales(
 
   if (metrica === "cumplimiento") {
     const { n } = valorDepartamento(d, "cumplimiento", periodo)
-    const ns = repartirEntero(n ?? 0, pesosMunicipales(municipios, "asignaciones"))
+    const ns = repartirEntero(
+      n ?? 0,
+      pesosMunicipales(municipios, "asignaciones")
+    )
     municipios.forEach((m, i) => {
-      if (ns[i] > 0) resultado.set(m.codigo, tasaSimulada(m.codigo, ns[i], "mpio"))
+      if (ns[i] > 0)
+        resultado.set(m.codigo, tasaSimulada(m.codigo, ns[i], "mpio"))
     })
     return resultado
   }
@@ -199,23 +211,75 @@ function valoresMunicipales(
 
 /** Peso relativo de cada país por métrica (Colombia se calcula aparte). */
 const PAISES_SIMULADOS: Readonly<
-  Record<"accesos" | "audiencia" | "anunciantes", Readonly<Record<string, number>>>
+  Record<
+    "accesos" | "audiencia" | "anunciantes",
+    Readonly<Record<string, number>>
+  >
 > = {
   audiencia: {
-    VE: 180_000, US: 240_000, MX: 95_000, ES: 120_000, EC: 70_000,
-    PE: 55_000, PA: 40_000, AR: 30_000, CL: 28_000, BR: 20_000,
-    CA: 18_000, GB: 12_000, DE: 9_000, FR: 8_000, IT: 7_000,
-    CR: 9_000, DO: 11_000, GT: 5_000, AW: 6_000, CW: 4_500,
-    SX: 1_200, BQ: 800, KY: 900, BB: 600, SG: 1_500, HK: 900,
-    MT: 700, GP: 500, MQ: 400, AD: 300, LC: 350, AU: 6_500,
+    VE: 180_000,
+    US: 240_000,
+    MX: 95_000,
+    ES: 120_000,
+    EC: 70_000,
+    PE: 55_000,
+    PA: 40_000,
+    AR: 30_000,
+    CL: 28_000,
+    BR: 20_000,
+    CA: 18_000,
+    GB: 12_000,
+    DE: 9_000,
+    FR: 8_000,
+    IT: 7_000,
+    CR: 9_000,
+    DO: 11_000,
+    GT: 5_000,
+    AW: 6_000,
+    CW: 4_500,
+    SX: 1_200,
+    BQ: 800,
+    KY: 900,
+    BB: 600,
+    SG: 1_500,
+    HK: 900,
+    MT: 700,
+    GP: 500,
+    MQ: 400,
+    AD: 300,
+    LC: 350,
+    AU: 6_500,
   },
   accesos: {
-    US: 120, ES: 60, MX: 35, PA: 25, EC: 18, PE: 12, CL: 8, DE: 5,
-    AW: 6, CW: 3, GB: 4, CA: 5, AR: 3, VE: 7,
+    US: 120,
+    ES: 60,
+    MX: 35,
+    PA: 25,
+    EC: 18,
+    PE: 12,
+    CL: 8,
+    DE: 5,
+    AW: 6,
+    CW: 3,
+    GB: 4,
+    CA: 5,
+    AR: 3,
+    VE: 7,
   },
   anunciantes: {
-    US: 8, MX: 5, ES: 4, PA: 3, PE: 2, EC: 2, CL: 2, AR: 1, BR: 1,
-    CA: 1, DE: 1, GB: 1, KY: 1,
+    US: 8,
+    MX: 5,
+    ES: 4,
+    PA: 3,
+    PE: 2,
+    EC: 2,
+    CL: 2,
+    AR: 1,
+    BR: 1,
+    CA: 1,
+    DE: 1,
+    GB: 1,
+    KY: 1,
   },
 }
 
@@ -228,7 +292,8 @@ function valoresPaises(
     metrica === "audiencia"
       ? Math.round(3_200_000 * (0.9 + 0.2 * azar("audiencia|CO")))
       : listarDepartamentos().reduce(
-          (suma, d) => suma + (valorDepartamento(d, metrica, periodo).valor ?? 0),
+          (suma, d) =>
+            suma + (valorDepartamento(d, metrica, periodo).valor ?? 0),
           0
         )
   resultado.set(CODIGO_COLOMBIA, { valor: colombia, n: null })
@@ -260,20 +325,26 @@ function zonasDelNivel(consulta: ConsultaMapaGeo): ZonaSimulada[] {
 
   switch (consulta.nivel) {
     case "internacional": {
-      if (metrica !== "accesos" && metrica !== "audiencia" && metrica !== "anunciantes") {
+      if (
+        metrica !== "accesos" &&
+        metrica !== "audiencia" &&
+        metrica !== "anunciantes"
+      ) {
         return []
       }
       return [...valoresPaises(metrica, periodo)].flatMap(([iso2, valor]) => {
         const pais = obtenerPais(iso2)
         return pais
-          ? [{
-              codigo: iso2,
-              codigoGeometria: iso2,
-              nombre: pais.nombre,
-              poblacion: null,
-              centro: pais.centroide,
-              valor,
-            }]
+          ? [
+              {
+                codigo: iso2,
+                codigoGeometria: iso2,
+                nombre: pais.nombre,
+                poblacion: null,
+                centro: pais.centroide,
+                valor,
+              },
+            ]
           : []
       })
     }
@@ -281,17 +352,22 @@ function zonasDelNivel(consulta: ConsultaMapaGeo): ZonaSimulada[] {
       return listarDepartamentos().flatMap((d) => {
         const valor = valorDepartamento(d, metrica, periodo)
         // Accesos y anunciantes no existen en departamentos pequeños: sin fila.
-        if (valor.valor === 0 && (metrica === "accesos" || metrica === "anunciantes")) {
+        if (
+          valor.valor === 0 &&
+          (metrica === "accesos" || metrica === "anunciantes")
+        ) {
           return []
         }
-        return [{
-          codigo: d.codigo,
-          codigoGeometria: d.codigo,
-          nombre: d.nombre,
-          poblacion: d.poblacion,
-          centro: d.centroide,
-          valor,
-        }]
+        return [
+          {
+            codigo: d.codigo,
+            codigoGeometria: d.codigo,
+            nombre: d.nombre,
+            poblacion: d.poblacion,
+            centro: d.centroide,
+            valor,
+          },
+        ]
       })
     case "departamental": {
       const departamento = obtenerDepartamento(consulta.departamento ?? "")
@@ -300,14 +376,16 @@ function zonasDelNivel(consulta: ConsultaMapaGeo): ZonaSimulada[] {
         ([codigo, valor]) => {
           const municipio = obtenerMunicipio(codigo)
           return municipio
-            ? [{
-                codigo,
-                codigoGeometria: municipio.codigoGeometria,
-                nombre: municipio.nombre,
-                poblacion: null,
-                centro: municipio.centroide,
-                valor,
-              }]
+            ? [
+                {
+                  codigo,
+                  codigoGeometria: municipio.codigoGeometria,
+                  nombre: municipio.nombre,
+                  poblacion: null,
+                  centro: municipio.centroide,
+                  valor,
+                },
+              ]
             : []
         }
       )
@@ -358,7 +436,11 @@ function puntosMunicipales(consulta: ConsultaMapaGeo): PuntoGeo[] {
   const radio = consulta.metrica === "medios" ? 0.05 : 0.025
   return departamentos.flatMap((codigo) =>
     puntosDeZonas(
-      zonasDelNivel({ ...consulta, nivel: "departamental", departamento: codigo }),
+      zonasDelNivel({
+        ...consulta,
+        nivel: "departamental",
+        departamento: codigo,
+      }),
       consulta.metrica,
       radio
     )
@@ -404,7 +486,9 @@ function serieSimulada(
     valores = cubetas.map((_, i) =>
       Math.round(
         valor *
-          (0.86 + (0.14 * (i + 1)) / cubetas.length + (aleatorio() - 0.5) * 0.015)
+          (0.86 +
+            (0.14 * (i + 1)) / cubetas.length +
+            (aleatorio() - 0.5) * 0.015)
       )
     )
     valores[cubetas.length - 1] = valor
@@ -422,17 +506,37 @@ function serieSimulada(
 }
 
 const PREFIJOS_MEDIO = [
-  "Radio", "Noticias", "Estéreo", "Canal", "Diario", "La Voz de",
-  "Onda", "Visión", "Contacto", "Enlace",
+  "Radio",
+  "Noticias",
+  "Estéreo",
+  "Canal",
+  "Diario",
+  "La Voz de",
+  "Onda",
+  "Visión",
+  "Contacto",
+  "Enlace",
 ] as const
-const SUFIJOS_MEDIO = ["Digital", "TV", "Al Día", "Informa", "Hoy", "Stereo"] as const
+const SUFIJOS_MEDIO = [
+  "Digital",
+  "TV",
+  "Al Día",
+  "Informa",
+  "Hoy",
+  "Stereo",
+] as const
 
-function nombresMedios(lugar: string, semilla: string, cantidad: number): string[] {
+function nombresMedios(
+  lugar: string,
+  semilla: string,
+  cantidad: number
+): string[] {
   const aleatorio = generador(`medios|${semilla}`)
   const corto = lugar.split(",")[0]
   const nombres = new Set<string>()
   while (nombres.size < cantidad) {
-    const prefijo = PREFIJOS_MEDIO[Math.floor(aleatorio() * PREFIJOS_MEDIO.length)]
+    const prefijo =
+      PREFIJOS_MEDIO[Math.floor(aleatorio() * PREFIJOS_MEDIO.length)]
     const sufijo = SUFIJOS_MEDIO[Math.floor(aleatorio() * SUFIJOS_MEDIO.length)]
     nombres.add(
       aleatorio() < 0.5 ? `${prefijo} ${corto}` : `${corto} ${sufijo}`
@@ -444,7 +548,29 @@ function nombresMedios(lugar: string, semilla: string, cantidad: number): string
   return [...nombres].slice(0, cantidad)
 }
 
-/** Medios con más asignaciones en la zona (como `reporte_cumplimiento_medios`). */
+/** Municipio donde se ubica cada medio destacado (la capital pesa más). */
+function lugaresDeMedios(
+  consulta: ConsultaDetalleGeo,
+  aleatorio: () => number,
+  cantidad: number
+): string[] {
+  const departamentos =
+    consulta.nivel === "nacional"
+      ? [consulta.zona]
+      : listarDepartamentos().map((d) => d.codigo)
+  return Array.from({ length: cantidad }, () => {
+    const codigo = departamentos[Math.floor(aleatorio() * departamentos.length)]
+    const municipios = municipiosDeDepartamento(codigo)
+    const capital = municipios.find((m) => m.esCapital)
+    const elegido =
+      capital && aleatorio() < 0.6
+        ? capital
+        : municipios[Math.floor(aleatorio() * municipios.length)]
+    return elegido?.nombre ?? "Colombia"
+  })
+}
+
+/** Medios con más GMV comprometido en la zona (como la sección `medio` de `detalle_zona_geo`). */
 function mediosSimulados(consulta: ConsultaDetalleGeo): TopZona | null {
   const lugar =
     consulta.nivel === "departamental"
@@ -455,21 +581,46 @@ function mediosSimulados(consulta: ConsultaDetalleGeo): TopZona | null {
           ? "Colombia"
           : undefined
   if (!consulta.conMedios || !lugar) return null
+  const colombia = consulta.nivel === "internacional"
+  const gmvZona = colombia
+    ? listarDepartamentos().reduce(
+        (suma, d) =>
+          suma + (valorDepartamento(d, "gmv", periodoDe(consulta)).valor ?? 0),
+        0
+      )
+    : (valorDeZona({ ...consulta, metrica: "gmv" }, consulta.zona).valor ?? 0)
+  if (gmvZona <= 0) return null
+
   const semilla = `${consulta.nivel}|${consulta.zona}|${consulta.desde}|${consulta.hasta}`
-  const aleatorio = generador(`asignaciones|${semilla}`)
+  const aleatorio = generador(`medios-gmv|${semilla}`)
   const nombres = nombresMedios(lugar, semilla, 5)
-  const total = Math.round(8 + aleatorio() * 60 * (periodoDe(consulta).dias / 30))
-  const asignaciones = repartirEntero(total, nombres.map((_, i) => 1 / (i + 1.4)))
+  // Los cinco primeros concentran una parte del GMV de la zona.
+  const concentrado = Math.round((gmvZona * (colombia ? 0.04 : 0.3)) / 1000)
+  const gmv = repartirEntero(
+    concentrado,
+    nombres.map((_, i) => 1 / (i + 1.4))
+  ).map((miles) => miles * 1000)
+  const lugares = lugaresDeMedios(consulta, aleatorio, nombres.length)
   return {
-    titulo: "Medios con más asignaciones",
-    descripcion: "Asignaciones con entrega en el periodo y su cumplimiento.",
-    metrica: "asignaciones",
-    filas: nombres.map((nombre, i) => ({
-      codigo: null,
-      nombre,
-      valor: asignaciones[i],
-      detalle: `${Math.round(82 + aleatorio() * 18)} % a tiempo`,
-    })),
+    titulo: "Medios con más GMV",
+    descripcion:
+      "GMV comprometido por sus asignaciones aceptadas en el periodo.",
+    metrica: "gmv",
+    filas: nombres.map((nombre, i) => {
+      const asignaciones = Math.max(
+        1,
+        Math.round(gmv[i] / (380_000 + 260_000 * aleatorio()))
+      )
+      return {
+        codigo: null,
+        nombre,
+        valor: gmv[i],
+        detalle:
+          consulta.nivel === "departamental"
+            ? `${asignaciones} ${asignaciones === 1 ? "asignación" : "asignaciones"}`
+            : lugares[i],
+      }
+    }),
   }
 }
 
@@ -479,7 +630,9 @@ function topSubzonas(
 ): TopZona | null {
   const aditiva = DEFINICIONES_METRICAS[consulta.metrica].aditiva
   const filas = zonasDelNivel(consulta)
-    .filter((z) => z.valor.valor !== null && (aditiva ? z.valor.valor > 0 : true))
+    .filter(
+      (z) => z.valor.valor !== null && (aditiva ? z.valor.valor > 0 : true)
+    )
     .sort((a, b) => (b.valor.valor ?? 0) - (a.valor.valor ?? 0))
     .slice(0, 5)
     .map((z): FilaTopZona => ({
@@ -500,7 +653,10 @@ function titulo(prefijo: string, metrica: MetricaGeo): string {
 function topSimulado(consulta: ConsultaDetalleGeo): TopZona | null {
   if (consulta.nivel === "internacional") {
     return consulta.zona === CODIGO_COLOMBIA && consulta.metrica !== "audiencia"
-      ? topSubzonas({ ...consulta, nivel: "nacional" }, titulo("Departamentos", consulta.metrica))
+      ? topSubzonas(
+          { ...consulta, nivel: "nacional" },
+          titulo("Departamentos", consulta.metrica)
+        )
       : null
   }
   if (consulta.nivel === "nacional") {
@@ -520,6 +676,46 @@ function valorDeZona(consulta: ConsultaMapaGeo, zona: string) {
     : { valor: tasaPonderada(zonas.map((z) => z.valor)), n: zonas[0].valor.n }
 }
 
+/** La misma consulta en el periodo anterior de igual duración. */
+function consultaAnterior(consulta: ConsultaMapaGeo): ConsultaMapaGeo | null {
+  const desde = parsearFecha(consulta.desde)
+  const hasta = parsearFecha(consulta.hasta)
+  if (!desde || !hasta) return null
+  const anterior = periodoAnterior(rangoPersonalizado(desde, hasta))
+  return {
+    ...consulta,
+    desde: serializarFecha(anterior.desde),
+    hasta: serializarFecha(anterior.hasta),
+  }
+}
+
+/** KPI con su comparativo: los flujos varían con el periodo; las fotos crecen despacio. */
+function kpiSimulado(
+  consulta: ConsultaDetalleGeo,
+  metrica: MetricaGeo
+): KpiZona {
+  const actual = valorDeZona({ ...consulta, metrica }, consulta.zona)
+  const previa = consultaAnterior({ ...consulta, metrica })
+  let anterior: number | null = null
+  if (metrica !== "audiencia" && actual.valor !== null && previa) {
+    anterior = DEFINICIONES_METRICAS[metrica].foto
+      ? Math.round(
+          actual.valor *
+            (0.9 + 0.08 * azar(`anterior|${metrica}|${consulta.zona}`))
+        )
+      : valorDeZona(previa, consulta.zona).valor
+  }
+  return {
+    metrica,
+    ...actual,
+    anterior,
+    variacion:
+      actual.valor === null || !anterior
+        ? null
+        : (actual.valor - anterior) / anterior,
+  }
+}
+
 // ── Proveedor ────────────────────────────────────────────────────────────────
 
 /** Latencia artificial opcional para ver estados de carga en desarrollo. */
@@ -528,7 +724,9 @@ export interface OpcionesProveedorSimulado {
 }
 
 const esperar = (ms: number) =>
-  ms > 0 ? new Promise<void>((resolver) => setTimeout(resolver, ms)) : Promise.resolve()
+  ms > 0
+    ? new Promise<void>((resolver) => setTimeout(resolver, ms))
+    : Promise.resolve()
 
 export function crearProveedorSimulado({
   latenciaMs = 0,
@@ -536,7 +734,9 @@ export function crearProveedorSimulado({
   return {
     async mapa(consulta): Promise<RespuestaMapaGeo> {
       await esperar(latenciaMs)
-      const filas = zonasDelNivel(consulta).map((z) => aFila(z, consulta.metrica))
+      const filas = zonasDelNivel(consulta).map((z) =>
+        aFila(z, consulta.metrica)
+      )
       return {
         consulta,
         filas,
@@ -548,7 +748,9 @@ export function crearProveedorSimulado({
     async puntos(consulta): Promise<RespuestaPuntosGeo> {
       await esperar(latenciaMs)
       const puntos = puntosSimulados(consulta)
-      const total = Math.round(puntos.reduce((suma, [, , peso]) => suma + peso, 0))
+      const total = Math.round(
+        puntos.reduce((suma, [, , peso]) => suma + peso, 0)
+      )
       return {
         consulta,
         puntos,
@@ -561,11 +763,11 @@ export function crearProveedorSimulado({
 
     async detalle(consulta): Promise<RespuestaDetalleGeo> {
       await esperar(latenciaMs)
-      const kpis = consulta.metricasKpi.map((metrica) => ({
-        metrica,
-        ...valorDeZona({ ...consulta, metrica }, consulta.zona),
-      }))
-      const actual = kpis.find((k) => k.metrica === consulta.metrica)?.valor ?? null
+      const kpis = consulta.metricasKpi.map((metrica) =>
+        kpiSimulado(consulta, metrica)
+      )
+      const actual =
+        kpis.find((k) => k.metrica === consulta.metrica)?.valor ?? null
       const serie = serieSimulada(consulta, actual)
       return {
         consulta,

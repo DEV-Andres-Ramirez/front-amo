@@ -5,7 +5,11 @@ import {
   type FiltroPostgrest,
   filtrosVentana,
 } from "@/features/auditoria/filtros-postgrest"
-import { instantesDelRango, parsearFecha, rangoPersonalizado } from "@/lib/fechas"
+import {
+  instantesDelRango,
+  parsearFecha,
+  rangoPersonalizado,
+} from "@/lib/fechas"
 import { obtenerMunicipio } from "@/lib/geo/catalogo"
 
 import { puntosAlrededor } from "./azar"
@@ -52,10 +56,18 @@ function filtrosAccesos(consulta: ConsultaMapaGeo): FiltroPostgrest[] {
     ...filtrosVentana(ventana(consulta)),
   ]
   if (consulta.nivel !== "internacional") {
-    filtros.push({ columna: "pais_iso2", operador: "eq", valor: CODIGO_COLOMBIA })
+    filtros.push({
+      columna: "pais_iso2",
+      operador: "eq",
+      valor: CODIGO_COLOMBIA,
+    })
   }
   if (consulta.nivel === "departamental" && consulta.departamento) {
-    filtros.push({ columna: "departamento_codigo", operador: "eq", valor: consulta.departamento })
+    filtros.push({
+      columna: "departamento_codigo",
+      operador: "eq",
+      valor: consulta.departamento,
+    })
   }
   return filtros
 }
@@ -92,12 +104,18 @@ async function puntosAccesos(
   for (const { data, error: errorPagina } of lecturas) {
     if (errorPagina) throw traducirError(errorPagina)
     for (const { lat, lon } of data ?? []) {
-      if (lat !== null && lon !== null) coordenadas.push({ lon, lat })
+      // `numeric`: se convierte por si el transporte lo entrega como texto.
+      if (lat !== null && lon !== null)
+        coordenadas.push({ lon: Number(lon), lat: Number(lat) })
     }
   }
   const muestra = filasLeidas(paginas)
   return {
-    puntos: agregarEnCuadricula(coordenadas, paso, muestra > 0 ? total / muestra : 1),
+    puntos: agregarEnCuadricula(
+      coordenadas,
+      paso,
+      muestra > 0 ? total / muestra : 1
+    ),
     total,
     muestra,
     pasoGrados: paso,
@@ -109,10 +127,18 @@ function filtrosMedios(consulta: ConsultaMapaGeo): FiltroPostgrest[] {
   const filtros: FiltroPostgrest[] = [
     { columna: "estado", operador: "eq", valor: "VERIFICADO" },
     { columna: "deleted_at", operador: "is", valor: "null" },
-    { columna: "verificado_at", operador: "lt", valor: ventana(consulta).hastaExclusivo },
+    {
+      columna: "verificado_at",
+      operador: "lt",
+      valor: ventana(consulta).hastaExclusivo,
+    },
   ]
   if (consulta.nivel === "departamental" && consulta.departamento) {
-    filtros.push({ columna: "departamento_codigo", operador: "eq", valor: consulta.departamento })
+    filtros.push({
+      columna: "departamento_codigo",
+      operador: "eq",
+      valor: consulta.departamento,
+    })
   }
   return filtros
 }
@@ -132,7 +158,10 @@ async function puntosMedios(
   const paginas = paginasEstratificadas(total, Number.MAX_SAFE_INTEGER)
   const lecturas = await Promise.all(
     paginas.map(([desde, hasta]) =>
-      aplicarFiltros(supabase.from("medios").select("municipio_codigo"), filtros)
+      aplicarFiltros(
+        supabase.from("medios").select("municipio_codigo"),
+        filtros
+      )
         .order("id", { ascending: true })
         .range(desde, hasta)
     )
@@ -147,7 +176,12 @@ async function puntosMedios(
   const puntos = [...porMunicipio].flatMap(([codigo, cantidad]): PuntoGeo[] => {
     const municipio = obtenerMunicipio(codigo)
     return municipio
-      ? puntosAlrededor(municipio.centroide, cantidad, `medios|${codigo}`, RADIO_MEDIOS_GRADOS)
+      ? puntosAlrededor(
+          municipio.centroide,
+          cantidad,
+          `medios|${codigo}`,
+          RADIO_MEDIOS_GRADOS
+        )
       : []
   })
   return { puntos, total, muestra: total, pasoGrados: 0.01 }

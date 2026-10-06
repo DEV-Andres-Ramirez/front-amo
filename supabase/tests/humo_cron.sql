@@ -5,6 +5,11 @@
 -- Se ejecuta como owner (MCP execute_sql o psql) dentro de una transacción que SIEMPRE se revierte.
 -- Cada prueba deja `true` si pasa o un texto con lo observado si falla.
 begin;
+-- Límite del lado del servidor: la suite retira los datos demo dentro de la transacción (unos 15 s con el juego demo
+-- actual) y mientras tanto los mantiene bloqueados. Si no termina a tiempo (p. ej. espera a otra transacción), se
+-- cancela y revierte en vez de seguir viva cuando el cliente (MCP) ya dejó de esperar. No ejecutar en paralelo con
+-- otra suite que también purgue.
+set local statement_timeout = '45s';
 
 do $humo$
 declare
@@ -58,6 +63,13 @@ begin
   -- ── Preparación (owner, modo_carga) ─────────────────────────────────────────────────────────────────
   update public.configuracion set valor = to_jsonb(1) where clave = 'calidad.minimo_publicaciones';
   perform set_config('amo.modo_carga', 'on', true);
+  -- Las funciones programadas recorren toda la plataforma y aquí el mínimo de publicaciones baja a 1: con los datos
+  -- demo que traiga la BD recalcularían cientos de cuentas (la suite no terminaba a tiempo). Se retiran dentro de esta
+  -- transacción con la purga de la propia BD (que así se ejerce sobre el juego demo completo); la sección (e) la
+  -- vuelve a probar con los datos demo de la prueba.
+  perform set_config('amo.purga', 'on', true);
+  perform private.purgar_demo();
+  perform set_config('amo.purga', '', true);
   insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at)
   select u, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', e, now(), now(), now()
   from (values (u_mea, 'humo11.mea@amo.test'), (u_meb, 'humo11.meb@amo.test'), (u_ana, 'humo11.ana@amo.test')) x (u, e);
@@ -99,9 +111,11 @@ begin
          (o6, c1, an_a, 'Oferta Once cortes', f_post, 'INSTAGRAM', 5000000, 0, 1, '{H24,D7}', now() - interval '3 days',
           now() + interval '5 days', now() - interval '4 days', 'EN_EJECUCION', now() - interval '5 days', 5, 0),
          (o_d, c_d, an_d, 'Oferta Demo Once', f_post, 'INSTAGRAM', 1000000, 0, 1, '{D7}', now() + interval '1 day',
-          now() + interval '10 days', now() + interval '1 day', 'PUBLICADA', now(), 5, 0);
+          now() + interval '10 days', now() + interval '1 day', 'PUBLICADA', now(), 5, 1);
+  -- La oferta demo lleva un cupo ocupado en sus contadores, como cualquier oferta demo real: la purga debe poder
+  -- borrarla (e4; antes de 20261006152348_purga_demo_cupos_en_cascada fallaba con ofertas_cupos_ocupados_chk).
   insert into public.oferta_cupos (oferta_id, franja_id, cupos_totales, cupos_ocupados)
-  values (o1, fr1, 5, 2), (o2, fr1, 5, 0), (o3, fr1, 5, 0), (o4, fr1, 5, 0), (o5, fr1, 5, 0), (o6, fr1, 5, 0), (o_d, fr1, 5, 0);
+  values (o1, fr1, 5, 2), (o2, fr1, 5, 0), (o3, fr1, 5, 0), (o4, fr1, 5, 0), (o5, fr1, 5, 0), (o6, fr1, 5, 0), (o_d, fr1, 5, 1);
   insert into public.asignaciones (id, oferta_id, campana_id, anunciante_id, medio_id, cuenta_social_id, plataforma, slot, estado,
     aceptada_at, contenido_descargado_at, publicada_at, evidencia_validada_at, verificada_at, fecha_limite_publicacion,
     publicaciones, monto_bruto, tarifa_id, franja_id, es_demo)
@@ -268,6 +282,10 @@ begin
     and not exists (select 1 from public.asignaciones where id = a_d)
     and exists (select 1 from public.anunciantes where id = an_a) and exists (select 1 from public.campanas where id = c1)
     and v_j ? 'organizaciones_conservadas');
+  r := r || jsonb_build_object('e4_purga_demo_oferta_con_cupos_ocupados',
+    (v_j ->> 'ofertas')::int >= 1 and (v_j ->> 'oferta_cupos')::int >= 1
+    and not exists (select 1 from public.ofertas where id = o_d)
+    and not exists (select 1 from public.oferta_cupos where oferta_id = o_d));
 
   -- ── (f) Agenda y permisos ──────────────────────────────────────────────────────────────────────────
   select jsonb_object_agg(j.jobname, j.schedule) into v_j from cron.job j where j.jobname like 'amo\_%';

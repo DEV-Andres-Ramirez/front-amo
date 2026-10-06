@@ -23,6 +23,7 @@ import {
   type FilaSalud,
   type FilaZona,
   type FuenteActividad,
+  type MedioEnRiesgo,
   type PuntoGmv,
 } from "./datos"
 
@@ -78,13 +79,17 @@ export const serieGmv = cache(
   }
 )
 
-/** GMV verificado de los últimos 90 días (proporción de la regla 3). */
+/**
+ * GMV verificado de los 90 días que terminan en `hasta` (proporción de la
+ * regla 3). Mismo cierre que `salud_medios`: su «GMV en juego» también mira
+ * los 90 días anteriores al fin del periodo, no a hoy.
+ */
 export const gmvVerificado90Dias = cache(
-  async (hoy: string): Promise<number> => {
-    const fin = new Date(`${hoy}T12:00:00Z`)
+  async (hasta: string): Promise<number> => {
+    const fin = new Date(`${hasta}T12:00:00Z`)
     const puntos = await serieGmv(
       serializarFecha(subDays(fin, 89)),
-      hoy,
+      hasta,
       "mes"
     )
     return puntos.reduce((total, punto) => total + punto.gmvVerificado, 0)
@@ -171,15 +176,6 @@ export const saludMedios = cache(
     )
   }
 )
-
-export interface MedioEnRiesgo {
-  id: string
-  nombre: string
-  departamento: string | null
-  ultimaAceptacionAt: string | null
-  gmv90d: number
-  abiertas: number
-}
 
 export const mediosEnRiesgo = cache(
   async (limite: number): Promise<MedioEnRiesgo[]> => {

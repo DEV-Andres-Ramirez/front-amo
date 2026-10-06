@@ -66,7 +66,19 @@ const TONO_SECUNDARIO = {
 function Secundario({ dato }: { dato: DatoSecundario }) {
   return (
     <dl className="flex h-8.5 min-w-0 items-center justify-between gap-2 border-t border-dashed px-3.5 text-xs sm:px-4">
-      <dt className="truncate text-muted-foreground">{dato.etiqueta}</dt>
+      <dt
+        className="truncate text-muted-foreground"
+        title={dato.titulo ?? dato.etiqueta}
+      >
+        {dato.titulo ? (
+          <>
+            <span aria-hidden>{dato.etiqueta}</span>
+            <span className="sr-only">{dato.titulo}</span>
+          </>
+        ) : (
+          dato.etiqueta
+        )}
+      </dt>
       <dd
         className={cn(
           "shrink-0 font-medium cifras",
@@ -78,6 +90,15 @@ function Secundario({ dato }: { dato: DatoSecundario }) {
     </dl>
   )
 }
+
+/**
+ * Ocho tarjetas en filas pares: 2 columnas, y 4 cuando el panel mide al menos
+ * 56 rem (cada tarjeta, ≥ 212 px). Depende del ancho del panel y no del de la
+ * ventana: a 1024 px con la barra lateral abierta, 4 columnas dejarían cada
+ * tarjeta en ~165 px, con títulos, comparativo y dato secundario cortados.
+ * Los `md:`/`lg:` solo anulan las columnas por ventana de `RejillaKpi`.
+ */
+const COLUMNAS = "md:grid-cols-2 lg:grid-cols-2 @4xl/panel:grid-cols-4"
 
 const MARCO =
   "flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card transition-[border-color,box-shadow] duration-300 hover:border-foreground/15"
@@ -92,6 +113,7 @@ export function TarjetasKpi({
   filas,
   tarjetas,
   nMinimo,
+  razones = "agregadas",
   etiquetaComparacion,
   className,
 }: {
@@ -99,16 +121,23 @@ export function TarjetasKpi({
   filas: readonly FilaKpi[]
   tarjetas: readonly DefinicionTarjeta[]
   nMinimo: number
+  /**
+   * `agregadas` (panel general): la RPC oculta la tasa con menos de `nMinimo`
+   * casos y la tarjeta lo dice («se necesitan 20»). `propias` (una sola
+   * entidad, como el anunciante): la tasa llega siempre con su n
+   * (docs/kpis.md §0.4), así que una tasa sin valor es que no hubo datos, no
+   * que falte muestra.
+   */
+  razones?: "agregadas" | "propias"
   etiquetaComparacion: string
   className?: string
 }) {
   const porClave = new Map(filas.map((fila) => [fila.kpi, fila]))
   const conSecundario = tarjetas.some((tarjeta) => tarjeta.secundario)
   return (
-    <RejillaKpi
-      etiqueta={etiqueta}
-      className={cn("md:grid-cols-4 lg:grid-cols-4", className)}
-    >
+    <RejillaKpi etiqueta={etiqueta} className={cn(COLUMNAS, className)}>
+      {/* Las tarjetas titulan con h3: sin este h2 la página saltaría de h1 a h3. */}
+      <h2 className="sr-only">{etiqueta}</h2>
       {tarjetas.map((tarjeta, indice) => {
         const fila = porClave.get(tarjeta.kpi) ?? filaVacia(tarjeta.kpi)
         const props = propsDesdeFila(fila, nMinimo)
@@ -124,6 +153,11 @@ export function TarjetasKpi({
           >
             <TarjetaKpi
               {...props}
+              nMinimo={
+                razones === "propias" && fila.valor === null
+                  ? undefined
+                  : props.nMinimo
+              }
               titulo={tarjeta.titulo ?? props.titulo}
               icono={ICONOS[tarjeta.icono]}
               etiquetaComparacion={etiquetaComparacion}
@@ -167,7 +201,7 @@ export function EsqueletoTarjetasKpi({
   return (
     <RejillaKpi
       etiqueta="Cargando indicadores"
-      className={cn("md:grid-cols-4 lg:grid-cols-4", className)}
+      className={cn(COLUMNAS, className)}
     >
       {Array.from({ length: cantidad }, (_, i) => (
         <div key={i} className={MARCO}>

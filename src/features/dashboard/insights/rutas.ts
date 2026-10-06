@@ -2,8 +2,9 @@
  * Enlaces de las acciones sugeridas. Conservan el periodo consultado
  * (`desde`/`hasta`) y el filtro del grupo.
  *
- * Verificados con sus pantallas: mapa (`metrica`, `nivel`, `depto`,
- * `desde`/`hasta`, features/geo/estado-url.ts) y accesos (`motivo`,
+ * El explorador geográfico tiene su propio constructor
+ * (`rutaExplorador`, features/geo/rutas.ts). Verificados con sus pantallas:
+ * accesos (`motivo`,
  * `periodo=personalizado` + `desde`/`hasta`, features/accesos). Supuestos a
  * confirmar cuando existan: reportes (`cumplimiento-medios`,
  * `desempeno-campanas` con `departamento`/`plataforma`), medios
@@ -11,7 +12,9 @@
  */
 import type { Route } from "next"
 
-import type { EntradaInsights } from "./tipos"
+import type { MetricaGeo } from "@/features/geo/metricas"
+
+import type { EntradaInsights, KpiVariacion } from "./tipos"
 
 type Parametros = Record<string, string | null | undefined>
 
@@ -33,7 +36,6 @@ export function construirHref(
 }
 
 export const RUTAS_INSIGHTS = {
-  mapa: "/analitica/mapa",
   reporteCumplimiento: "/reportes/cumplimiento-medios",
   reporteDesempeno: "/reportes/desempeno-campanas",
   medios: "/operacion/medios",
@@ -42,7 +44,7 @@ export const RUTAS_INSIGHTS = {
 } as const satisfies Record<string, `/${string}`>
 
 /** Métrica del explorador geográfico equivalente a cada KPI de la regla 1. */
-export const METRICA_MAPA: Readonly<Record<string, string>> = {
+export const METRICA_MAPA: Readonly<Record<KpiVariacion, MetricaGeo>> = {
   gmv_verificado: "gmv",
   gmv_comprometido: "gmv",
   negocios_cerrados: "asignaciones",

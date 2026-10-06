@@ -22,11 +22,15 @@ describe("MiniMapaColombia", () => {
       screen.getByRole("group", { name: "Medios por departamento" })
     ).toBeInTheDocument()
     expect(screen.getAllByRole("link")).toHaveLength(33)
-    expect(screen.getByRole("link", { name: "Antioquia: 123" })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /^Amazonas: Sin datos$/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "Antioquia: 123" })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: /^Amazonas: Sin datos$/ })
+    ).toBeInTheDocument()
   })
 
-  it("cada departamento abre el explorador; Bogotá abre el mapa nacional", () => {
+  it("cada departamento abre el explorador con la métrica del mapa; Bogotá abre el mapa nacional", () => {
     render(
       <MiniMapaColombia
         valores={VALORES}
@@ -37,20 +41,58 @@ describe("MiniMapaColombia", () => {
     )
     fireEvent.click(screen.getByRole("link", { name: /^Antioquia/ }))
     expect(push).toHaveBeenLastCalledWith(
-      "/analitica/mapa?nivel=departamental&depto=05"
+      "/analitica/mapa?metrica=medios&nivel=departamental&depto=05"
     )
     fireEvent.keyDown(screen.getByRole("link", { name: /^Bogotá/ }), {
       key: "Enter",
     })
-    expect(push).toHaveBeenLastCalledWith("/analitica/mapa")
+    expect(push).toHaveBeenLastCalledWith("/analitica/mapa?metrica=medios")
+  })
+
+  it("los enlaces conservan el periodo de las cifras", () => {
+    render(
+      <MiniMapaColombia
+        valores={VALORES}
+        metrica="gmv"
+        etiqueta="GMV"
+        enlazar
+        periodo={{ desde: "2026-09-01", hasta: "2026-09-30" }}
+      />
+    )
+    fireEvent.click(screen.getByRole("link", { name: /^Valle del Cauca/ }))
+    expect(push).toHaveBeenLastCalledWith(
+      "/analitica/mapa?metrica=gmv&nivel=departamental&depto=76&desde=2026-09-01&hasta=2026-09-30"
+    )
   })
 
   it("sin enlaces no expone controles, pero cada cifra sigue siendo legible", () => {
-    render(<MiniMapaColombia valores={VALORES} metrica="medios" etiqueta="Medios" />)
-    expect(screen.queryAllByRole("link")).toHaveLength(0)
-    expect(screen.getByRole("img", { name: "Antioquia: 123" })).not.toHaveAttribute(
-      "tabindex"
+    render(
+      <MiniMapaColombia valores={VALORES} metrica="medios" etiqueta="Medios" />
     )
+    expect(screen.queryAllByRole("link")).toHaveLength(0)
+    expect(
+      screen.getByRole("img", { name: "Antioquia: 123" })
+    ).not.toHaveAttribute("tabindex")
     expect(screen.getByText("Sin datos")).toBeInTheDocument()
+  })
+
+  it("nombra las zonas sin dato como pida quien lo usa (leyenda y cada zona)", () => {
+    render(
+      <MiniMapaColombia
+        valores={VALORES}
+        metrica="accesos"
+        etiqueta="Ingresos por departamento"
+        etiquetaSinDatos="Sin ingresos"
+      />
+    )
+    expect(screen.getByText("Sin ingresos")).toBeInTheDocument()
+    expect(screen.queryByText("Sin datos")).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("img", { name: "Amazonas: Sin ingresos" })
+    ).toBeInTheDocument()
+    // Un cero es un dato: conserva su cifra.
+    expect(
+      screen.getByRole("img", { name: "Atlántico: 0" })
+    ).toBeInTheDocument()
   })
 })

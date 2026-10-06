@@ -3,19 +3,24 @@ import { describe, expect, it, vi } from "vitest"
 vi.mock("server-only", () => ({}))
 vi.mock("@/lib/supabase/server", () => ({ crearClienteServidor: vi.fn() }))
 
-const { obtenerProveedorGeo, usarDatosSimulados } = await import(
-  "./proveedor-servidor"
-)
+const { obtenerProveedorGeo, usarDatosSimulados } =
+  await import("./proveedor-servidor")
 
 describe("elección del proveedor de datos geográficos", () => {
   it("usa datos simulados solo con AMO_GEO_MOCK=1 fuera de producción", () => {
-    expect(usarDatosSimulados({ AMO_GEO_MOCK: "1", NODE_ENV: "development" })).toBe(true)
+    expect(
+      usarDatosSimulados({ AMO_GEO_MOCK: "1", NODE_ENV: "development" })
+    ).toBe(true)
     expect(usarDatosSimulados({ NODE_ENV: "development" })).toBe(false)
-    expect(usarDatosSimulados({ AMO_GEO_MOCK: "true", NODE_ENV: "development" })).toBe(false)
+    expect(
+      usarDatosSimulados({ AMO_GEO_MOCK: "true", NODE_ENV: "development" })
+    ).toBe(false)
   })
 
   it("nunca en producción, aunque la variable exista", () => {
-    expect(usarDatosSimulados({ AMO_GEO_MOCK: "1", NODE_ENV: "production" })).toBe(false)
+    expect(
+      usarDatosSimulados({ AMO_GEO_MOCK: "1", NODE_ENV: "production" })
+    ).toBe(false)
     expect(
       usarDatosSimulados({
         AMO_GEO_MOCK: "1",
@@ -31,7 +36,10 @@ describe("elección del proveedor de datos geográficos", () => {
   })
 
   it("el simulado responde con origen «simulado»", async () => {
-    const proveedor = await obtenerProveedorGeo({ AMO_GEO_MOCK: "1", NODE_ENV: "test" })
+    const proveedor = await obtenerProveedorGeo({
+      AMO_GEO_MOCK: "1",
+      NODE_ENV: "test",
+    })
     const respuesta = await proveedor.mapa({
       nivel: "nacional",
       metrica: "medios",

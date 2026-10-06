@@ -77,12 +77,10 @@ export function EsqueletoOrigenAccesos() {
         <Esqueleto className="h-5 w-48" />
         <Esqueleto className="h-3.5 w-80 max-w-full" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-5">
-        <EsqueletoMapaIngresos className="min-w-0 lg:col-span-3" />
-        <div className="grid min-w-0 gap-4 md:grid-cols-2 lg:col-span-2 lg:grid-cols-1">
-          <Tarjeta />
-          <Tarjeta />
-        </div>
+      <EsqueletoMapaIngresos />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Tarjeta />
+        <Tarjeta />
       </div>
     </div>
   )

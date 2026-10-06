@@ -28,6 +28,8 @@ const MENSAJES_NEGOCIO: Readonly<Record<string, string>> = {
   AMO_ROL_PROPIO: "No puedes cambiar los permisos de tu propio rol.",
   AMO_ESCALADA_PERMISOS:
     "No puedes otorgar ni retirar un permiso que tú no tienes.",
+  AMO_PERMISO_NO_APLICABLE:
+    "Ese permiso no aplica a este tipo de rol: los roles de anunciante y de medio solo admiten los permisos de su portal.",
 }
 
 const RESTRICCIONES: readonly (ErrorRolInterpretado & { nombre: string })[] = [
@@ -79,10 +81,25 @@ function mensajeEscalada(error: ErrorBdRol): string {
   return MENSAJES_NEGOCIO.AMO_ESCALADA_PERMISOS
 }
 
+/**
+ * Un rol de anunciante o de medio solo admite los permisos de su rol de
+ * sistema. El `hint` trae el permiso rechazado (el primero, si eran varios):
+ * se nombra para que la persona sepa cuál quitar de la selección.
+ */
+function mensajeNoAplicable(error: ErrorBdRol): string {
+  const clave = error.hint?.trim()
+  if (clave && esPermisoValido(clave)) {
+    return `«${PERMISOS[clave].descripcion}» no aplica a este tipo de rol: los roles de anunciante y de medio solo admiten los permisos de su portal.`
+  }
+  return error.details?.trim() || MENSAJES_NEGOCIO.AMO_PERMISO_NO_APLICABLE
+}
+
 export function interpretarErrorRol(error: ErrorBdRol): ErrorRolInterpretado {
   const codigo = codigoNegocio(error)
   if (codigo === "AMO_ESCALADA_PERMISOS")
     return { mensaje: mensajeEscalada(error) }
+  if (codigo === "AMO_PERMISO_NO_APLICABLE")
+    return { mensaje: mensajeNoAplicable(error) }
   if (codigo) {
     return {
       mensaje:

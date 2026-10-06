@@ -72,6 +72,32 @@ function plataformasDe(ofertas: FilaCampanaBd["ofertas"]): Plataforma[] {
   return ORDEN_PLATAFORMAS.filter((plataforma) => presentes.has(plataforma))
 }
 
+function aCampanaFila(fila: FilaCampanaBd): CampanaFila {
+  return {
+    id: fila.id,
+    nombre: fila.nombre,
+    marca: fila.marca,
+    anuncianteId: fila.anunciante_id,
+    anunciante: fila.anunciante?.nombre_comercial ?? null,
+    estado: fila.estado,
+    fechaInicio: fila.fecha_inicio,
+    fechaFin: fila.fecha_fin,
+    presupuestoTotal: fila.presupuesto_total,
+    presupuestoComprometido: fila.presupuesto_comprometido,
+    ofertas: fila.ofertas.length,
+    plataformas: plataformasDe(fila.ofertas),
+    cuposTotales: fila.ofertas.reduce(
+      (suma, oferta) => suma + oferta.cupos_totales,
+      0
+    ),
+    cuposOcupados: fila.ofertas.reduce(
+      (suma, oferta) => suma + oferta.cupos_ocupados,
+      0
+    ),
+    creadaAt: fila.created_at,
+  }
+}
+
 export async function listarCampanas(
   estado: EstadoTablaCampanas
 ): Promise<PaginaFilas<CampanaFila>> {
@@ -95,7 +121,8 @@ export async function listarCampanas(
       if (texto) {
         consulta = consulta.or(`nombre.ilike.%${texto}%,marca.ilike.%${texto}%`)
       }
-      if (estado.estado.length > 0) consulta = consulta.in("estado", estado.estado)
+      if (estado.estado.length > 0)
+        consulta = consulta.in("estado", estado.estado)
       if (estado.anunciante.length > 0) {
         consulta = consulta.in("anunciante_id", estado.anunciante)
       }
@@ -114,27 +141,30 @@ export async function listarCampanas(
     }
   )
 
-  return {
-    total: pagina.total,
-    filas: pagina.filas.map((fila) => ({
-      id: fila.id,
-      nombre: fila.nombre,
-      marca: fila.marca,
-      anuncianteId: fila.anunciante_id,
-      anunciante: fila.anunciante?.nombre_comercial ?? null,
-      estado: fila.estado,
-      fechaInicio: fila.fecha_inicio,
-      fechaFin: fila.fecha_fin,
-      presupuestoTotal: fila.presupuesto_total,
-      presupuestoComprometido: fila.presupuesto_comprometido,
-      ofertas: fila.ofertas.length,
-      plataformas: plataformasDe(fila.ofertas),
-      cuposTotales: fila.ofertas.reduce((s, o) => s + o.cupos_totales, 0),
-      cuposOcupados: fila.ofertas.reduce((s, o) => s + o.cupos_ocupados, 0),
-      creadaAt: fila.created_at,
-    })),
-  }
+  return { total: pagina.total, filas: pagina.filas.map(aCampanaFila) }
 }
+
+/** Todas las campañas de un anunciante (las más recientes primero) para su ficha. */
+export const campanasDelAnunciante = cache(
+  async (anuncianteId: string): Promise<CampanaFila[]> => {
+    const supabase = await clienteSolicitud()
+    const filas = await leerTodo(
+      "leer las campañas del anunciante",
+      (desde, hasta) =>
+        supabase
+          .from("campanas")
+          .select(SELECCION_LISTADO)
+          .eq("anunciante_id", anuncianteId)
+          .is("deleted_at", null)
+          .is("ofertas.deleted_at", null)
+          .order("fecha_inicio", { ascending: false })
+          .order("id")
+          .range(desde, hasta)
+          .overrideTypes<FilaCampanaBd[], { merge: false }>()
+    )
+    return filas.map(aCampanaFila)
+  }
+)
 
 const campanasVisibles = cache(async () => {
   const supabase = await clienteSolicitud()

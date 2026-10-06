@@ -29,6 +29,21 @@ const CABECERAS_SEGURIDAD = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ]
 
+/**
+ * Polígonos de `public/data/geo` (países, departamentos y municipios). Son
+ * públicos, no dependen de la sesión y solo cambian con un despliegue
+ * (`pnpm geo:build`), pero su nombre no lleva hash: sin esta cabecera Next
+ * los sirve con `max-age=0` y el explorador los vuelve a validar en cada
+ * visita. Un día de caché y una semana sirviendo la copia mientras se
+ * revalida en segundo plano.
+ */
+const CACHE_GEODATOS = [
+  {
+    key: "Cache-Control",
+    value: "public, max-age=86400, stale-while-revalidate=604800",
+  },
+]
+
 /** Mensajes de todos los grupos inválidos (públicas y de servidor) a la vez. */
 function erroresDeEntorno(): string[] {
   const errores: string[] = []
@@ -78,7 +93,10 @@ export default function configuracion(fase: string): NextConfig {
       ],
     },
     async headers() {
-      return [{ source: "/:path*", headers: CABECERAS_SEGURIDAD }]
+      return [
+        { source: "/:path*", headers: CABECERAS_SEGURIDAD },
+        { source: "/data/geo/:path*", headers: CACHE_GEODATOS },
+      ]
     },
   }
 }

@@ -1,8 +1,8 @@
 import { ArrowLeft, Ban, KeyRound, MailClock } from "lucide-react"
-import Link from "next/link"
 import type { ReactNode } from "react"
 
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
+import { TituloMiga } from "@/components/layout/titulo-miga"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -103,16 +103,16 @@ export function CabeceraUsuario({
 
   return (
     <div className="flex flex-col gap-4">
-      <Button
+      <TituloMiga titulo={nombre} />
+      <EnlaceBoton
         variant="ghost"
         size="sm"
         className="-ml-2 w-fit text-muted-foreground"
-        render={<Link href={RUTA_USUARIOS} />}
-        nativeButton={false}
+        href={RUTA_USUARIOS}
       >
         <ArrowLeft data-icon="inline-start" aria-hidden />
         Usuarios
-      </Button>
+      </EnlaceBoton>
       <header className="relative overflow-hidden rounded-2xl border bg-card">
         <div
           aria-hidden

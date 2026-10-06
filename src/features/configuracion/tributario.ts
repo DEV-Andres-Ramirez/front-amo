@@ -44,7 +44,8 @@ export function consumoResolucion(
   }
 }
 
-export type AlertaResolucion = "agotada" | "casi-agotada" | "por-vencer" | "vencida"
+export type AlertaResolucion =
+  "agotada" | "casi-agotada" | "por-vencer" | "vencida"
 
 /** Alertas de una resolución activa: rango agotado o cerca, vigencia vencida o cerca. */
 export function alertasResolucion(
@@ -93,5 +94,47 @@ export function ordenarPorVigencia<
         ORDEN_ESTADO[
           estadoVigenciaDias(b.vigenteDesde, b.vigenteHasta, ahora)
         ] || b.vigenteDesde.localeCompare(a.vigenteDesde)
+  )
+}
+
+/**
+ * ReteICA municipal para la lista: vigentes, programadas y finalizadas, y
+ * dentro de cada estado por nombre del municipio (un municipio se busca por
+ * su nombre; todas las tarifas suelen empezar el mismo 1.º de enero) y la
+ * vigencia más reciente antes.
+ */
+export function ordenarReteica<
+  T extends Pick<
+    ReteicaMunicipal,
+    "municipioNombre" | "vigenteDesde" | "vigenteHasta"
+  >,
+>(filas: readonly T[], ahora: Date = new Date()): T[] {
+  const estado = (fila: T) =>
+    ORDEN_ESTADO[
+      estadoVigenciaDias(fila.vigenteDesde, fila.vigenteHasta, ahora)
+    ]
+  return [...filas].sort(
+    (a, b) =>
+      estado(a) - estado(b) ||
+      a.municipioNombre.localeCompare(b.municipioNombre, "es-CO") ||
+      b.vigenteDesde.localeCompare(a.vigenteDesde)
+  )
+}
+
+/** ¿La fila coincide con lo buscado? Por municipio, departamento o código DIVIPOLA. */
+export function coincideReteica(
+  fila: Pick<
+    ReteicaMunicipal,
+    "municipioNombre" | "departamentoNombre" | "municipioCodigo"
+  >,
+  /** Texto ya normalizado (sin tildes ni mayúsculas). */
+  textoNormalizado: string,
+  normalizar: (texto: string) => string
+): boolean {
+  if (!textoNormalizado) return true
+  return (
+    normalizar(fila.municipioNombre).includes(textoNormalizado) ||
+    normalizar(fila.departamentoNombre ?? "").includes(textoNormalizado) ||
+    fila.municipioCodigo.startsWith(textoNormalizado)
   )
 }

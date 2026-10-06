@@ -16,7 +16,8 @@ export type Bloque =
   | { tipo: "parrafo"; lineas: Segmento[][] }
   | { tipo: "lista"; ordenada: boolean; elementos: Segmento[][] }
 
-const PATRON_EN_LINEA = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|\{\{\s*[a-z_][a-z0-9_]*\s*\}\})/gi
+const PATRON_EN_LINEA =
+  /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|\{\{\s*[a-z_][a-z0-9_]*\s*\}\})/gi
 
 /** Segmentos de una línea: texto, énfasis y variables. */
 export function segmentosEnLinea(linea: string): Segmento[] {

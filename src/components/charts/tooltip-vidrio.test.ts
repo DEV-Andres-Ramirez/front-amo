@@ -47,7 +47,13 @@ describe("textoTooltip", () => {
       textoTooltip({
         titulo: "abr",
         filas: [
-          { id: "a", color: "#000", clave: "bloque", valor: "$ 1", etiqueta: "GMV" },
+          {
+            id: "a",
+            color: "#000",
+            clave: "bloque",
+            valor: "$ 1",
+            etiqueta: "GMV",
+          },
         ],
         pie: "Puesto 1",
       })

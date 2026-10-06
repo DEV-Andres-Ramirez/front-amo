@@ -5,14 +5,11 @@
  * escribe sus datos en el Excel. Módulo puro.
  */
 import type { SerieFormateada } from "@/components/charts/accesibilidad"
-import type {
-  CeldaActividad,
-  ElementoValor,
-} from "@/components/charts/datos"
+import type { CeldaActividad, ElementoValor } from "@/components/charts/datos"
 import type { FormatoValor, Unidad } from "@/components/charts/formatos"
 import type { Serie } from "@/components/charts/tipos"
 import type { MetricaGeo } from "@/features/geo/metricas"
-import { serializarFecha, ZONA } from "@/lib/fechas"
+import { ZONA } from "@/lib/fechas"
 
 interface BaseGrafico {
   id: string
@@ -87,8 +84,6 @@ export interface CapaMapa {
   valores: Record<string, number | null>
 }
 
-export type TipoGrafico = EspecGrafico["tipo"]
-
 /** Sin valores distintos de cero: el gráfico no dice nada. */
 export function sinValores(valores: readonly (number | null)[]): boolean {
   return valores.every((valor) => valor === null || valor === 0)
@@ -120,7 +115,10 @@ const formatoMes = new Intl.DateTimeFormat("es-CO", {
  * Etiqueta del eje para un periodo 'YYYY-MM-DD' (inicio del día, de la
  * semana ISO o del mes): "12 sept", "Sem. 7 sept", "sept 26".
  */
-export function etiquetaPeriodo(periodo: string, granularidad: Granularidad): string {
+export function etiquetaPeriodo(
+  periodo: string,
+  granularidad: Granularidad
+): string {
   // Mediodía UTC: el día de calendario es el mismo en Bogotá.
   const fecha = new Date(`${periodo.slice(0, 10)}T12:00:00Z`)
   if (Number.isNaN(fecha.getTime())) return periodo
@@ -134,11 +132,6 @@ export function etiquetaPeriodo(periodo: string, granularidad: Granularidad): st
   }
 }
 
-/** Fecha 'YYYY-MM-DD' de Bogotá para las RPC con granularidad. */
-export function diaSerie(fecha: Date): string {
-  return serializarFecha(fecha)
-}
-
 /**
  * Alinea la serie del periodo anterior con la actual por posición (día 1 con
  * día 1): rellena con `null` lo que falte y descarta lo que sobre.
@@ -148,4 +141,23 @@ export function alinearSerie(
   largo: number
 ): (number | null)[] {
   return Array.from({ length: largo }, (_, i) => valores[i] ?? null)
+}
+
+/**
+ * Ancho final de cada gráfico en la rejilla de dos columnas: un gráfico de
+ * media fila que quedaría solo (entre dos de fila completa, o al final) pasa
+ * a ocupar la fila entera para no dejar un hueco.
+ */
+export function distribuirAnchos(
+  graficos: readonly Pick<EspecGrafico, "ancho">[]
+): EspecGrafico["ancho"][] {
+  const anchos = graficos.map((grafico) => grafico.ancho)
+  let inicioTramo = 0
+  for (let i = 0; i <= anchos.length; i++) {
+    if (i < anchos.length && anchos[i] === "mitad") continue
+    const largo = i - inicioTramo
+    if (largo % 2 === 1) anchos[i - 1] = "completo"
+    inicioTramo = i + 1
+  }
+  return anchos
 }

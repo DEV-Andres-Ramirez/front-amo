@@ -116,7 +116,10 @@ function claveMes(instante: string | Date): string {
 }
 
 /** Primer día de los últimos `meses` meses de Bogotá, del más antiguo al actual. */
-function mesesHasta(ahora: Date, meses: number): { clave: string; fecha: Date }[] {
+function mesesHasta(
+  ahora: Date,
+  meses: number
+): { clave: string; fecha: Date }[] {
   const [anio, mes] = claveMes(ahora).split("-").map(Number)
   return Array.from({ length: meses }, (_, indice) => {
     const desplazamiento = meses - 1 - indice
@@ -166,11 +169,7 @@ export function serieConDatos(puntos: readonly PuntoMensual[]): boolean {
 // ── Verificación de cuentas sociales ─────────────────────────────────────────
 
 export type VigenciaVerificacion =
-  | "sin_verificar"
-  | "vigente"
-  | "por_vencer"
-  | "en_gracia"
-  | "vencida"
+  "sin_verificar" | "vigente" | "por_vencer" | "en_gracia" | "vencida"
 
 export interface ResultadoVigencia {
   vigencia: VigenciaVerificacion
@@ -263,12 +262,7 @@ export interface FacturaParaCartera {
   fechaVencimiento: string | null
 }
 
-export const TRAMOS_CARTERA = [
-  "0_30",
-  "31_60",
-  "61_90",
-  "90_mas",
-] as const
+export const TRAMOS_CARTERA = ["0_30", "31_60", "61_90", "90_mas"] as const
 
 export type TramoCartera = (typeof TRAMOS_CARTERA)[number]
 
@@ -321,14 +315,69 @@ export function resumirCartera(
     pagado += factura.pagado
     saldo += pendiente
     const mora = factura.fechaVencimiento
-      ? differenceInCalendarDays(
-          ahora,
-          new Date(`${factura.fechaVencimiento}T12:00:00-05:00`),
-          enBogota
-        )
+      ? -diasHasta(factura.fechaVencimiento, ahora)
       : null
     porTramo[tramoDeMora(mora)] += pendiente
     if (pendiente > 0 && mora !== null && mora > 0) facturasVencidas += 1
   }
   return { facturado, pagado, saldo, porTramo, facturasVencidas }
+}
+
+// ── Vencimientos (`date`) ────────────────────────────────────────────────────
+
+/**
+ * Días de calendario de Bogotá que faltan para una fecha `YYYY-MM-DD`: 0 = es
+ * hoy (sigue vigente hasta el final del día), negativo = ya pasó.
+ */
+export function diasHasta(dia: string, ahora: Date = new Date()): number {
+  return differenceInCalendarDays(
+    new Date(`${dia}T12:00:00-05:00`),
+    ahora,
+    enBogota
+  )
+}
+
+export type AvisoVencimiento = "vencido" | "hoy" | "manana" | "pronto"
+
+/** Con esta anticipación (días) se avisa el vencimiento de un documento. */
+export const DIAS_AVISO_DOCUMENTO = 30
+
+/** ¿El documento ya venció o está por vencer? `null` si aún falta más del aviso. */
+export function avisoVencimiento(
+  venceAt: string | null,
+  ahora: Date = new Date()
+): { aviso: AvisoVencimiento; dias: number } | null {
+  if (!venceAt) return null
+  const dias = diasHasta(venceAt, ahora)
+  if (dias < 0) return { aviso: "vencido", dias }
+  if (dias === 0) return { aviso: "hoy", dias }
+  if (dias === 1) return { aviso: "manana", dias }
+  return dias <= DIAS_AVISO_DOCUMENTO ? { aviso: "pronto", dias } : null
+}
+
+// ── Tope anual por nivel ─────────────────────────────────────────────────────
+
+export type SituacionTope = "sin_tope" | "normal" | "alerta" | "bloqueo"
+
+/**
+ * Cuánto del tope anual del nivel lleva consumido el medio y si ya cruzó el
+ * umbral de alerta o el de bloqueo (fracciones de `niveles_verificacion`).
+ */
+export function situacionTope(tope: {
+  tope: number | null
+  consumido: number
+  alerta: number
+  bloqueo: number
+}): { fraccion: number | null; situacion: SituacionTope } {
+  if (tope.tope === null || tope.tope <= 0) {
+    return { fraccion: null, situacion: "sin_tope" }
+  }
+  const fraccion = Math.max(0, tope.consumido / tope.tope)
+  const situacion: SituacionTope =
+    fraccion >= tope.bloqueo
+      ? "bloqueo"
+      : fraccion >= tope.alerta
+        ? "alerta"
+        : "normal"
+  return { fraccion, situacion }
 }

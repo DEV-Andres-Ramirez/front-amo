@@ -24,7 +24,11 @@ import {
   type MarcasAsignacion,
   type TransicionRegistrada,
 } from "../linea-tiempo"
-import { type CorteMetrica, leerDetalleAlertas, ordenarCortes } from "../metricas"
+import {
+  type CorteMetrica,
+  leerDetalleAlertas,
+  ordenarCortes,
+} from "../metricas"
 import { ventanaOpcional } from "../periodo"
 import type {
   AsignacionDetalle,
@@ -148,7 +152,8 @@ function consultaFiltrada(
   if (estado.plataforma.length > 0) {
     consulta = consulta.in("plataforma", estado.plataforma)
   }
-  if (estado.campana.length > 0) consulta = consulta.in("campana_id", estado.campana)
+  if (estado.campana.length > 0)
+    consulta = consulta.in("campana_id", estado.campana)
   if (estado.medio.length > 0) consulta = consulta.in("medio_id", estado.medio)
   if (estado.anunciante.length > 0) {
     consulta = consulta.in("anunciante_id", estado.anunciante)
@@ -253,7 +258,10 @@ export async function resumenAsignaciones(
       return [grupo, count ?? 0] as const
     })
   )
-  const porGrupo = Object.fromEntries(conteos) as Record<GrupoAsignacion, number>
+  const porGrupo = Object.fromEntries(conteos) as Record<
+    GrupoAsignacion,
+    number
+  >
   return {
     total: conteos.reduce((suma, [, cantidad]) => suma + cantidad, 0),
     porGrupo,
@@ -337,7 +345,9 @@ async function transicionesDe(
 ): Promise<TransicionRegistrada[]> {
   const { data, error } = await supabase
     .from("bitacora")
-    .select("id, created_at, estado_anterior, estado_nuevo, actor_email, actor_rol, motivo")
+    .select(
+      "id, created_at, estado_anterior, estado_nuevo, actor_email, actor_rol, motivo"
+    )
     .eq("entidad", "asignaciones")
     .eq("entidad_id", asignacionId)
     .eq("accion", "TRANSICION")
@@ -365,45 +375,57 @@ export const obtenerAsignacion = cache(
     verBitacora: boolean
   ): Promise<AsignacionDetalle | null> => {
     const supabase = await clienteSolicitud()
-    const [asignacion, publicaciones, metricas, disputas, descargas, transiciones, { formatos }] =
-      await Promise.all([
-        supabase.from("asignaciones").select(SELECCION_FICHA).eq("id", id).maybeSingle(),
-        supabase
-          .from("publicaciones")
-          .select(
-            `id, numero, url_post, fecha_publicacion, permanencia_hasta, permanencia_verificada_at,
+    const [
+      asignacion,
+      publicaciones,
+      metricas,
+      disputas,
+      descargas,
+      transiciones,
+      { formatos },
+    ] = await Promise.all([
+      supabase
+        .from("asignaciones")
+        .select(SELECCION_FICHA)
+        .eq("id", id)
+        .maybeSingle(),
+      supabase
+        .from("publicaciones")
+        .select(
+          `id, numero, url_post, fecha_publicacion, permanencia_hasta, permanencia_verificada_at,
              etiqueta_publicidad_confirmada, etiqueta_verificada, estado_validacion, validada_at,
              observaciones, retirada_detectada_at, captura_path, created_at`
-          )
-          .eq("asignacion_id", id)
-          .order("numero"),
-        supabase
-          .from("metricas")
-          .select(
-            `id, publicacion_id, corte, fecha_corte, alcance_norm, impresiones_norm, interacciones,
+        )
+        .eq("asignacion_id", id)
+        .order("numero"),
+      supabase
+        .from("metricas")
+        .select(
+          `id, publicacion_id, corte, fecha_corte, alcance_norm, impresiones_norm, interacciones,
              clics_enlace, estado_validacion, alerta_desviacion, alerta_multiplo, detalle_alertas,
              observaciones, validada_at, created_at, captura_path`
-          )
-          .eq("asignacion_id", id)
-          .order("fecha_corte"),
-        supabase
-          .from("disputas")
-          .select(
-            "id, estado, motivo, parte, descripcion, resolucion, created_at, fecha_resolucion"
-          )
-          .eq("asignacion_id", id)
-          .order("created_at"),
-        supabase
-          .from("descargas_contenido")
-          .select("descargado_at", { count: "exact" })
-          .eq("asignacion_id", id)
-          .order("descargado_at", { ascending: false })
-          .limit(1),
-        verBitacora ? transicionesDe(supabase, id) : Promise.resolve([]),
-        catalogos(),
-      ])
+        )
+        .eq("asignacion_id", id)
+        .order("fecha_corte"),
+      supabase
+        .from("disputas")
+        .select(
+          "id, estado, motivo, parte, descripcion, resolucion, created_at, fecha_resolucion"
+        )
+        .eq("asignacion_id", id)
+        .order("created_at"),
+      supabase
+        .from("descargas_contenido")
+        .select("descargado_at", { count: "exact" })
+        .eq("asignacion_id", id)
+        .order("descargado_at", { ascending: false })
+        .limit(1),
+      verBitacora ? transicionesDe(supabase, id) : Promise.resolve([]),
+      catalogos(),
+    ])
     if (asignacion.error) fallar("leer la asignación", asignacion.error)
-    if (publicaciones.error) fallar("leer las publicaciones", publicaciones.error)
+    if (publicaciones.error)
+      fallar("leer las publicaciones", publicaciones.error)
     if (metricas.error) fallar("leer las métricas", metricas.error)
     if (disputas.error) fallar("leer las disputas", disputas.error)
     if (descargas.error) fallar("leer las descargas", descargas.error)
@@ -470,6 +492,7 @@ export const obtenerAsignacion = cache(
         : null,
       motivo: fila.motivo,
       creadaAt: fila.created_at,
+      aceptadaAt: fila.aceptada_at,
       fechaLimite: fila.fecha_limite_publicacion,
       ventanaInicio: fila.oferta?.ventana_inicio ?? null,
       ventanaFin: fila.oferta?.ventana_fin ?? null,

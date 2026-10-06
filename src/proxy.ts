@@ -21,6 +21,7 @@ export async function proxy(request: NextRequest) {
   const politica = construirCsp({
     nonce,
     desarrollo: process.env.NODE_ENV === "development",
+    https: request.nextUrl.protocol === "https:",
   })
   const cabeceraCsp = nombreCabeceraCsp(
     modoCspDesdeEntorno(process.env.AMO_CSP_MODO)

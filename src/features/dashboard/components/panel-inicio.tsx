@@ -8,7 +8,6 @@ import type { UsuarioSesion } from "@/lib/auth/tipos"
 
 import { PanelAdmin } from "../admin/components/panel-admin"
 import { PanelAnunciante } from "../anunciante/components/panel-anunciante"
-import { BarraInferiorMedio } from "../medio/components/barra-inferior-medio"
 import { PanelMedio } from "../medio/components/panel-medio"
 import { PRESET_POR_DEFECTO_PANEL, panelPara, type TipoPanel } from "../panel"
 import {
@@ -64,7 +63,7 @@ export function PanelInicio({
   const periodo = periodoPanel(valores, porDefecto, ahora)
   return (
     <ProveedorPeriodo porDefecto={porDefecto}>
-      <ContenedorPagina className={panel === "medio" ? "max-md:pb-28" : undefined}>
+      <ContenedorPagina>
         <EncabezadoPanel
           nombre={usuario.nombre}
           ahora={ahora}
@@ -74,13 +73,16 @@ export function PanelInicio({
           {panel === "admin" ? (
             <PanelAdmin usuario={usuario} periodo={periodo} ahora={ahora} />
           ) : panel === "anunciante" ? (
-            <PanelAnunciante usuario={usuario} periodo={periodo} ahora={ahora} />
+            <PanelAnunciante
+              usuario={usuario}
+              periodo={periodo}
+              ahora={ahora}
+            />
           ) : (
             <PanelMedio usuario={usuario} periodo={periodo} ahora={ahora} />
           )}
         </ContenidoPanel>
       </ContenedorPagina>
-      {panel === "medio" ? <BarraInferiorMedio /> : null}
     </ProveedorPeriodo>
   )
 }

@@ -17,7 +17,9 @@ interface MapaIngresosProps {
 }
 
 async function DatosMapaIngresos({ rango, usuario }: MapaIngresosProps) {
-  return <TarjetaMapaIngresos datos={await ingresosPorUbicacion(rango, usuario)} />
+  return (
+    <TarjetaMapaIngresos datos={await ingresosPorUbicacion(rango, usuario)} />
+  )
 }
 
 /**

@@ -15,11 +15,11 @@ function FallaMapa(_props: object, { error, retry }: ErrorInfo) {
   return (
     <div
       className={cn(
-        "grid place-items-center patron-rejilla bg-background",
+        "grid place-items-center bg-background patron-rejilla",
         CLASE_LIENZO
       )}
     >
-      <div className="vidrio max-w-md rounded-2xl">
+      <div className="max-w-md rounded-2xl vidrio">
         <EstadoError
           titulo="No pudimos mostrar el mapa"
           descripcion="El resto de AMO sigue disponible. Reintenta; si persiste, puede que tu navegador no tenga WebGL activo."

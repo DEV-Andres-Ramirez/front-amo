@@ -113,16 +113,28 @@ export function AccionesMapa({
         </ConAyuda>
       ) : null}
       <span aria-hidden className="mx-0.5 h-5 w-px bg-foreground/10" />
-      <ConAyuda texto={pantallaCompleta ? "Salir de pantalla completa" : "Pantalla completa"}>
+      <ConAyuda
+        texto={
+          pantallaCompleta ? "Salir de pantalla completa" : "Pantalla completa"
+        }
+      >
         <Button
           variant="ghost"
           size="icon"
           onClick={onPantallaCompleta}
-          aria-label={pantallaCompleta ? "Salir de pantalla completa" : "Pantalla completa"}
+          aria-label={
+            pantallaCompleta
+              ? "Salir de pantalla completa"
+              : "Pantalla completa"
+          }
           aria-pressed={pantallaCompleta}
           className={CLASE_BOTON_ICONO}
         >
-          {pantallaCompleta ? <Minimize aria-hidden /> : <Maximize aria-hidden />}
+          {pantallaCompleta ? (
+            <Minimize aria-hidden />
+          ) : (
+            <Maximize aria-hidden />
+          )}
         </Button>
       </ConAyuda>
       <ConAyuda texto="Descargar imagen (PNG)">
@@ -180,10 +192,19 @@ export function MenuAccionesMapa({ opciones }: { opciones: OpcionesVista }) {
           <DropdownMenuSeparator />
         ) : null}
         <DropdownMenuItem onClick={opciones.onPantallaCompleta}>
-          {opciones.pantallaCompleta ? <Minimize aria-hidden /> : <Maximize aria-hidden />}
-          {opciones.pantallaCompleta ? "Salir de pantalla completa" : "Pantalla completa"}
+          {opciones.pantallaCompleta ? (
+            <Minimize aria-hidden />
+          ) : (
+            <Maximize aria-hidden />
+          )}
+          {opciones.pantallaCompleta
+            ? "Salir de pantalla completa"
+            : "Pantalla completa"}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={opciones.onExportar} disabled={opciones.exportando}>
+        <DropdownMenuItem
+          onClick={opciones.onExportar}
+          disabled={opciones.exportando}
+        >
           <ImageDown aria-hidden />
           Descargar imagen (PNG)
         </DropdownMenuItem>
@@ -231,7 +252,11 @@ export function ControlesZoom({
     <div
       role="group"
       aria-label="Zoom del mapa"
-      className={cn(CLASE_PANEL, "flex flex-col gap-0.5 rounded-xl p-1", className)}
+      className={cn(
+        CLASE_PANEL,
+        "flex flex-col gap-0.5 rounded-xl p-1",
+        className
+      )}
     >
       <BotonZoom etiqueta="Acercar" onClick={onAcercar}>
         <Plus aria-hidden />

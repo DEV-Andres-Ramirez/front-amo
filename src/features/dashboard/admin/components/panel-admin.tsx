@@ -7,14 +7,26 @@ import type { ClavePermiso } from "@/lib/auth/permisos"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
 import { cn } from "@/lib/utils"
 
-import { BloquePanel } from "../../components/bloque-panel"
+import {
+  BloquePanel,
+  FILA_PRINCIPAL,
+  FILA_TERCIOS,
+  PRIMERO_DE_TERCIOS,
+  PRINCIPAL,
+} from "../../components/bloque-panel"
 import {
   EsqueletoLista,
   EsqueletoMapaRanking,
 } from "../../components/esqueletos-panel"
 import { EsqueletoTarjetasKpi } from "../../components/tarjetas-kpi"
 import type { PeriodoPanel } from "../../periodo"
-import type { FuenteActividad } from "../datos"
+import {
+  ALTO_DONA,
+  ALTO_EMBUDO,
+  ALTO_MAPA_CALOR,
+  type FuenteActividad,
+} from "../datos"
+import { EsqueletoActividadReciente } from "./actividad-reciente"
 import {
   BloqueActividad,
   BloqueActividadReciente,
@@ -34,7 +46,8 @@ const FILA = "grid gap-4 sm:gap-5"
 /**
  * Panel general (interno): indicadores → qué cambió y la tendencia →
  * cómo avanza la operación (embudo, mezcla) → dónde y con quién (territorio,
- * salud de medios) → cuándo (actividad) y qué atender (alertas, bitácora).
+ * salud de medios) → cuándo (actividad) y qué atender (alertas) → qué pasó
+ * hace poco (bitácora).
  * Cada bloque consulta en paralelo y solo aparece si el rol tiene su permiso.
  */
 export function PanelAdmin({
@@ -63,39 +76,39 @@ export function PanelAdmin({
         <BloqueKpisAdmin periodo={periodo} />
       </BloquePanel>
 
-      <div className={cn(FILA, "lg:grid-cols-3")}>
+      <div className={cn(FILA, FILA_PRINCIPAL)}>
         <BloquePanel
           titulo="GMV verificado y comisión"
           orden={1}
-          className="lg:col-span-2"
+          className={PRINCIPAL}
           esqueleto={<EsqueletoTarjetaGrafico alto="min-h-80" />}
         >
           <BloqueTendenciaGmv periodo={periodo} />
         </BloquePanel>
-        {/* En móvil los hallazgos van antes del gráfico: son la lectura rápida. */}
+        {/* En una columna los hallazgos van antes del gráfico: son la lectura rápida. */}
         <BloquePanel
           titulo="Lo que cambió en el periodo"
           orden={2}
-          className="max-lg:-order-1"
+          className="@max-4xl/panel:-order-1"
           esqueleto={<EsqueletoPanelInsights />}
         >
           <BloqueInsights periodo={periodo} usuario={usuario} ahora={ahora} />
         </BloquePanel>
       </div>
 
-      <div className={cn(FILA, "md:grid-cols-2 lg:grid-cols-3")}>
+      <div className={cn(FILA, FILA_TERCIOS)}>
         <BloquePanel
           titulo="Embudo de asignaciones"
           orden={3}
-          className="md:col-span-2 lg:col-span-1"
-          esqueleto={<EsqueletoTarjetaGrafico alto="min-h-96" />}
+          className={PRIMERO_DE_TERCIOS}
+          esqueleto={<EsqueletoTarjetaGrafico alto={ALTO_EMBUDO} />}
         >
           <BloqueEmbudo periodo={periodo} />
         </BloquePanel>
         <BloquePanel
           titulo="GMV por plataforma"
           orden={4}
-          esqueleto={<EsqueletoTarjetaGrafico alto="min-h-64" />}
+          esqueleto={<EsqueletoTarjetaGrafico alto={ALTO_DONA} />}
         >
           <BloquePlataformas periodo={periodo} />
         </BloquePanel>
@@ -108,12 +121,12 @@ export function PanelAdmin({
         </BloquePanel>
       </div>
 
-      <div className={cn(FILA, conTerritorio && "lg:grid-cols-3")}>
+      <div className={cn(FILA, conTerritorio && FILA_PRINCIPAL)}>
         {conTerritorio ? (
           <BloquePanel
             titulo="Top departamentos"
             orden={6}
-            className="lg:col-span-2"
+            className={PRINCIPAL}
             esqueleto={<EsqueletoMapaRanking />}
           >
             <BloqueDepartamentos periodo={periodo} usuario={usuario} />
@@ -124,50 +137,47 @@ export function PanelAdmin({
           orden={7}
           esqueleto={<EsqueletoLista filas={5} />}
         >
-          <BloqueSaludMedios periodo={periodo} ahora={ahora} />
+          <BloqueSaludMedios
+            periodo={periodo}
+            ahora={ahora}
+            conMedios={puede("medios.ver")}
+          />
         </BloquePanel>
       </div>
 
-      <div
-        className={cn(FILA, (conAlertas || conBitacora) && "lg:grid-cols-3")}
-      >
+      {/*
+       * El mapa de calor conserva su alto natural (celdas casi cuadradas): al
+       * lado solo van las alertas. La bitácora cierra el panel a todo el ancho.
+       */}
+      <div className={cn(FILA, conAlertas && FILA_PRINCIPAL)}>
         <BloquePanel
           titulo="Actividad por día y hora"
           orden={8}
-          className="lg:col-span-2"
-          esqueleto={<EsqueletoTarjetaGrafico alto="min-h-72" />}
+          className={cn(conAlertas && PRINCIPAL)}
+          esqueleto={<EsqueletoTarjetaGrafico alto={ALTO_MAPA_CALOR} />}
         >
           <BloqueActividad periodo={periodo} fuentes={fuentes} />
         </BloquePanel>
-        {conAlertas || conBitacora ? (
-          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-            {conAlertas ? (
-              <BloquePanel
-                titulo="Alertas"
-                orden={9}
-                className="flex-none"
-                esqueleto={<EsqueletoLista filas={3} />}
-              >
-                <BloqueAlertas
-                  periodo={periodo}
-                  usuario={usuario}
-                  ahora={ahora}
-                />
-              </BloquePanel>
-            ) : null}
-            {conBitacora ? (
-              <BloquePanel
-                titulo="Actividad reciente"
-                orden={10}
-                className="flex-1"
-                esqueleto={<EsqueletoLista filas={6} />}
-              >
-                <BloqueActividadReciente usuario={usuario} ahora={ahora} />
-              </BloquePanel>
-            ) : null}
-          </div>
+        {conAlertas ? (
+          <BloquePanel
+            titulo="Alertas"
+            orden={9}
+            esqueleto={<EsqueletoLista filas={4} />}
+          >
+            <BloqueAlertas periodo={periodo} usuario={usuario} ahora={ahora} />
+          </BloquePanel>
         ) : null}
       </div>
+
+      {conBitacora ? (
+        <BloquePanel
+          titulo="Actividad reciente"
+          orden={10}
+          esqueleto={<EsqueletoActividadReciente />}
+        >
+          <BloqueActividadReciente usuario={usuario} ahora={ahora} />
+        </BloquePanel>
+      ) : null}
     </div>
   )
 }

@@ -7,6 +7,7 @@
 import type { FilaKpi } from "@/components/kpi/tipos"
 import {
   formatearCompacto,
+  formatearCOP,
   formatearCOPCompacto,
   formatearNumero,
   formatearPorcentaje,
@@ -33,7 +34,10 @@ export type NombreIconoKpi =
   | "usuarios"
 
 export interface DatoSecundario {
+  /** Corta: cabe en media columna a 390 px. */
   etiqueta: string
+  /** Versión completa de la etiqueta, para `title` y lectores de pantalla. */
+  titulo?: string
   /** Cifra ya formateada (es-CO). */
   valor: string
   /** `aviso` resalta un dato que pide atención (medios en riesgo…). */
@@ -65,13 +69,18 @@ export const MINIMO_ANUNCIANTES_TICKET = 5
 
 function ticket(indice: Indice): DatoSecundario {
   const anunciantes = valor(indice, "anunciantes_activos") ?? 0
-  const promedio = valor(indice, "ticket_promedio")
-  const pocos = anunciantes > 0 && anunciantes < MINIMO_ANUNCIANTES_TICKET
-  return {
-    etiqueta: pocos ? "Ticket promedio (muestra pequeña)" : "Ticket promedio",
-    valor: formatearCOPCompacto(promedio),
-    tono: pocos ? "aviso" : "neutro",
+  const promedio = formatearCOPCompacto(valor(indice, "ticket_promedio"))
+  if (anunciantes > 0 && anunciantes < MINIMO_ANUNCIANTES_TICKET) {
+    return {
+      // "Ticket (pocos datos)" se recortaba a "Ticket (poc…" a 390 px: el
+      // aviso era justo lo que se perdía.
+      etiqueta: `Ticket (n < ${MINIMO_ANUNCIANTES_TICKET})`,
+      titulo: `Ticket promedio con pocos datos: menos de ${MINIMO_ANUNCIANTES_TICKET} anunciantes`,
+      valor: promedio,
+      tono: "aviso",
+    }
   }
+  return { etiqueta: "Ticket promedio", valor: promedio, tono: "neutro" }
 }
 
 /** Alcance medio por negocio verificado (contexto del alcance acumulado). */
@@ -82,6 +91,28 @@ function alcancePorNegocio(indice: Indice): string {
     ? formatearCompacto(alcance / negocios)
     : SIN_DATO
 }
+
+/**
+ * KPI que prueban que el periodo tuvo movimiento (`hayActividad`): si todos
+ * están en cero y sin muestra, el panel avisa que el periodo está vacío.
+ */
+export const KPI_ACTIVIDAD_ADMIN: readonly string[] = [
+  "gmv_comprometido",
+  "gmv_verificado",
+  "negocios_cerrados",
+  "ofertas_publicadas",
+  "medios_activos",
+  "medios_nuevos",
+  "anunciantes_activos",
+]
+
+export const KPI_ACTIVIDAD_ANUNCIANTE: readonly string[] = [
+  "inversion_comprometida",
+  "inversion_verificada",
+  "ofertas_publicadas",
+  "campanas_activas",
+  "alcance_total",
+]
 
 /** Las 8 tarjetas del panel general (docs/kpis.md §1). */
 export function tarjetasAdmin(indice: Indice): DefinicionTarjeta[] {
@@ -115,7 +146,7 @@ export function tarjetasAdmin(indice: Indice): DefinicionTarjeta[] {
       kpi: "tasa_llenado",
       icono: "llenado",
       secundario: {
-        etiqueta: "Tiempo medio de llenado",
+        etiqueta: "Tiempo de llenado",
         valor: horas(valor(indice, "tiempo_medio_llenado_h")),
       },
     },
@@ -123,7 +154,7 @@ export function tarjetasAdmin(indice: Indice): DefinicionTarjeta[] {
       kpi: "tasa_cumplimiento",
       icono: "cumplimiento",
       secundario: {
-        etiqueta: "Tasa de aceptación",
+        etiqueta: "Aceptación",
         valor: formatearPorcentaje(valor(indice, "tasa_aceptacion"), 1),
       },
     },
@@ -131,7 +162,7 @@ export function tarjetasAdmin(indice: Indice): DefinicionTarjeta[] {
       kpi: "alcance_total",
       icono: "alcance",
       secundario: {
-        etiqueta: "Por negocio verificado",
+        etiqueta: "Por negocio",
         valor: alcancePorNegocio(indice),
       },
     },
@@ -144,15 +175,23 @@ export function tarjetasAdmin(indice: Indice): DefinicionTarjeta[] {
         tono: enRiesgo > 0 ? "aviso" : "neutro",
       },
     },
-    { kpi: "anunciantes_activos", icono: "anunciantes", secundario: ticket(indice) },
+    {
+      kpi: "anunciantes_activos",
+      icono: "anunciantes",
+      secundario: ticket(indice),
+    },
   ]
 }
 
-/** Costo por persona → por mil personas (docs/kpis.md §2: la UI muestra ambos). */
+/**
+ * Costo por persona → por mil personas (docs/kpis.md §2: la UI muestra ambos).
+ * En pesos exactos, como el CPM de la tarjeta: son cifras de cuatro o cinco
+ * dígitos que se comparan entre sí.
+ */
 function porMil(costoPorPersona: number | null): string {
   return costoPorPersona === null
     ? SIN_DATO
-    : formatearCOPCompacto(costoPorPersona * 1000)
+    : formatearCOP(Math.round(costoPorPersona * 1000))
 }
 
 /** Las 8 tarjetas del panel del anunciante (docs/kpis.md §3.1). */
@@ -172,7 +211,7 @@ export function tarjetasAnunciante(indice: Indice): DefinicionTarjeta[] {
       icono: "alcance",
       titulo: "Alcance",
       secundario: {
-        etiqueta: "Medios que aceptaron",
+        etiqueta: "Medios contratados",
         valor: formatearNumero(valor(indice, "medios_alcanzados")),
       },
     },
@@ -196,7 +235,9 @@ export function tarjetasAnunciante(indice: Indice): DefinicionTarjeta[] {
       kpi: "cpm_efectivo",
       icono: "costo",
       secundario: {
-        etiqueta: "Por mil personas alcanzadas",
+        // "Por mil personas" se recortaba junto a "$ 13.000" a 390 px.
+        etiqueta: "Mil personas",
+        titulo: "Costo por mil personas alcanzadas",
         valor: porMil(valor(indice, "costo_por_alcance")),
       },
     },
@@ -212,7 +253,7 @@ export function tarjetasAnunciante(indice: Indice): DefinicionTarjeta[] {
       kpi: "engagement",
       icono: "porcentaje",
       secundario: {
-        etiqueta: "Cumplimiento de los medios",
+        etiqueta: "Cumplimiento",
         valor: formatearPorcentaje(valor(indice, "tasa_cumplimiento"), 1),
       },
     },
@@ -220,7 +261,9 @@ export function tarjetasAnunciante(indice: Indice): DefinicionTarjeta[] {
       kpi: "campanas_activas",
       icono: "campanas",
       secundario: {
-        etiqueta: "Ofertas publicadas · llenado",
+        // "Ofertas · llenado" no cabía en media columna a 390 px.
+        etiqueta: "Ofertas · cupos",
+        titulo: "Ofertas publicadas · cupos tomados",
         valor: `${formatearNumero(valor(indice, "ofertas_publicadas") ?? 0)} · ${formatearPorcentaje(valor(indice, "tasa_llenado"), 0)}`,
       },
     },

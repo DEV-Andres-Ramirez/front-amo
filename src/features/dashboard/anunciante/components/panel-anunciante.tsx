@@ -9,7 +9,13 @@ import type { UsuarioSesion } from "@/lib/auth/tipos"
 import { serializarFecha } from "@/lib/fechas"
 import { cn } from "@/lib/utils"
 
-import { BloquePanel } from "../../components/bloque-panel"
+import { ALTO_DONA } from "../../admin/datos"
+import { AvisoSinActividad } from "../../components/aviso-sin-actividad"
+import {
+  BloquePanel,
+  FILA_PRINCIPAL,
+  PRINCIPAL,
+} from "../../components/bloque-panel"
 import {
   EsqueletoLista,
   EsqueletoMapaRanking,
@@ -18,10 +24,10 @@ import {
   EsqueletoTarjetasKpi,
   TarjetasKpi,
 } from "../../components/tarjetas-kpi"
-import { indicePorKpi } from "../../kpi"
+import { hayActividad, indicePorKpi } from "../../kpi"
 import { etiquetaComparacionCorta, type PeriodoPanel } from "../../periodo"
 import { configAnalitica } from "../../servidor"
-import { tarjetasAnunciante } from "../../tarjetas"
+import { KPI_ACTIVIDAD_ANUNCIANTE, tarjetasAnunciante } from "../../tarjetas"
 import {
   desempenoPorPlataforma,
   inversionPorDepartamento,
@@ -59,13 +65,19 @@ async function BloqueKpis({ periodo }: PropsPeriodo) {
     configAnalitica(),
   ])
   return (
-    <TarjetasKpi
-      etiqueta="Indicadores de tu pauta"
-      filas={filas}
-      tarjetas={tarjetasAnunciante(indicePorKpi(filas))}
-      nMinimo={config.nMinimo}
-      etiquetaComparacion={etiquetaComparacionCorta(periodo.rango)}
-    />
+    <div className="flex flex-col gap-4 sm:gap-5">
+      {hayActividad(filas, KPI_ACTIVIDAD_ANUNCIANTE) ? null : (
+        <AvisoSinActividad detalle="campañas activas, ofertas ni negocios" />
+      )}
+      <TarjetasKpi
+        etiqueta="Indicadores de tu pauta"
+        filas={filas}
+        tarjetas={tarjetasAnunciante(indicePorKpi(filas))}
+        nMinimo={config.nMinimo}
+        razones="propias"
+        etiquetaComparacion={etiquetaComparacionCorta(periodo.rango)}
+      />
+    </div>
   )
 }
 
@@ -154,15 +166,18 @@ export function PanelAnunciante({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <BloquePanel titulo="Indicadores de tu pauta" esqueleto={<EsqueletoTarjetasKpi />}>
+      <BloquePanel
+        titulo="Indicadores de tu pauta"
+        esqueleto={<EsqueletoTarjetasKpi />}
+      >
         <BloqueKpis periodo={periodo} />
       </BloquePanel>
 
-      <div className={cn(FILA, conCartera && "lg:grid-cols-3")}>
+      <div className={cn(FILA, conCartera && FILA_PRINCIPAL)}>
         <BloquePanel
           titulo="Inversión y alcance"
           orden={1}
-          className={cn(conCartera && "lg:col-span-2")}
+          className={cn(conCartera && PRINCIPAL)}
           esqueleto={<EsqueletoTarjetaGrafico alto="min-h-80" />}
         >
           <BloqueTendencia periodo={periodo} />
@@ -178,18 +193,18 @@ export function PanelAnunciante({
         ) : null}
       </div>
 
-      <div className={cn(FILA, "lg:grid-cols-3")}>
+      <div className={cn(FILA, FILA_PRINCIPAL)}>
         <BloquePanel
           titulo="Inversión por plataforma"
           orden={3}
-          esqueleto={<EsqueletoTarjetaGrafico alto="min-h-56" />}
+          esqueleto={<EsqueletoTarjetaGrafico alto={ALTO_DONA} />}
         >
           <BloquePlataformas periodo={periodo} />
         </BloquePanel>
         <BloquePanel
           titulo="Cobertura territorial"
           orden={4}
-          className="lg:col-span-2"
+          className={PRINCIPAL}
           esqueleto={<EsqueletoMapaRanking />}
         >
           <BloqueCobertura periodo={periodo} />

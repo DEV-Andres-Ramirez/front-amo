@@ -31,15 +31,19 @@ export interface ResultadoAcceso {
   motivo: string | null
 }
 
-/** Log de servidor de un fallo de autenticación: solo la operación y el código, sin datos personales. */
-export function informarFallo(operacion: string, error: unknown): void {
+/** Log de servidor de un fallo al registrar: solo la operación y el código, sin datos personales. */
+export function informarFallo(
+  operacion: string,
+  error: unknown,
+  ambito: "auth" | "bitacora" = "auth"
+): void {
   const detalle =
     error && typeof error === "object" && "code" in error
       ? String(error.code)
       : error instanceof Error
         ? error.name
         : "desconocido"
-  console.error(`[auth] ${operacion} falló (${detalle})`)
+  console.error(`[${ambito}] ${operacion} falló (${detalle})`)
 }
 
 export async function registrarAcceso(
@@ -95,20 +99,47 @@ export async function registrarIngreso(claims: ClaimsSesion): Promise<void> {
   })
 }
 
-export type AccionBitacora = "OTRO" | "CERRAR_SESIONES"
+/**
+ * Acciones de `bitacora` que registra la aplicación (las demás las escriben
+ * los triggers de la BD). `OTRO` describe la operación en `metadatos.evento`.
+ */
+export type AccionBitacora =
+  | "OTRO"
+  | "CERRAR_SESIONES"
+  | "EXPORTAR"
+  | "URL_FIRMADA"
+  | "INVITAR"
+  | "GENERAR_ENLACE"
+
+type ClienteAdmin = Awaited<ReturnType<typeof crearClienteAdmin>>
 
 export interface DatosEvento {
   actorId: string
   accion: AccionBitacora
   entidad: string
   entidadId?: string | null
+  /** NUNCA enlaces, tokens ni contraseñas: solo el tipo de operación y su contexto. */
   metadatos?: Record<string, Json>
+  /**
+   * Cliente de servicio ya abierto para este actor (el de `contextoDelActor`
+   * de una Server Action); sin él se crea uno.
+   */
+  admin?: ClienteAdmin
 }
 
-export async function registrarEvento(datos: DatosEvento): Promise<void> {
+/**
+ * Evento de aplicación en la bitácora (`registrar_evento_srv`), con el
+ * contexto confiable de la solicitud (IP, país, ciudad, agente). Es el único
+ * envoltorio de esa RPC: los módulos lo llaman con su acción y su entidad.
+ *
+ * Devuelve si quedó registrado. Quien entrega datos sensibles (exportaciones,
+ * URL firmadas) registra ANTES y no entrega sin registro; para el resto, un
+ * fallo no deshace la acción: queda en el log del servidor.
+ */
+export async function registrarEvento(datos: DatosEvento): Promise<boolean> {
   try {
     const [admin, contexto] = await Promise.all([
-      crearClienteAdmin({ actorId: datos.actorId }),
+      datos.admin ?? crearClienteAdmin({ actorId: datos.actorId }),
       obtenerContextoSolicitud(),
     ])
     const { error } = await admin.rpc(
@@ -126,7 +157,13 @@ export async function registrarEvento(datos: DatosEvento): Promise<void> {
       })
     )
     if (error) throw error
+    return true
   } catch (error) {
-    informarFallo(`registrar_evento_srv(${datos.accion})`, error)
+    informarFallo(
+      `registrar_evento_srv(${datos.accion} ${datos.entidad})`,
+      error,
+      "bitacora"
+    )
+    return false
   }
 }

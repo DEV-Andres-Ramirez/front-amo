@@ -52,6 +52,11 @@ export interface ItemNavegacion {
   descripcion: string
   /** Sinónimos para la búsqueda del menú de comandos. */
   palabrasClave: readonly string[]
+  /**
+   * Subpáginas con nombre propio (`/reportes/finanzas`): segmento → título de
+   * su miga. Sin entrada, el título sale del segmento (ver `migas`).
+   */
+  subpaginas?: Readonly<Record<string, string>>
 }
 
 export type IdGrupoNavegacion =
@@ -110,6 +115,17 @@ export const NAVEGACION: readonly GrupoNavegacion[] = [
         permisos: ["reportes.ver"],
         descripcion: "Reportes con filtros y exportación a Excel y PDF",
         palabrasClave: ["informes", "estadísticas", "excel", "pdf", "exportar"],
+        // Mismos títulos que el catálogo de reportes (un test lo vigila): el
+        // slug no lleva tildes ni preposiciones («Desempeno campanas»).
+        subpaginas: {
+          "resumen-ejecutivo": "Resumen ejecutivo",
+          "desempeno-campanas": "Desempeño de campañas",
+          finanzas: "Finanzas",
+          cartera: "Cartera",
+          "cobertura-territorial": "Cobertura territorial",
+          "cumplimiento-medios": "Cumplimiento de medios",
+          "usuarios-accesos": "Usuarios y accesos",
+        },
       },
     ],
   },
@@ -354,11 +370,13 @@ function buscarSeccion(
 }
 
 /**
- * Migas para una ruta: grupo › sección › subpáginas. Los segmentos que
- * parecen identificadores se muestran como "Detalle"; la última miga no
- * enlaza (es la página actual).
+ * Migas para una ruta: grupo › sección › subpáginas. Una subpágina toma su
+ * título del registro (`subpaginas`) o, si no, de su segmento; los que
+ * parecen identificadores se muestran como "Detalle". La última miga no
+ * enlaza (es la página actual) y puede llevar el título que la propia página
+ * conoce (`tituloFinal`: el nombre del medio, de la campaña…).
  */
-export function migas(rutaActual: string): Miga[] {
+export function migas(rutaActual: string, tituloFinal?: string | null): Miga[] {
   const rutaLimpia = rutaActual.split(/[?#]/)[0].replace(/\/+$/, "") || "/"
   const seccion = buscarSeccion(rutaLimpia)
   if (!seccion) return []
@@ -380,15 +398,20 @@ export function migas(rutaActual: string): Miga[] {
   restantes.forEach((segmento, indice) => {
     acumulada = `${acumulada}/${segmento}`
     const esUltimo = indice === restantes.length - 1
+    // Solo el primer nivel bajo la sección tiene nombre en el registro.
+    const titulo =
+      (indice === 0 ? item.subpaginas?.[segmento] : undefined) ??
+      tituloDeSegmento(segmento)
     resultado.push(
-      esUltimo
-        ? { titulo: tituloDeSegmento(segmento) }
-        : {
-            titulo: tituloDeSegmento(segmento),
-            href: ruta(acumulada as `/${string}`),
-          }
+      esUltimo ? { titulo } : { titulo, href: ruta(acumulada as `/${string}`) }
     )
   })
+
+  const propio = tituloFinal?.trim()
+  // El título propio nombra una subpágina, nunca a la sección misma.
+  if (propio && restantes.length > 0) {
+    resultado[resultado.length - 1] = { titulo: propio }
+  }
   return resultado
 }
 

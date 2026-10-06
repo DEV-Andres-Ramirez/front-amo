@@ -32,7 +32,7 @@ export function TooltipFlotante({
         className
       )}
     >
-      <div className="vidrio min-w-44 rounded-xl px-3 py-2.5 text-xs shadow-lg shadow-black/20">
+      <div className="min-w-44 rounded-xl vidrio px-3 py-2.5 text-xs shadow-lg shadow-black/20">
         {children}
       </div>
     </div>

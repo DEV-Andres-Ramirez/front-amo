@@ -161,6 +161,20 @@ export function rankingMedios(
   }
 }
 
+/**
+ * "Bogotá, D.C., Bogotá" → "Bogotá, D.C.": la RPC nombra cada municipio con
+ * su departamento, y el único cuyo nombre ya lleva coma (el distrito capital)
+ * lo repetiría. "Boyacá, Boyacá" o "Sucre, Sucre" son municipios reales y se
+ * dejan igual.
+ */
+export function etiquetaMunicipio(etiqueta: string): string {
+  const partes = etiqueta.split(", ")
+  const departamento = partes.at(-1) ?? ""
+  return partes.length > 2 && partes[0] === departamento
+    ? partes.slice(0, -1).join(", ")
+    : etiqueta
+}
+
 /** Inversión por código DANE para el mini-mapa. */
 export function inversionPorDepartamento(
   filas: readonly FilaDesempeno[]

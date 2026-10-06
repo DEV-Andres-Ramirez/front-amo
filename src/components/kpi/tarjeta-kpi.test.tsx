@@ -71,6 +71,53 @@ describe("TarjetaKpi", () => {
     expect(screen.getByText("Sin datos en el periodo")).toBeInTheDocument()
   })
 
+  it("un indicador a fecha de corte dice qué falta, no «en el periodo»", () => {
+    render(
+      <TarjetaKpi
+        titulo="Saldo vencido"
+        valor={null}
+        unidad="COP"
+        textoSinDatos="Sin saldo a la fecha de corte"
+      />
+    )
+    expect(
+      screen.getByText("Sin saldo a la fecha de corte")
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText("Sin datos en el periodo")
+    ).not.toBeInTheDocument()
+  })
+
+  it("sin comparativo muestra por qué no se compara, sin variación ni «Nuevo»", () => {
+    render(
+      <TarjetaKpi
+        titulo="Cuentas sin verificación en dos pasos"
+        valor={12}
+        valorAnterior={null}
+        sinComparativo="Foto de hoy"
+      />
+    )
+    const tarjeta = screen.getByRole("article")
+    expect(screen.getByText("Foto de hoy")).toBeInTheDocument()
+    expect(screen.queryByText("Nuevo")).not.toBeInTheDocument()
+    expect(screen.queryByText("vs. periodo anterior")).not.toBeInTheDocument()
+    expect(plano(tarjeta.textContent)).not.toMatch(/frente al periodo anterior/)
+  })
+
+  it("sin comparativo y con muestra pequeña anota el n junto al rótulo", () => {
+    render(
+      <TarjetaKpi
+        titulo="Tasa de ingreso"
+        valor={0.5}
+        unidad="%"
+        n={4}
+        nMinimo={20}
+        sinComparativo="Foto de hoy"
+      />
+    )
+    expect(screen.getByText("Foto de hoy · n = 4")).toBeInTheDocument()
+  })
+
   it("el ícono de ayuda abre la definición del KPI", () => {
     const definicion = definicionKpi("gmv_verificado")
     render(
@@ -86,11 +133,15 @@ describe("TarjetaKpi", () => {
     ).toBeInTheDocument()
   })
 
-  it("con enlace toda la tarjeta navega al detalle", () => {
+  it("con enlace toda la tarjeta navega al detalle y dibuja el foco del teclado", () => {
     render(<TarjetaKpi titulo="Medios activos" valor={12} href="/inicio" />)
     expect(
       screen.getByRole("link", { name: "Medios activos" })
     ).toHaveAttribute("href", "/inicio")
+    // El enlace no pinta su contorno: lo hace la tarjeta con el anillo de marca.
+    expect(screen.getByRole("article")).toHaveClass(
+      "has-[a:focus-visible]:anillo-foco"
+    )
   })
 })
 

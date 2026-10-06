@@ -18,7 +18,7 @@ export interface FormatoCifraKpi {
   sufijo?: string
 }
 
-/** A partir de estos valores la tarjeta usa notación compacta ($ 184,3 M). */
+/** A partir de estos valores la tarjeta usa notación compacta ($184,3 M). */
 const COMPACTO_DESDE: Readonly<Partial<Record<UnidadKpi, number>>> = {
   COP: 1_000_000,
   personas: 100_000,

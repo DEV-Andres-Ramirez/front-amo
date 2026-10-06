@@ -37,9 +37,12 @@ const formatoMesAnio = new Intl.DateTimeFormat("es-CO", {
   year: "numeric",
 })
 
-/** "14 de sept" → "14 sept": cabe en el eje. */
+/**
+ * "14 de sept" → "14 sept" y "sept." → "sept": cabe en el eje y todas las
+ * etiquetas se escriben igual (es-CO añade el punto al mes abreviado solo).
+ */
 function sinPreposicion(texto: string): string {
-  return texto.replace(/\s+de\s+/g, " ")
+  return texto.replace(/\s+de\s+/g, " ").replace(/\.$/, "")
 }
 
 /**

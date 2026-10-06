@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  desgloseDesdeTopZonas,
-  mediosEnRiesgoDesdeRpc,
-  mezclaDesdeRpc,
-  numero,
-} from "./adaptadores"
+import { mediosEnRiesgoDesdeRpc, mezclaDesdeRpc, numero } from "./adaptadores"
 import { entradaVacia } from "./fixtures"
 import { reglaMejorCpm } from "./reglas/cpm"
 
@@ -59,21 +54,6 @@ describe("adaptadores de las RPC de analítica", () => {
     expect(reglaMejorCpm(entradaVacia({ mezclaPlataformas: mezcla }))?.id).toBe(
       "cpm-instagram-reel"
     )
-  })
-
-  it("top_zonas da el desglose con el periodo anterior", () => {
-    expect(
-      desgloseDesdeTopZonas([
-        {
-          codigo: "05",
-          nombre: "Antioquia",
-          valor: "120",
-          valor_anterior: null,
-        },
-      ])
-    ).toEqual([
-      { clave: "05", nombre: "Antioquia", valor: 120, valorAnterior: 0 },
-    ])
   })
 
   it("salud_medios + medios_en_riesgo dan la entrada de la regla 3", () => {

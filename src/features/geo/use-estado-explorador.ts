@@ -3,14 +3,10 @@
 import { useQueryStates } from "nuqs"
 import { useCallback, useMemo, useState } from "react"
 
-import {
-  type RangoFechas,
-  serializarFecha,
-} from "@/lib/fechas"
+import { type RangoFechas, serializarFecha } from "@/lib/fechas"
 
 import { parsersMapa, rangoDelMapa, rangoParaUrl } from "./estado-url"
 import {
-  admiteCalor,
   admitePor100k,
   type MetricaGeo,
   metricaDisponibleEn,
@@ -43,7 +39,9 @@ export interface EstadoExplorador {
  * "Atrás" deshaga la última navegación; las vistas, con `replace`.
  */
 export function useEstadoExplorador(
-  metricasPermitidas: readonly MetricaGeo[]
+  metricasPermitidas: readonly MetricaGeo[],
+  /** Métricas con puntos de calor que el usuario puede leer. */
+  metricasCalor: readonly MetricaGeo[]
 ): EstadoExplorador {
   const [url, fijar] = useQueryStates(parsersMapa, {
     history: "push",
@@ -77,7 +75,7 @@ export function useEstadoExplorador(
   )
 
   const conPor100k = metrica !== null && admitePor100k(nivel.nivel, metrica)
-  const conCalor = metrica !== null && admiteCalor(metrica)
+  const conCalor = metrica !== null && metricasCalor.includes(metrica)
 
   const irA = useCallback(
     (destino: EstadoNivel) => {

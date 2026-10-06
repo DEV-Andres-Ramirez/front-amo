@@ -73,8 +73,7 @@ export interface DisputaRegistrada {
   resolucion: string | null
 }
 
-export type CategoriaEvento =
-  "estado" | "evidencia" | "metrica" | "disputa"
+export type CategoriaEvento = "estado" | "evidencia" | "metrica" | "disputa"
 
 export interface EventoLineaTiempo {
   id: string
@@ -154,12 +153,17 @@ const COLUMNAS_MARCA: readonly [EstadoAsignacion, keyof MarcasAsignacion][] = [
 const TOLERANCIA_MS = 5 * 60_000
 
 function mismoMomento(a: string, b: string): boolean {
-  return Math.abs(new Date(a).getTime() - new Date(b).getTime()) <= TOLERANCIA_MS
+  return (
+    Math.abs(new Date(a).getTime() - new Date(b).getTime()) <= TOLERANCIA_MS
+  )
 }
+
+/** Evento de estado con el estado del que salió (solo para armar la línea). */
+type EventoDeEstado = EventoLineaTiempo & { desde: string | null }
 
 function eventosDeBitacora(
   transiciones: readonly TransicionRegistrada[]
-): EventoLineaTiempo[] {
+): EventoDeEstado[] {
   return transiciones.flatMap((transicion) => {
     if (!esEstado(transicion.hacia)) return []
     const hacia = transicion.hacia
@@ -168,6 +172,7 @@ function eventosDeBitacora(
       : null
     return [
       {
+        desde: transicion.desde,
         id: `bitacora-${transicion.id}`,
         at: transicion.at,
         categoria: "estado" as const,
@@ -187,8 +192,8 @@ function eventosDeBitacora(
 function eventosDeMarcas(
   marcas: MarcasAsignacion,
   registradas: readonly EventoLineaTiempo[]
-): EventoLineaTiempo[] {
-  const eventos: EventoLineaTiempo[] = []
+): EventoDeEstado[] {
+  const eventos: EventoDeEstado[] = []
   for (const [estado, columna] of COLUMNAS_MARCA) {
     const at = marcas[columna]
     if (typeof at !== "string") continue
@@ -197,6 +202,7 @@ function eventosDeMarcas(
     )
     if (yaRegistrado) continue
     eventos.push({
+      desde: null,
       id: `marca-${estado}`,
       at,
       categoria: "estado",
@@ -219,6 +225,7 @@ function eventosDeMarcas(
     !registradas.some((evento) => evento.estado === "RECHAZADA")
   ) {
     eventos.push({
+      desde: null,
       id: "marca-RECHAZADA",
       at: marcas.creadaAt,
       categoria: "estado",
@@ -292,6 +299,8 @@ function eventosDeValidaciones(
   return eventos
 }
 
+const SUFIJO_CIERRE = "-cierre"
+
 function eventosDeDisputas(
   disputas: readonly DisputaRegistrada[]
 ): EventoLineaTiempo[] {
@@ -311,7 +320,7 @@ function eventosDeDisputas(
     return [
       abierta,
       {
-        id: `disputa-${disputa.id}-cierre`,
+        id: `disputa-${disputa.id}${SUFIJO_CIERRE}`,
         at: disputa.resueltaAt,
         categoria: "disputa",
         titulo:
@@ -326,6 +335,49 @@ function eventosDeDisputas(
       },
     ]
   })
+}
+
+/**
+ * Abrir o cerrar una disputa deja dos registros del mismo hecho: la disputa y
+ * el cambio de estado de la asignación. Se cuentan una sola vez: con el texto
+ * de la disputa (motivo, parte, resolución) y el actor de la transición.
+ */
+function fusionarDisputas(
+  estados: readonly EventoDeEstado[],
+  disputas: readonly EventoLineaTiempo[]
+): EventoLineaTiempo[] {
+  const absorbidos = new Set<string>()
+  const fusionadas = disputas.map((disputa): EventoLineaTiempo => {
+    const esCierre = disputa.id.endsWith(SUFIJO_CIERRE)
+    const transicion = estados.find(
+      (evento) =>
+        !absorbidos.has(evento.id) &&
+        mismoMomento(evento.at, disputa.at) &&
+        (esCierre
+          ? evento.desde === "EN_DISPUTA"
+          : evento.estado === "EN_DISPUTA")
+    )
+    if (!transicion) return disputa
+    absorbidos.add(transicion.id)
+    const destino =
+      esCierre && transicion.estado
+        ? `: pasa a «${ESTADOS_ASIGNACION[transicion.estado].etiqueta.toLocaleLowerCase("es-CO")}»`
+        : ""
+    return {
+      ...disputa,
+      titulo: `${disputa.titulo}${destino}`,
+      detalle: disputa.detalle ?? transicion.detalle,
+      estado: transicion.estado,
+      actor: transicion.actor,
+      fuente: transicion.fuente,
+    }
+  })
+  return [
+    ...estados
+      .filter((evento) => !absorbidos.has(evento.id))
+      .map(({ desde: _desde, ...evento }) => evento),
+    ...fusionadas,
+  ]
 }
 
 export interface FuentesLineaTiempo {
@@ -348,10 +400,11 @@ export function construirLineaTiempo({
   const variasPublicaciones =
     new Set(publicaciones.map((publicacion) => publicacion.numero)).size > 1
   return [
-    ...deBitacora,
-    ...eventosDeMarcas(marcas, deBitacora),
+    ...fusionarDisputas(
+      [...deBitacora, ...eventosDeMarcas(marcas, deBitacora)],
+      eventosDeDisputas(disputas)
+    ),
     ...eventosDeValidaciones(publicaciones, metricas, variasPublicaciones),
-    ...eventosDeDisputas(disputas),
   ].sort(
     (a, b) =>
       new Date(a.at).getTime() - new Date(b.at).getTime() ||

@@ -4,7 +4,10 @@
  * usa su propia fuente y sigue funcionando sin mapa base.
  */
 export function esErrorFatalMapa(evento: object): boolean {
-  return !("sourceId" in evento && evento.sourceId) && !("tile" in evento && evento.tile)
+  return (
+    !("sourceId" in evento && evento.sourceId) &&
+    !("tile" in evento && evento.tile)
+  )
 }
 
 /**
@@ -13,7 +16,11 @@ export function esErrorFatalMapa(evento: object): boolean {
  */
 export function mensajeErrorMapa(error: unknown): string {
   const texto =
-    error instanceof Error ? error.message : typeof error === "string" ? error : ""
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : ""
   const estado =
     typeof error === "object" && error !== null && "status" in error
       ? Number(error.status)

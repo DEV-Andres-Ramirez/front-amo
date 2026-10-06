@@ -7,25 +7,22 @@ import { ZONA } from "./fechas"
 
 export const LOCALE = "es-CO"
 
+/** Decimales de la cifra abreviada: "1,3 M", "250,9 mil M". */
+const DECIMALES_COMPACTO = 1
+
 /** Opciones compartidas con `NumeroAnimado` para que cifras y animaciones coincidan. */
 export const OPCIONES_NUMERO = {
   cop: { style: "currency", currency: "COP", maximumFractionDigits: 0 },
-  copCompacto: {
-    style: "currency",
-    currency: "COP",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  },
-  compacto: { notation: "compact", maximumFractionDigits: 1 },
+  /** La cifra ya escalada de la notación compacta (ver `descomponerCompacto`). */
+  compacto: { maximumFractionDigits: DECIMALES_COMPACTO },
 } as const satisfies Record<string, Intl.NumberFormatOptions>
 
 const SIN_VALOR = "—"
+/** Espacio duro: la cifra y su abreviatura no se separan al saltar de línea. */
+const ESPACIO_DURO = "\u00a0"
+const SIMBOLO_COP = "$"
 
 const formatoCOP = new Intl.NumberFormat(LOCALE, OPCIONES_NUMERO.cop)
-const formatoCOPCompacto = new Intl.NumberFormat(
-  LOCALE,
-  OPCIONES_NUMERO.copCompacto
-)
 const formatoCompacto = new Intl.NumberFormat(LOCALE, OPCIONES_NUMERO.compacto)
 
 /** Caché por número de decimales (los valores posibles son pocos). */
@@ -75,9 +72,73 @@ export function formatearCOP(valor: Numerico): string {
   return esNumeroValido(valor) ? formatoCOP.format(valor) : SIN_VALOR
 }
 
-/** $1,3 M · $13,5 k */
+// ── Notación compacta ───────────────────────────────────────────────────────
+
+/**
+ * Escalas de la notación compacta, de menor a mayor. Regla única de la app
+ * (escala larga del español: un billón es un millón de millones):
+ * «mil» = 10³ · «M» = millones · «mil M» = miles de millones · «B» = billones.
+ * No se usa la notación compacta de `Intl`: en es-CO mezcla «K» y «k», deja
+ * «1656 M» sin separador de miles y solo pasa a «mil M» desde diez mil millones.
+ */
+const ESCALAS_COMPACTAS = [
+  { factor: 1, abreviatura: "" },
+  { factor: 1e3, abreviatura: "mil" },
+  { factor: 1e6, abreviatura: "M" },
+  { factor: 1e9, abreviatura: `mil${ESPACIO_DURO}M` },
+  { factor: 1e12, abreviatura: "B" },
+] as const
+
+/** Una cifra escalada nunca llega a mil: pasa a la escala siguiente. */
+const TOPE_ESCALA = 1000
+
+export interface CifraCompacta {
+  /** Cifra ya dividida por su escala y redondeada (conserva el signo). */
+  valor: number
+  /** Abreviatura con su espacio duro (" M"), o vacío por debajo de mil. */
+  sufijo: string
+}
+
+function redondearCompacto(valor: number): number {
+  const precision = 10 ** DECIMALES_COMPACTO
+  return Math.round(valor * precision) / precision
+}
+
+/**
+ * Parte una cifra en valor escalado y abreviatura: 1.656.000.000 →
+ * { valor: 1,7, sufijo: " mil M" }. Lo comparten los formateadores de texto y
+ * `NumeroAnimado`, así la cifra animada y la escrita siempre coinciden.
+ */
+export function descomponerCompacto(valor: number): CifraCompacta {
+  const ultima = ESCALAS_COMPACTAS.length - 1
+  // La primera escala cuya cifra, ya redondeada, no llega a mil: 999.950 es
+  // "1 M", no "1.000 mil". Los billones no tienen a dónde saltar ("1.250 B").
+  const indice = ESCALAS_COMPACTAS.findIndex(
+    ({ factor }, i) =>
+      i === ultima || Math.abs(redondearCompacto(valor / factor)) < TOPE_ESCALA
+  )
+  const { factor, abreviatura } = ESCALAS_COMPACTAS[indice]
+  return {
+    valor: redondearCompacto(valor / factor),
+    sufijo: abreviatura ? `${ESPACIO_DURO}${abreviatura}` : "",
+  }
+}
+
+/** Signo y símbolo que anteceden a una cifra abreviada en pesos: "$", "-$". */
+export function prefijoCOPCompacto(valor: number): string {
+  return valor < 0 ? `-${SIMBOLO_COP}` : SIMBOLO_COP
+}
+
+/**
+ * $ 950 · $13,5 mil · $1,3 M · $2,6 mil M · $1,3 B. Por debajo de mil no hay
+ * nada que abreviar: la cifra es la misma de `formatearCOP`.
+ */
 export function formatearCOPCompacto(valor: Numerico): string {
-  return esNumeroValido(valor) ? formatoCOPCompacto.format(valor) : SIN_VALOR
+  if (!esNumeroValido(valor)) return SIN_VALOR
+  const cifra = descomponerCompacto(valor)
+  if (!cifra.sufijo) return formatoCOP.format(valor)
+  const magnitud = formatoCompacto.format(Math.abs(cifra.valor))
+  return `${prefijoCOPCompacto(cifra.valor)}${magnitud}${cifra.sufijo}`
 }
 
 /** 1.234.567 (hasta `decimales` decimales, sin ceros de relleno). */
@@ -87,9 +148,11 @@ export function formatearNumero(valor: Numerico, decimales = 0): string {
     : SIN_VALOR
 }
 
-/** 1,3 M · 13,5 k */
+/** 950 · 13,5 mil · 1,3 M · 2,6 mil M · 1,3 B */
 export function formatearCompacto(valor: Numerico): string {
-  return esNumeroValido(valor) ? formatoCompacto.format(valor) : SIN_VALOR
+  if (!esNumeroValido(valor)) return SIN_VALOR
+  const cifra = descomponerCompacto(valor)
+  return `${formatoCompacto.format(cifra.valor)}${cifra.sufijo}`
 }
 
 /** Recibe una fracción: 0.125 → "12,5%". */

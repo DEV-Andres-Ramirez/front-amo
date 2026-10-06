@@ -141,8 +141,7 @@ export function GraficoDona({
   const enfocado =
     visibles.find((s) => s.id === resaltado) ??
     visibles.find((s) => s.id === tooltip?.filas[0]?.id)
-  const idEnfocado =
-    enfocado && !ocultas.has(enfocado.id) ? enfocado.id : null
+  const idEnfocado = enfocado && !ocultas.has(enfocado.id) ? enfocado.id : null
 
   const datos = useMemo<ChartData<"doughnut", number[], string>>(() => {
     // Énfasis: con un segmento enfocado, el resto se atenúa (la identidad
@@ -218,8 +217,7 @@ export function GraficoDona({
   const centro = idEnfocado ? enfocado : undefined
   const valorCentro = centro?.valor ?? total
   const etiquetaCentro = centro?.nombre ?? etiquetaTotal
-  const participacionCentro =
-    centro && total > 0 ? centro.valor / total : null
+  const participacionCentro = centro && total > 0 ? centro.valor / total : null
 
   const accesibles = useMemo(
     () => datosDona({ titulo, segmentos: visibles, formato, nombreCategoria }),

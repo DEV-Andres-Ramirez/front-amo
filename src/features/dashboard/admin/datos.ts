@@ -1,6 +1,6 @@
 /**
  * Transformaciones puras del panel general: filas de las RPC de analítica
- * (ya normalizadas por `queries-admin.ts`) a las formas que piden los
+ * (ya normalizadas por `queries.ts`) a las formas que piden los
  * gráficos, el mini-mapa y el motor de insights. Sin I/O ni React.
  */
 import type {
@@ -17,6 +17,7 @@ import {
   type EntradaInsights,
   type FilaDesglose,
   type FilaMezcla,
+  type Insight,
   type KpiVariacion,
   type MediosEnRiesgo,
   type MetricasAtipicas,
@@ -104,9 +105,43 @@ export function etapasEmbudo(filas: readonly FilaEtapa[]): EtapaEmbudo[] {
     }))
 }
 
+/**
+ * Etapa de `embudo_asignaciones` que NO es de la cohorte: cuenta los pares
+ * oferta × medio vistos en el periodo, no asignaciones aceptadas.
+ */
+export const ETAPA_VISTAS = "vistas"
+
+export interface EmbudoPanel {
+  /** Ofertas vistas por los medios en el periodo (`null` si la RPC no la trae). */
+  vistas: number | null
+  /** De aceptadas a pagadas: la cohorte que dibuja el embudo. */
+  ejecucion: EtapaEmbudo[]
+}
+
+/**
+ * Separa las ofertas vistas de la cohorte de aceptadas. Dibujadas juntas, las
+ * vistas (decenas de veces más) dejan las demás etapas en barras mínimas e
+ * iguales, y el «% del inicio» de cada etapa mezclaría dos cohortes. El
+ * embudo parte del 100 % de las aceptadas; las vistas van como contexto.
+ */
+export function embudoPanel(etapas: readonly EtapaEmbudo[]): EmbudoPanel {
+  return {
+    vistas: etapas.find((etapa) => etapa.id === ETAPA_VISTAS)?.cantidad ?? null,
+    ejecucion: etapas.filter((etapa) => etapa.id !== ETAPA_VISTAS),
+  }
+}
+
+/**
+ * Alto del embudo: siete etapas con su conversión escrita entre barras. Lo
+ * comparten la tarjeta y su esqueleto.
+ */
+export const ALTO_EMBUDO = "min-h-80"
+
 /** El embudo arranca en las aceptadas: sin ellas no hay nada que seguir. */
 export function embudoVacio(etapas: readonly EtapaEmbudo[]): boolean {
-  return etapas.every((etapa) => etapa.id === "vistas" || etapa.cantidad === 0)
+  return etapas.every(
+    (etapa) => etapa.id === ETAPA_VISTAS || etapa.cantidad === 0
+  )
 }
 
 // ── Mezcla por plataforma y formato ─────────────────────────────────────────
@@ -115,6 +150,13 @@ export interface FilaMezclaPanel extends FilaMezcla {
   alcance: number
   participacion: number | null
 }
+
+/**
+ * Alto de las donas por plataforma. La dona mide lo que deja el ancho (44 %
+ * de la tarjeta): en una columna, más alto solo añade aire arriba y abajo;
+ * en fila, la tarjeta se estira con sus vecinas. Tarjeta y esqueleto.
+ */
+export const ALTO_DONA = "min-h-48"
 
 /** Orden fijo: el color sigue a la plataforma, no a su puesto en el periodo. */
 export const ORDEN_PLATAFORMAS: readonly Plataforma[] = [
@@ -150,7 +192,18 @@ export function segmentosPlataforma(
   )
 }
 
-/** "Reel · Instagram": cada formato con su plataforma, por GMV verificado. */
+/**
+ * Sigla de cada red en los rótulos del ranking de formatos: el eje recorta a
+ * 22 caracteres y "Post de feed · Instagram" no cabe (el gráfico explica las
+ * siglas al pie).
+ */
+export const SIGLAS_PLATAFORMA: Readonly<Record<Plataforma, string>> = {
+  FACEBOOK: "FB",
+  INSTAGRAM: "IG",
+  TIKTOK: "TikTok",
+}
+
+/** "Reel · IG": cada formato con su plataforma, por GMV verificado. */
 export function rankingFormatos(
   filas: readonly FilaMezclaPanel[]
 ): ElementoValor[] {
@@ -158,9 +211,23 @@ export function rankingFormatos(
     .filter((fila) => fila.gmv > 0)
     .map((fila) => ({
       id: `${fila.plataforma}-${fila.formatoClave}`,
-      nombre: `${fila.formatoNombre} · ${NOMBRES_PLATAFORMA[fila.plataforma]}`,
+      nombre: `${fila.formatoNombre} · ${SIGLAS_PLATAFORMA[fila.plataforma]}`,
       valor: fila.gmv,
     }))
+}
+
+/** "FB: Facebook · IG: Instagram": las siglas que aparecen en el ranking. */
+export function leyendaSiglas(filas: readonly FilaMezclaPanel[]): string {
+  return ORDEN_PLATAFORMAS.filter(
+    (plataforma) =>
+      SIGLAS_PLATAFORMA[plataforma] !== NOMBRES_PLATAFORMA[plataforma] &&
+      filas.some((fila) => fila.plataforma === plataforma && fila.gmv > 0)
+  )
+    .map(
+      (plataforma) =>
+        `${SIGLAS_PLATAFORMA[plataforma]}: ${NOMBRES_PLATAFORMA[plataforma]}`
+    )
+    .join(" · ")
 }
 
 /** CPM por plataforma como cociente de sumas (las impresiones = GMV / CPM × 1.000). */
@@ -177,7 +244,10 @@ export function cpmPorPlataforma(
       (s, f) => s + (f.gmv / (f.cpmEfectivo ?? 1)) * 1000,
       0
     )
-    resultado.set(plataforma, impresiones > 0 ? (gmv / impresiones) * 1000 : null)
+    resultado.set(
+      plataforma,
+      impresiones > 0 ? (gmv / impresiones) * 1000 : null
+    )
   }
   return resultado
 }
@@ -214,7 +284,9 @@ export function combinarZonas(
         ...zona,
         valorAnterior,
         variacion:
-          valorAnterior > 0 ? (zona.valor - valorAnterior) / valorAnterior : null,
+          valorAnterior > 0
+            ? (zona.valor - valorAnterior) / valorAnterior
+            : null,
       }
     })
 }
@@ -305,6 +377,13 @@ export interface MedioRiesgoResumen {
   gmv90d: number
 }
 
+/** Fila de `medios_en_riesgo` tal como la muestra la tarjeta de salud. */
+export interface MedioEnRiesgo extends MedioRiesgoResumen {
+  ultimaAceptacionAt: string | null
+  /** Asignaciones aún abiertas del medio. */
+  abiertas: number
+}
+
 /** Regla 3: segmento `en_riesgo` de la salud + los medios de mayor GMV en juego. */
 export function mediosEnRiesgoEntrada(
   salud: readonly FilaSalud[],
@@ -330,6 +409,12 @@ export function mediosEnRiesgoEntrada(
 
 /** Fuentes de `actividad_heatmap` que muestra el panel (`accesos` exige `accesos.ver`). */
 export type FuenteActividad = "asignaciones" | "publicaciones" | "accesos"
+
+/**
+ * Alto del mapa de calor (7 filas × 24 columnas): el que deja las celdas casi
+ * cuadradas en cada ancho. Lo comparten la tarjeta y su esqueleto.
+ */
+export const ALTO_MAPA_CALOR = "min-h-60 sm:min-h-72"
 
 export interface FilaCalor {
   dia_semana: number
@@ -399,6 +484,29 @@ export function vencidasDelPeriodo(
   }
 }
 
+// ── Acciones de los hallazgos ────────────────────────────────────────────────
+
+/**
+ * Deja la acción de cada hallazgo solo si su destino es una sección que la
+ * persona puede abrir (`secciones`: las rutas de su menú). El hallazgo se
+ * conserva: informa aunque no haya a dónde ir. Un rol personalizado con el
+ * panel pero sin el mapa o los reportes no debe recibir enlaces que acaban
+ * en un 403.
+ */
+export function conAccionesAccesibles(
+  insights: readonly Insight[],
+  secciones: readonly string[]
+): Insight[] {
+  return insights.map((insight) => {
+    if (!insight.accion) return insight
+    const destino = insight.accion.href.split(/[?#]/)[0]
+    const accesible = secciones.some(
+      (seccion) => destino === seccion || destino.startsWith(`${seccion}/`)
+    )
+    return accesible ? insight : { ...insight, accion: undefined }
+  })
+}
+
 // ── Entrada del motor de insights ────────────────────────────────────────────
 
 function desglosePorPlataforma(
@@ -442,7 +550,9 @@ export interface DatosInsightsAdmin {
  * Los desgloses usan la fuente cuyo ancla coincide con la del KPI: zonas por
  * fecha de aceptación (GMV comprometido) y plataformas por verificación.
  */
-export function entradaInsightsAdmin(datos: DatosInsightsAdmin): EntradaInsights {
+export function entradaInsightsAdmin(
+  datos: DatosInsightsAdmin
+): EntradaInsights {
   const desgloses: Partial<Record<KpiVariacion, DesgloseVariacion>> = {}
   if (datos.zonasGmv) {
     desgloses.gmv_comprometido = {
@@ -458,7 +568,11 @@ export function entradaInsightsAdmin(datos: DatosInsightsAdmin): EntradaInsights
       plataforma: desglosePorPlataforma(actual, anterior, (f) => f.gmv),
     }
     desgloses.negocios_cerrados = {
-      plataforma: desglosePorPlataforma(actual, anterior, (f) => f.asignaciones),
+      plataforma: desglosePorPlataforma(
+        actual,
+        anterior,
+        (f) => f.asignaciones
+      ),
     }
     desgloses.alcance_total = {
       plataforma: desglosePorPlataforma(actual, anterior, (f) => f.alcance),

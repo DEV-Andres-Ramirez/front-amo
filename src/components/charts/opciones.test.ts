@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  maximoConMargen,
-  rangoConHolgura,
-  retardoEscalonado,
-} from "./opciones"
+import { maximoConMargen, rangoConHolgura, retardoEscalonado } from "./opciones"
 
 describe("rangoConHolgura", () => {
   it("abarca al menos ±10 % del valor medio (no exagera variaciones mínimas)", () => {

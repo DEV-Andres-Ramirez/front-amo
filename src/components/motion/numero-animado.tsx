@@ -1,12 +1,13 @@
 "use client"
 
-import NumberFlow, { type Format } from "@number-flow/react"
+import NumberFlow from "@number-flow/react"
 
+import { LOCALE } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { LOCALE, OPCIONES_NUMERO, opcionesPorcentaje } from "@/lib/format"
 
-export type FormatoNumero =
-  "numero" | "cop" | "copCompacto" | "compacto" | "porcentaje"
+import { cifraAnimada, type FormatoNumero } from "./cifra-animada"
+
+export type { FormatoNumero }
 
 interface NumeroAnimadoProps {
   valor: number
@@ -18,41 +19,32 @@ interface NumeroAnimadoProps {
   sufijo?: string
 }
 
-function opcionesDeFormato(formato: FormatoNumero, decimales: number): Format {
-  switch (formato) {
-    case "cop":
-      return OPCIONES_NUMERO.cop
-    case "copCompacto":
-      return OPCIONES_NUMERO.copCompacto
-    case "compacto":
-      return OPCIONES_NUMERO.compacto
-    case "porcentaje":
-      return opcionesPorcentaje(decimales)
-    case "numero":
-      return { maximumFractionDigits: decimales }
-  }
-}
-
 /**
  * Cifra que anima sus dígitos al cambiar (NumberFlow). Usa las mismas opciones
- * de Intl que `@/lib/format`, así el texto coincide con tablas y exportaciones.
- * NumberFlow respeta `prefers-reduced-motion` por defecto.
+ * de Intl y la misma notación compacta que `@/lib/format` (ver `cifraAnimada`),
+ * así el texto coincide con tablas y exportaciones. NumberFlow respeta
+ * `prefers-reduced-motion` por defecto.
  */
 export function NumeroAnimado({
   valor,
   formato = "numero",
   decimales = formato === "porcentaje" ? 1 : 0,
   className,
-  prefijo,
-  sufijo,
+  prefijo = "",
+  sufijo = "",
 }: NumeroAnimadoProps) {
+  const cifra = cifraAnimada(
+    Number.isFinite(valor) ? valor : 0,
+    formato,
+    decimales
+  )
   return (
     <NumberFlow
-      value={Number.isFinite(valor) ? valor : 0}
+      value={cifra.valor}
       locales={LOCALE}
-      format={opcionesDeFormato(formato, decimales)}
-      prefix={prefijo}
-      suffix={sufijo}
+      format={cifra.formato}
+      prefix={`${prefijo}${cifra.prefijo}`}
+      suffix={`${cifra.sufijo}${sufijo}`}
       className={cn("cifras", className)}
     />
   )

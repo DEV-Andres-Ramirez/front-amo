@@ -31,7 +31,7 @@ function Posicion({ posicion }: { posicion: number | null }) {
   return (
     <span
       className={cn(
-        "cifras grid size-6 shrink-0 place-items-center rounded-md text-[0.6875rem] font-semibold",
+        "grid size-6 shrink-0 place-items-center rounded-md text-[0.6875rem] font-semibold cifras",
         posicion !== null && posicion <= 3
           ? "bg-primary/15 text-primary"
           : "text-muted-foreground"
@@ -72,7 +72,10 @@ export function RankingZonas({
   useEffect(() => {
     if (!seleccionado) return
     const indice = filas.findIndex((fila) => fila.codigo === seleccionado)
-    botones.current[indice]?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+    botones.current[indice]?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    })
   }, [seleccionado, filas])
 
   const enfocar = (indice: number) => {
@@ -81,7 +84,11 @@ export function RankingZonas({
     botones.current[destino]?.focus()
   }
 
-  const alTeclear = (evento: KeyboardEvent, fila: FilaRanking, indice: number) => {
+  const alTeclear = (
+    evento: KeyboardEvent,
+    fila: FilaRanking,
+    indice: number
+  ) => {
     switch (evento.key) {
       case "ArrowDown":
         evento.preventDefault()
@@ -170,7 +177,7 @@ export function RankingZonas({
                   </span>
                   <span
                     className={cn(
-                      "cifras shrink-0 text-xs",
+                      "shrink-0 text-xs cifras",
                       conDato ? "text-foreground" : "text-muted-foreground"
                     )}
                   >
@@ -190,7 +197,10 @@ export function RankingZonas({
                 >
                   <span
                     className="block h-full rounded-full transition-[width] duration-500 ease-out"
-                    style={{ width: `${ancho}%`, backgroundColor: colorDe(fila.valor) }}
+                    style={{
+                      width: `${ancho}%`,
+                      backgroundColor: colorDe(fila.valor),
+                    }}
                   />
                 </span>
               </span>

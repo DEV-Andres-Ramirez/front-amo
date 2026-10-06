@@ -14,9 +14,12 @@ export const esquemaRevelar = z
     id: z.uuid(),
     grupo: z.enum(GRUPOS_PRIVADOS),
   })
-  .refine((entrada) => entrada.entidad === "medio" || entrada.grupo === "contacto", {
-    message: "Ese grupo de datos no existe para un anunciante.",
-  })
+  .refine(
+    (entrada) => entrada.entidad === "medio" || entrada.grupo === "contacto",
+    {
+      message: "Ese grupo de datos no existe para un anunciante.",
+    }
+  )
 
 export type EntradaRevelar = z.input<typeof esquemaRevelar>
 

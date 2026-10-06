@@ -1,18 +1,20 @@
-import { expect, type Page, test } from "@playwright/test"
-
 import { permisosDeRol } from "../src/lib/auth/permisos"
 import { generarContrasena } from "../scripts/bootstrap/contrasena"
 import {
-  asegurarTotp,
   clienteComoSuperadmin,
-  codigoTotpEstable,
   type CuentaE2E,
-  emailDe,
   prepararCuenta,
 } from "../scripts/bootstrap/provision-e2e"
 import type { ClienteSupabase } from "../scripts/bootstrap/supabase"
-import { PASO_TOTP_SEGUNDOS } from "../scripts/bootstrap/totp"
 import { credenciales, entorno, ingresar } from "./utilidades/cuentas"
+import {
+  abrirSesionMfa,
+  type CookiesSesion,
+  prepararCuentaMfa,
+  usarSesion,
+} from "./utilidades/mfa"
+import { expect, type Page, test } from "./utilidades/prueba"
+import { PROYECTO_CON_CUENTAS } from "./utilidades/proyectos"
 
 /**
  * Módulo de Roles y permisos contra `pnpm build && pnpm start` y el Supabase real.
@@ -23,15 +25,14 @@ import { credenciales, entorno, ingresar } from "./utilidades/cuentas"
  * - un gestor LIMITADO (rol personalizado con los permisos de ADMIN +
  *   `roles.gestionar`) para comprobar la anti-escalada y el rol propio.
  * Los roles de prueba usan la clave `E2E_ROLES_*` y se borran antes y después.
- * Un rol externo solo admite los permisos de su portal (`esAplicable`): uno con
- * un permiso interno heredado lo muestra para retirarlo.
+ * Un rol externo solo admite los permisos de su portal (`esAplicable`): la
+ * matriz no ofrece los internos y la base de datos los rechaza.
  */
 
 const PREFIJO_CLAVE = "E2E_ROLES_"
 const CLAVE_ROL_LIMITADO = `${PREFIJO_CLAVE}GESTOR_LIMITADO`
 const CLAVE_ROL_AJENO = `${PREFIJO_CLAVE}FINANZAS_AJENO`
 const CLAVE_ROL_EXTERNO = `${PREFIJO_CLAVE}ANUNCIANTE_HEREDADO`
-const PROYECTO_CON_CUENTAS = "escritorio"
 
 const SUPERADMIN: CuentaE2E = {
   clave: "ROLES_SUPER",
@@ -53,12 +54,6 @@ const LIMITADO: CuentaE2E = {
   variablePassword: "E2E_ROLES_LIMITADO_PASSWORD",
   debeCambiarPassword: false,
   conTotp: true,
-}
-
-interface CredencialesMfa {
-  email: string
-  password: string
-  secreto: string
 }
 
 // ── Datos de prueba ──────────────────────────────────────────────────────────
@@ -115,57 +110,7 @@ async function crearRol(
   return data.id
 }
 
-/** Cuenta exclusiva con TOTP recién enrolado; opcionalmente con un rol personalizado. */
-async function prepararCuentaMfa(
-  servicio: ClienteSupabase,
-  cuenta: CuentaE2E,
-  rolId?: string
-): Promise<CredencialesMfa> {
-  const email = emailDe(cuenta)
-  const password = generarContrasena()
-  const usuarioId = await prepararCuenta(servicio, cuenta, password)
-  if (rolId) {
-    const { error } = await servicio
-      .from("perfiles")
-      .update({ rol_id: rolId })
-      .eq("id", usuarioId)
-    if (error) throw new Error(`No se pudo asignar el rol: ${error.message}`)
-  }
-  const secreto = await asegurarTotp(
-    entorno,
-    servicio,
-    usuarioId,
-    { email, password },
-    undefined
-  )
-  // Enrolar consume el código del periodo actual.
-  ultimoPaso.set(secreto, pasoTotp())
-  return { email, password, secreto }
-}
-
-// ── Sesión ───────────────────────────────────────────────────────────────────
-
-const ultimoPaso = new Map<string, number>()
-const pasoTotp = () => Math.floor(Date.now() / 1000 / PASO_TOTP_SEGUNDOS)
-
-/** Código de un periodo TOTP posterior al último usado con ese secreto. */
-async function codigoNuevo(secreto: string): Promise<string> {
-  while (pasoTotp() <= (ultimoPaso.get(secreto) ?? -1)) {
-    await new Promise((resolver) => setTimeout(resolver, 1000))
-  }
-  const codigo = await codigoTotpEstable(secreto)
-  ultimoPaso.set(secreto, pasoTotp())
-  return codigo
-}
-
-async function ingresarConMfa(page: Page, cuenta: CredencialesMfa) {
-  await ingresar(page, cuenta)
-  await expect(page).toHaveURL(/\/mfa\/verificar/)
-  await page
-    .getByLabel("Código de verificación")
-    .fill(await codigoNuevo(cuenta.secreto))
-  await expect(page).toHaveURL(/\/inicio$/)
-}
+// ── Navegación ───────────────────────────────────────────────────────────────
 
 async function abrirRoles(page: Page): Promise<void> {
   await page.goto("/administracion/roles")
@@ -195,15 +140,16 @@ test.describe("roles y permisos", () => {
   test.describe.configure({ mode: "serial", timeout: 180_000 })
 
   let servicio: ClienteSupabase
-  let superadmin: CredencialesMfa
-  let limitado: CredencialesMfa
+  let sesionSuperadmin: CookiesSesion
+  let sesionLimitado: CookiesSesion
+  let rolExterno: string
   const sufijo = Date.now().toString(36).toUpperCase()
   const nombreRol = `Coordinación E2E ${sufijo}`
   const nombreAjeno = `Finanzas ajeno E2E ${sufijo}`
   const nombreExterno = `Anunciante heredado E2E ${sufijo}`
 
   // Playwright exige desestructurar los fixtures aunque no se usen.
-  test.beforeAll(async ({}, info) => {
+  test.beforeAll(async ({ browser }, info) => {
     info.skip(
       info.project.name !== PROYECTO_CON_CUENTAS,
       "Cuentas exclusivas y datos reales: esta suite corre solo en el proyecto de escritorio."
@@ -224,15 +170,23 @@ test.describe("roles y permisos", () => {
       nombre: nombreAjeno,
       permisos: ["inicio.admin", "pagos.registrar"],
     })
-    // Rol externo con un permiso interno otorgado antes de la regla por tipo.
-    await crearRol(servicio, {
+    rolExterno = await crearRol(servicio, {
       clave: CLAVE_ROL_EXTERNO,
       nombre: nombreExterno,
       tipo: "ANUNCIANTE",
-      permisos: ["inicio.anunciante", "campanas.ver"],
+      permisos: ["inicio.anunciante"],
     })
-    superadmin = await prepararCuentaMfa(servicio, SUPERADMIN)
-    limitado = await prepararCuentaMfa(servicio, LIMITADO, rolLimitado)
+    const { baseURL } = info.project.use
+    sesionSuperadmin = await abrirSesionMfa(
+      browser,
+      baseURL,
+      await prepararCuentaMfa(servicio, SUPERADMIN)
+    )
+    sesionLimitado = await abrirSesionMfa(
+      browser,
+      baseURL,
+      await prepararCuentaMfa(servicio, LIMITADO, rolLimitado)
+    )
   })
 
   test.afterAll(async ({}, info) => {
@@ -244,7 +198,7 @@ test.describe("roles y permisos", () => {
   test("el superadministrador crea, ajusta con diff, edita y elimina un rol", async ({
     page,
   }) => {
-    await ingresarConMfa(page, superadmin)
+    await usarSesion(page, sesionSuperadmin)
     await abrirRoles(page)
 
     await test.step("buscar sin resultados muestra el estado vacío", async () => {
@@ -425,7 +379,7 @@ test.describe("roles y permisos", () => {
   })
 
   test("los roles de sistema son de solo lectura", async ({ page }) => {
-    await ingresarConMfa(page, superadmin)
+    await usarSesion(page, sesionSuperadmin)
     await abrirRoles(page)
     await abrirRol(page, "Administrador")
     await expect(page.getByText("Rol de sistema: solo lectura")).toBeVisible()
@@ -445,29 +399,32 @@ test.describe("roles y permisos", () => {
   test("un rol externo solo ofrece los permisos de su portal", async ({
     page,
   }) => {
-    await ingresarConMfa(page, superadmin)
+    await usarSesion(page, sesionSuperadmin)
     await abrirRoles(page)
     await abrirRol(page, nombreExterno)
-    // El permiso interno heredado se señala y solo se puede retirar.
     await expect(
-      page.getByText("1 permiso no corresponde a un rol de tipo «Anunciante»")
-    ).toBeVisible()
-    await expect(permiso(page, "Ver todas las campañas")).toBeChecked()
-    await expect(permiso(page, "Ver todas las campañas")).toBeEnabled()
-    // Los demás permisos internos ni se ofrecen.
+      permiso(page, "Ver el panel de inicio del anunciante")
+    ).toBeChecked()
+    await expect(
+      permiso(page, "Crear y gestionar las campañas propias")
+    ).toBeEnabled()
+    // Los permisos internos ni se ofrecen…
+    await expect(permiso(page, "Ver todas las campañas")).toHaveCount(0)
     await expect(
       permiso(page, "Ver el listado y la ficha de usuarios")
     ).toHaveCount(0)
     await expect(permiso(page, "Registrar pagos de anunciantes")).toHaveCount(0)
-    await expect(
-      permiso(page, "Crear y gestionar las campañas propias")
-    ).toBeEnabled()
+    // …y la base de datos tampoco los admite, ni con la clave de servicio.
+    const { error } = await servicio
+      .from("rol_permisos")
+      .insert({ rol_id: rolExterno, permiso_clave: "campanas.ver" })
+    expect(error?.message).toBe("AMO_PERMISO_NO_APLICABLE")
   })
 
   test("anti-escalada: un gestor limitado no otorga lo que no tiene ni toca su propio rol", async ({
     page,
   }) => {
-    await ingresarConMfa(page, limitado)
+    await usarSesion(page, sesionLimitado)
     await abrirRoles(page)
 
     await abrirRol(page, nombreAjeno)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  describirCalorVacio,
   describirPuntosCalor,
   etiquetaCubeta,
   formatearValorGeo,
@@ -44,25 +45,62 @@ describe("formato de cifras del mapa", () => {
   })
 })
 
+describe("modo calor sin puntos", () => {
+  it("explica el vacío con el vocabulario de la métrica", () => {
+    expect(describirCalorVacio("accesos")).toMatch(
+      /Ningún ingreso .* coordenadas/
+    )
+    expect(describirCalorVacio("medios")).toMatch(/medios verificados/)
+  })
+})
+
 describe("nota del modo calor", () => {
   const base = {
-    consulta: { nivel: "nacional", metrica: "accesos", desde: "2026-09-01", hasta: "2026-09-30", departamento: null },
+    consulta: {
+      nivel: "nacional",
+      metrica: "accesos",
+      desde: "2026-09-01",
+      hasta: "2026-09-30",
+      departamento: null,
+    },
     puntos: [],
     origen: "base-de-datos",
   } as const
 
   it("accesos: total, tamaño de la celda y aviso de muestra", () => {
-    expect(sinEspacios(describirPuntosCalor({ ...base, total: 1234, muestra: 1234, pasoGrados: 0.05 }))).toBe(
-      "1.234 ingresos con ubicación · celdas de ≈ 6 km"
-    )
-    expect(sinEspacios(describirPuntosCalor({ ...base, total: 24_000, muestra: 12_000, pasoGrados: 0.01 }))).toBe(
+    expect(
+      sinEspacios(
+        describirPuntosCalor({
+          ...base,
+          total: 1234,
+          muestra: 1234,
+          pasoGrados: 0.05,
+        })
+      )
+    ).toBe("1.234 ingresos con ubicación · celdas de ≈ 6 km")
+    expect(
+      sinEspacios(
+        describirPuntosCalor({
+          ...base,
+          total: 24_000,
+          muestra: 12_000,
+          pasoGrados: 0.01,
+        })
+      )
+    ).toBe(
       "24.000 ingresos con ubicación · celdas de ≈ 1 km · muestra de 12.000"
     )
   })
 
   it("medios: en la cabecera de su municipio", () => {
     expect(
-      describirPuntosCalor({ ...base, consulta: { ...base.consulta, metrica: "medios" }, total: 1, muestra: 1, pasoGrados: 0.01 })
+      describirPuntosCalor({
+        ...base,
+        consulta: { ...base.consulta, metrica: "medios" },
+        total: 1,
+        muestra: 1,
+        pasoGrados: 0.01,
+      })
     ).toBe("1 medio · en la cabecera de su municipio")
   })
 })
@@ -71,8 +109,20 @@ describe("rótulos de la serie de una zona", () => {
   const limpio = (texto: string) => texto.replace(/\s/g, " ").replace(/\.$/, "")
 
   it("día, semana y mes en español (hora de Bogotá)", () => {
-    expect(limpio(etiquetaCubeta({ desde: "2026-09-24", hasta: "2026-09-24" }, "dia"))).toMatch(/^jue/)
-    expect(limpio(etiquetaCubeta({ desde: "2026-09-07", hasta: "2026-09-13" }, "semana"))).toBe("7 a 13 de sept")
-    expect(limpio(etiquetaCubeta({ desde: "2026-02-01", hasta: "2026-02-28" }, "mes"))).toMatch(/^feb.* 2026$/)
+    expect(
+      limpio(
+        etiquetaCubeta({ desde: "2026-09-24", hasta: "2026-09-24" }, "dia")
+      )
+    ).toMatch(/^jue/)
+    expect(
+      limpio(
+        etiquetaCubeta({ desde: "2026-09-07", hasta: "2026-09-13" }, "semana")
+      )
+    ).toBe("7 a 13 de sept")
+    expect(
+      limpio(
+        etiquetaCubeta({ desde: "2026-02-01", hasta: "2026-02-28" }, "mes")
+      )
+    ).toMatch(/^feb.* 2026$/)
   })
 })

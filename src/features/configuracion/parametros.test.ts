@@ -36,7 +36,13 @@ const SEMILLA: readonly Regla[] = [
   ["medios.n_minimo_cumplimiento", "ENTERO", 1, 100],
   ["medios.dias_actividad", "ENTERO", 7, 365],
   ["medios.dias_riesgo_sin_aceptar", "ENTERO", 7, 180],
-  ["metricas.cortes_requeridos", "LISTA_TEXTO", null, null, ["H24", "H72", "D7"]],
+  [
+    "metricas.cortes_requeridos",
+    "LISTA_TEXTO",
+    null,
+    null,
+    ["H24", "H72", "D7"],
+  ],
   ["metricas.plazo_carga_horas", "ENTERO", 1, 336],
   ["metricas.factor_desviacion", "DECIMAL", 1.5, 10],
   ["metricas.minimo_historial", "ENTERO", 1, 50],
@@ -67,9 +73,21 @@ const SEMILLA: readonly Regla[] = [
   ["liquidaciones.dias_pago", "ENTERO", 0, 90],
   ["facturacion.dias_vencimiento", "ENTERO", 0, 120],
   ["facturacion.iva", "PORCENTAJE", 0, 0.5],
-  ["tributario.reteica_municipio_base", "TEXTO", null, null, ["MEDIO", "PLATAFORMA"]],
+  [
+    "tributario.reteica_municipio_base",
+    "TEXTO",
+    null,
+    null,
+    ["MEDIO", "PLATAFORMA"],
+  ],
   ["tributario.municipio_plataforma", "TEXTO", null, null],
-  ["tributario.politica_seg_social", "TEXTO", null, null, ["ALERTA", "BLOQUEAR"]],
+  [
+    "tributario.politica_seg_social",
+    "TEXTO",
+    null,
+    null,
+    ["ALERTA", "BLOQUEAR"],
+  ],
   ["analitica.n_minimo_tasas", "ENTERO", 1, 1000],
   ["analitica.umbral_variacion", "PORCENTAJE", 0.01, 1],
   ["seguridad.inactividad_minutos_admin", "ENTERO", 5, 480],
@@ -91,7 +109,13 @@ const SEMILLA: readonly Regla[] = [
   ["archivos.max_creativo_mb", "ENTERO", 1, 500],
 ]
 
-function reglas([clave, tipo, minimo, maximo, opciones]: Regla): ReglasParametro {
+function reglas([
+  clave,
+  tipo,
+  minimo,
+  maximo,
+  opciones,
+]: Regla): ReglasParametro {
   return { clave, tipo, minimo, maximo, opciones: opciones ?? null }
 }
 
@@ -105,15 +129,16 @@ describe("catálogo de parámetros", () => {
     "%s: el valor de fábrica cumple las reglas de la BD",
     (_clave, regla) => {
       const ficha = FICHAS[regla[0]]
-      expect(esquemaValorParametro(reglas(regla)).safeParse(ficha.defecto).success).toBe(
-        true
-      )
+      expect(
+        esquemaValorParametro(reglas(regla)).safeParse(ficha.defecto).success
+      ).toBe(true)
     }
   )
 
   it("cada ficha apunta a un grupo existente y cada sección con grupos es válida", () => {
     const ids = new Set(GRUPOS.map((g) => g.id))
-    for (const ficha of Object.values(FICHAS)) expect(ids.has(ficha.grupo)).toBe(true)
+    for (const ficha of Object.values(FICHAS))
+      expect(ids.has(ficha.grupo)).toBe(true)
     for (const grupo of GRUPOS) expect(SECCIONES).toContain(grupo.seccion)
     expect(ids.size).toBe(GRUPOS.length)
   })
@@ -121,7 +146,9 @@ describe("catálogo de parámetros", () => {
   it("una clave desconocida cae en «Otros parámetros» con un título legible", () => {
     expect(grupoDe("nuevo.limite_diario").id).toBe(GRUPO_OTROS)
     expect(tituloParametro("nuevo.limite_diario")).toBe("Limite diario")
-    expect(tituloParametro("comision.porcentaje_global")).toBe("Comisión global")
+    expect(tituloParametro("comision.porcentaje_global")).toBe(
+      "Comisión global"
+    )
   })
 
   it("agrupa por sección en el orden del catálogo y omite grupos vacíos", () => {
@@ -133,7 +160,11 @@ describe("catálogo de parámetros", () => {
       { clave: "nuevo.cosa" },
     ]
     const grupos = agruparParametros(parametros, "comercial")
-    expect(grupos.map((g) => g.grupo.id)).toEqual(["comision", "disputas", GRUPO_OTROS])
+    expect(grupos.map((g) => g.grupo.id)).toEqual([
+      "comision",
+      "disputas",
+      GRUPO_OTROS,
+    ])
     expect(grupos[0].parametros.map((p) => p.clave)).toEqual([
       "comision.porcentaje_global",
       "comision.visible_para_medio",

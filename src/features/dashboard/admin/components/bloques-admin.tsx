@@ -1,11 +1,19 @@
 import "server-only"
 
-import { alertasSospechosas, totalSospechosos } from "@/features/accesos/queries"
+import {
+  alertasSospechosas,
+  totalSospechosos,
+} from "@/features/accesos/queries"
 import { tramoLineaTiempo } from "@/features/auditoria/queries"
 import { PanelInsights } from "@/features/dashboard/insights/components/panel-insights"
 import { generarInsights } from "@/features/dashboard/insights/motor"
+import {
+  construirHref,
+  RUTAS_INSIGHTS,
+} from "@/features/dashboard/insights/rutas"
 import { NOMBRES_PLATAFORMA } from "@/features/dashboard/insights/textos"
 import { tieneAlgunPermiso } from "@/lib/auth/dal"
+import { filtrarNavegacion } from "@/lib/auth/navegacion"
 import type { UsuarioSesion } from "@/lib/auth/tipos"
 import {
   instantesDelRango,
@@ -13,24 +21,28 @@ import {
   serializarFecha,
 } from "@/lib/fechas"
 
+import { AvisoSinActividad } from "../../components/aviso-sin-actividad"
 import { TarjetasKpi } from "../../components/tarjetas-kpi"
-import { indicePorKpi } from "../../kpi"
+import { hayActividad, indicePorKpi } from "../../kpi"
 import {
   etiquetaComparacionCorta,
   granularidadPara,
   type PeriodoPanel,
 } from "../../periodo"
 import { configAnalitica } from "../../servidor"
-import { tarjetasAdmin } from "../../tarjetas"
+import { KPI_ACTIVIDAD_ADMIN, tarjetasAdmin } from "../../tarjetas"
 import {
   baseSalud,
   celdasCalor,
   combinarZonas,
+  conAccionesAccesibles,
   cpmPorPlataforma,
+  embudoPanel,
   embudoVacio,
   entradaInsightsAdmin,
   etapasEmbudo,
   type FuenteActividad,
+  leyendaSiglas,
   mediosEnRiesgoEntrada,
   ORDEN_PLATAFORMAS,
   rankingFormatos,
@@ -66,6 +78,11 @@ import {
 import { MapaCalorPanel } from "./mapa-calor-panel"
 import { SaludMedios } from "./salud-medios"
 
+/** El mismo destino que la acción del insight de medios en riesgo (regla 3). */
+const HREF_MEDIOS_EN_RIESGO = construirHref(RUTAS_INSIGHTS.medios, {
+  segmento: "en_riesgo",
+})
+
 /**
  * Bloques del panel general: cada uno es un Server Component asíncrono que
  * consulta lo suyo y se envuelve en `BloquePanel` (Suspense + límite de
@@ -88,13 +105,18 @@ export async function BloqueKpisAdmin({ periodo }: PropsPeriodo) {
     configAnalitica(),
   ])
   return (
-    <TarjetasKpi
-      etiqueta="Indicadores del periodo"
-      filas={filas}
-      tarjetas={tarjetasAdmin(indicePorKpi(filas))}
-      nMinimo={config.nMinimo}
-      etiquetaComparacion={etiquetaComparacionCorta(periodo.rango)}
-    />
+    <div className="flex flex-col gap-4 sm:gap-5">
+      {hayActividad(filas, KPI_ACTIVIDAD_ADMIN) ? null : (
+        <AvisoSinActividad detalle="negocios, ofertas ni medios activos" />
+      )}
+      <TarjetasKpi
+        etiqueta="Indicadores del periodo"
+        filas={filas}
+        tarjetas={tarjetasAdmin(indicePorKpi(filas))}
+        nMinimo={config.nMinimo}
+        etiquetaComparacion={etiquetaComparacionCorta(periodo.rango)}
+      />
+    </div>
   )
 }
 
@@ -105,10 +127,16 @@ export async function BloqueTendenciaGmv({ periodo }: PropsPeriodo) {
 }
 
 export async function BloqueEmbudo({ periodo }: PropsPeriodo) {
-  const etapas = etapasEmbudo(
-    await embudoAsignaciones(periodo.desde, periodo.hasta)
+  const { vistas, ejecucion } = embudoPanel(
+    etapasEmbudo(await embudoAsignaciones(periodo.desde, periodo.hasta))
   )
-  return <GraficoEmbudoPanel etapas={etapas} vacio={embudoVacio(etapas)} />
+  return (
+    <GraficoEmbudoPanel
+      etapas={ejecucion}
+      vistas={vistas}
+      vacio={embudoVacio(ejecucion)}
+    />
+  )
 }
 
 export async function BloquePlataformas({ periodo }: PropsPeriodo) {
@@ -128,7 +156,12 @@ export async function BloquePlataformas({ periodo }: PropsPeriodo) {
 
 export async function BloqueFormatos({ periodo }: PropsPeriodo) {
   const filas = await mezclaPlataformas(periodo.desde, periodo.hasta)
-  return <GraficoFormatos elementos={rankingFormatos(filas)} />
+  return (
+    <GraficoFormatos
+      elementos={rankingFormatos(filas)}
+      siglas={leyendaSiglas(filas)}
+    />
+  )
 }
 
 export async function BloqueDepartamentos({
@@ -149,10 +182,23 @@ export async function BloqueDepartamentos({
   )
 }
 
+/**
+ * `medios_en_riesgo` es una foto de HOY; `salud_medios`, del cierre del
+ * periodo. Solo describen lo mismo si el periodo termina hoy.
+ */
+function terminaHoy(periodo: PeriodoPanel, ahora: Date): boolean {
+  return periodo.hasta === serializarFecha(ahora)
+}
+
 export async function BloqueSaludMedios({
   periodo,
   ahora,
-}: PropsPeriodo & { ahora: Date }) {
+  conMedios,
+}: PropsPeriodo & {
+  ahora: Date
+  /** Con `medios.ver`: la tarjeta enlaza la lista de medios en riesgo. */
+  conMedios: boolean
+}) {
   const [filas, enRiesgo] = await Promise.all([
     saludMedios(periodo.desde, periodo.hasta),
     mediosEnRiesgo(5),
@@ -163,6 +209,8 @@ export async function BloqueSaludMedios({
       segmentos={segmentos}
       base={baseSalud(segmentos)}
       enRiesgo={enRiesgo}
+      periodoVigente={terminaHoy(periodo, ahora)}
+      enlaceRiesgo={conMedios ? HREF_MEDIOS_EN_RIESGO : undefined}
       ahora={ahora}
     />
   )
@@ -173,10 +221,15 @@ export async function BloqueActividad({
   fuentes,
 }: PropsPeriodo & { fuentes: readonly FuenteActividad[] }) {
   const celdas = await Promise.all(
-    fuentes.map(async (fuente) => [
-      fuente,
-      celdasCalor(await actividadHeatmap(periodo.desde, periodo.hasta, fuente)),
-    ] as const)
+    fuentes.map(
+      async (fuente) =>
+        [
+          fuente,
+          celdasCalor(
+            await actividadHeatmap(periodo.desde, periodo.hasta, fuente)
+          ),
+        ] as const
+    )
   )
   return <MapaCalorPanel fuentes={Object.fromEntries(celdas)} />
 }
@@ -222,7 +275,10 @@ export async function BloqueInsights({
     atipicas,
     sospechosos,
   ] = await Promise.all([
-    opcional("zonas", puede("analitica.global") && (() => zonasGmv(desde, hasta))),
+    opcional(
+      "zonas",
+      puede("analitica.global") && (() => zonasGmv(desde, hasta))
+    ),
     opcional(
       "zonas anteriores",
       puede("analitica.global") &&
@@ -238,7 +294,7 @@ export async function BloqueInsights({
     ),
     opcional("salud", () => saludMedios(desde, hasta)),
     opcional("medios en riesgo", () => mediosEnRiesgo(5)),
-    opcional("gmv 90 días", () => gmvVerificado90Dias(serializarFecha(ahora))),
+    opcional("gmv 90 días", () => gmvVerificado90Dias(hasta)),
     opcional(
       "métricas atípicas",
       puede("asignaciones.ver") && (() => metricasAtipicasPendientes())
@@ -250,7 +306,7 @@ export async function BloqueInsights({
     ),
   ])
 
-  const insights = generarInsights(
+  const hallazgos = generarInsights(
     entradaInsightsAdmin({
       periodo: { desde, hasta },
       ahora,
@@ -265,14 +321,25 @@ export async function BloqueInsights({
           ? { actual: mezclaActual, anterior: mezclaAnterior }
           : undefined,
       vencidas: cumplimiento ? vencidasDelPeriodo(cumplimiento) : undefined,
+      // Los nombres son de hoy: solo acompañan a un periodo que termina hoy.
       mediosEnRiesgo: salud
-        ? mediosEnRiesgoEntrada(salud, riesgo ?? [], gmv90 ?? null)
+        ? mediosEnRiesgoEntrada(
+            salud,
+            terminaHoy(periodo, ahora) ? (riesgo ?? []) : [],
+            gmv90 ?? null
+          )
         : undefined,
       metricasAtipicas: atipicas,
       accesosSospechosos: sospechosos,
     })
   )
-  return <PanelInsights insights={insights} />
+  // Las secciones del menú ya están filtradas por permiso y tipo de rol.
+  const secciones = filtrarNavegacion(usuario).flatMap((grupo) =>
+    grupo.items.map((item) => item.href)
+  )
+  return (
+    <PanelInsights insights={conAccionesAccesibles(hallazgos, secciones)} />
+  )
 }
 
 /** Los cambios más recientes de la bitácora (últimos 30 días). */
@@ -284,12 +351,12 @@ export async function BloqueActividadReciente({
   ahora: Date
 }) {
   const tramo = await tramoLineaTiempo(
-      { q: "", accion: [], entidad: [], actor: [], origen: [], grupo: [] },
-      rangoDesdePreset("ultimos30", ahora),
-      null,
-      usuario
-    )
-  return <ActividadReciente eventos={tramo.eventos.slice(0, 6)} ahora={ahora} />
+    { q: "", accion: [], entidad: [], actor: [], origen: [], grupo: [] },
+    rangoDesdePreset("ultimos30", ahora),
+    null,
+    usuario
+  )
+  return <ActividadReciente eventos={tramo.eventos} ahora={ahora} />
 }
 
 export async function BloqueAlertas({

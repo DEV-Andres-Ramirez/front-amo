@@ -19,8 +19,9 @@ import "server-only"
 
 import { refresh } from "next/cache"
 
+import { type ContextoActor, contextoDelActor } from "@/lib/auth/contexto-actor"
 import { requerirPermiso, tieneAlgunPermiso } from "@/lib/auth/dal"
-import { registrarAcceso } from "@/lib/auth/registro"
+import { registrarAcceso, registrarEvento } from "@/lib/auth/registro"
 import { getEnvServidor } from "@/lib/env.server"
 import {
   desdeErrorZod,
@@ -55,14 +56,11 @@ import {
 import {
   autorizarGestion,
   BLOQUEO_INDEFINIDO,
-  type ContextoActor,
-  contextoDelActor,
   falloAuth,
   falloBd,
   falloInesperado,
   informar,
   informarSiInesperado,
-  registrarEventoUsuarios,
   SIN_BLOQUEO,
   SITIO,
 } from "./servidor"
@@ -231,7 +229,9 @@ async function descartarCuentaNoInvitada(
 ): Promise<ResultadoAccion<null>> {
   const { error } = await contexto.admin.auth.admin.deleteUser(usuarioId)
   if (error) return falloAuth("deleteUser(cuenta no invitada)", error)
-  await registrarEventoUsuarios(contexto, {
+  await registrarEvento({
+    actorId: contexto.actorId,
+    admin: contexto.admin,
     accion: "OTRO",
     entidad: "perfiles",
     entidadId: usuarioId,
@@ -341,7 +341,9 @@ export async function crearUsuario(
       return perfil
     }
 
-    await registrarEventoUsuarios(contexto, {
+    await registrarEvento({
+      actorId: contexto.actorId,
+      admin: contexto.admin,
       accion: "INVITAR",
       entidad: "perfiles",
       entidadId: alta.datos.usuarioId,
@@ -591,7 +593,9 @@ export async function restablecerMfa(entrada: {
     if (errorSesiones)
       return falloBd("cerrar sesiones tras restablecer MFA", errorSesiones)
 
-    await registrarEventoUsuarios(contexto, {
+    await registrarEvento({
+      actorId: contexto.actorId,
+      admin: contexto.admin,
       accion: "OTRO",
       entidad: "perfiles",
       entidadId: usuarioId,
@@ -678,7 +682,9 @@ export async function generarEnlaceAcceso(entrada: {
       })
     if (errorEnlace) return falloAuth(`generateLink(${tipo})`, errorEnlace)
 
-    await registrarEventoUsuarios(contexto, {
+    await registrarEvento({
+      actorId: contexto.actorId,
+      admin: contexto.admin,
       accion: "GENERAR_ENLACE",
       entidad: "perfiles",
       entidadId: usuarioId,
@@ -774,7 +780,9 @@ export async function registrarExportacionUsuarios(entrada: {
 
   try {
     const contexto = await contextoDelActor(actor)
-    await registrarEventoUsuarios(contexto, {
+    await registrarEvento({
+      actorId: contexto.actorId,
+      admin: contexto.admin,
       accion: "EXPORTAR",
       entidad: "usuarios",
       entidadId: null,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   admiteCalor,
   admitePor100k,
+  calorPermitido,
   DEFINICIONES_METRICAS,
   METRICAS_GEO,
   metricaPermitida,
@@ -19,9 +20,37 @@ const SIN_ACCESOS = METRICAS_GEO.filter((metrica) => metrica !== "accesos")
  * la UI no puede ofrecer una métrica que la RPC rechace.
  */
 const MATRIZ_RPC = {
-  pais: ["accesos", "audiencia", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
-  departamento: ["accesos", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
-  municipio: ["accesos", "anunciantes", "gmv", "asignaciones", "medios", "alcance", "campanas", "cumplimiento"],
+  pais: [
+    "accesos",
+    "audiencia",
+    "anunciantes",
+    "gmv",
+    "asignaciones",
+    "medios",
+    "alcance",
+    "campanas",
+    "cumplimiento",
+  ],
+  departamento: [
+    "accesos",
+    "anunciantes",
+    "gmv",
+    "asignaciones",
+    "medios",
+    "alcance",
+    "campanas",
+    "cumplimiento",
+  ],
+  municipio: [
+    "accesos",
+    "anunciantes",
+    "gmv",
+    "asignaciones",
+    "medios",
+    "alcance",
+    "campanas",
+    "cumplimiento",
+  ],
 } as const
 
 describe("catálogo de métricas del mapa", () => {
@@ -35,7 +64,9 @@ describe("catálogo de métricas del mapa", () => {
   })
 
   it("Colombia ofrece todas las métricas de la RPC salvo la audiencia (solo por país)", () => {
-    expect([...metricasDelNivel("nacional")].sort()).toEqual([...MATRIZ_RPC.departamento].sort())
+    expect([...metricasDelNivel("nacional")].sort()).toEqual(
+      [...MATRIZ_RPC.departamento].sort()
+    )
   })
 
   it("cada nivel ofrece las métricas de la matriz (§5.9)", () => {
@@ -83,5 +114,13 @@ describe("catálogo de métricas del mapa", () => {
     expect(
       METRICAS_GEO.filter((m) => DEFINICIONES_METRICAS[m].conPuntos)
     ).toEqual(["medios", "accesos"])
+  })
+
+  it("los puntos de calor exigen poder leer su tabla con la RLS del usuario", () => {
+    expect(calorPermitido("medios", () => false)).toBe(false)
+    expect(calorPermitido("medios", (p) => p === "medios.ver")).toBe(true)
+    expect(calorPermitido("accesos", (p) => p === "accesos.ver")).toBe(true)
+    expect(calorPermitido("accesos", () => false)).toBe(false)
+    expect(calorPermitido("gmv", () => true)).toBe(false)
   })
 })

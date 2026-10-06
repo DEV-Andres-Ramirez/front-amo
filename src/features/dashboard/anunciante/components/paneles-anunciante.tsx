@@ -1,10 +1,4 @@
-import {
-  CircleCheck,
-  Heart,
-  MapPinned,
-  Radar,
-  ReceiptText,
-} from "lucide-react"
+import { CircleCheck, Heart, MapPinned, Radar, ReceiptText } from "lucide-react"
 
 import { EstadoVacio } from "@/components/feedback/estado-vacio"
 import { MiniMapaColombia } from "@/components/maps/mini-mapa-colombia"
@@ -18,8 +12,17 @@ import {
 } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
+import {
+  MAPA_EN_REJILLA,
+  REJILLA_MAPA_RANKING,
+} from "../../components/esqueletos-panel"
 import { TarjetaPanel } from "../../components/tarjeta-panel"
-import type { FilaDesempeno, RankingMedios, ResumenCartera } from "../datos"
+import {
+  type FilaDesempeno,
+  MINIMO_COMPARABLES,
+  type RankingMedios,
+  type ResumenCartera,
+} from "../datos"
 
 const VISIBLES = 5
 
@@ -57,14 +60,17 @@ export function CoberturaAnunciante({
           className="h-full py-6"
         />
       ) : (
-        <div className="grid flex-1 items-center gap-5 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className={REJILLA_MAPA_RANKING}>
           <MiniMapaColombia
             valores={departamentos}
             metrica="gmv"
             etiqueta="Inversión verificada por departamento"
-            className="mx-auto w-full max-w-64 sm:max-w-none"
+            className={MAPA_EN_REJILLA}
           />
-          <ol className="flex min-w-0 flex-col gap-2.5" aria-label="Municipios con más inversión">
+          <ol
+            className="flex min-w-0 flex-col gap-2.5"
+            aria-label="Municipios con más inversión"
+          >
             {top.map((fila, indice) => (
               <li key={fila.clave} className="flex items-center gap-2.5">
                 <span
@@ -118,18 +124,28 @@ export function MediosDestacados({
   className?: string
 }) {
   const porEngagement = ranking.criterio === "engagement"
+  // Sin medios no hay criterio que explicar: el estado vacío dice qué falta.
+  const sinMedios = ranking.filas.length === 0
   return (
     <TarjetaPanel
-      titulo={porEngagement ? "Medios con mejor engagement" : "Medios con más alcance"}
+      titulo={
+        sinMedios
+          ? "Medios destacados"
+          : porEngagement
+            ? "Medios con mejor engagement"
+            : "Medios con más alcance"
+      }
       descripcion={
-        porEngagement
-          ? "Interacciones por persona alcanzada, entre medios con muestra suficiente."
-          : `Ordenados por alcance: aún ningún medio reúne ${formatearNumero(nMinimo)} negocios medidos para comparar su engagement.`
+        sinMedios
+          ? "Los medios que mejor respondieron a tu pauta."
+          : porEngagement
+            ? "Interacciones por persona alcanzada, entre medios con muestra suficiente."
+            : `Ordenados por alcance: para comparar su engagement hacen falta ${formatearNumero(MINIMO_COMPARABLES)} medios con al menos ${formatearNumero(nMinimo)} negocios medidos.`
       }
       icono={porEngagement ? Heart : Radar}
       className={className}
     >
-      {ranking.filas.length === 0 ? (
+      {sinMedios ? (
         <EstadoVacio
           variante="simple"
           icono={Radar}
@@ -138,69 +154,136 @@ export function MediosDestacados({
           className="h-full py-6"
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-left text-[0.8125rem]">
-            <caption className="sr-only">
-              {porEngagement ? "Medios por engagement" : "Medios por alcance"}
-            </caption>
-            <thead className="text-xs text-muted-foreground">
-              <tr className="border-b">
-                <th scope="col" className="w-8 pb-2 font-medium">
-                  <span className="sr-only">Puesto</span>
-                </th>
-                <th scope="col" className="pb-2 font-medium">
-                  Medio
-                </th>
-                <th scope="col" className="pb-2 text-right font-medium">
-                  Alcance
-                </th>
-                <th scope="col" className="pb-2 text-right font-medium">
-                  Interacciones
-                </th>
-                <th scope="col" className="pb-2 text-right font-medium">
-                  Engagement
-                </th>
-                <th scope="col" className="pb-2 text-right font-medium">
-                  Inversión
-                </th>
-              </tr>
-            </thead>
-            <tbody className="cifras">
-              {ranking.filas.map((fila, indice) => (
-                <tr key={fila.clave} className="border-b border-border/60 last:border-0">
-                  <td className="py-2.5 text-xs font-semibold text-muted-foreground">
-                    {indice + 1}
-                  </td>
-                  <th scope="row" className="max-w-56 truncate py-2.5 font-medium">
-                    {fila.nombre}
-                    <span className="ml-1.5 text-[0.6875rem] font-normal text-muted-foreground">
-                      n = {formatearNumero(fila.n)}
-                    </span>
-                  </th>
-                  <td className="py-2.5 text-right">
-                    {formatearCompacto(fila.alcance)}
-                  </td>
-                  <td className="py-2.5 text-right">
-                    {formatearCompacto(fila.interacciones)}
-                  </td>
-                  <td
-                    className={cn(
-                      "py-2.5 text-right",
-                      porEngagement && "font-semibold text-primary"
-                    )}
-                  >
-                    {formatearPorcentaje(fila.engagement, 1)}
-                  </td>
-                  <td className="py-2.5 text-right">
-                    {formatearCOPCompacto(fila.gmv)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <ListaMediosMovil ranking={ranking} />
+          <TablaMedios ranking={ranking} />
+        </>
       )}
     </TarjetaPanel>
+  )
+}
+
+/**
+ * Celda angosta (menos de 42 rem): una fila por medio con el valor del
+ * criterio a la vista. En la tabla (34 rem de ancho mínimo) quedaba detrás
+ * del desplazamiento horizontal.
+ */
+function ListaMediosMovil({ ranking }: { ranking: RankingMedios }) {
+  const porEngagement = ranking.criterio === "engagement"
+  return (
+    <ol
+      className="flex flex-col divide-y @2xl/bloque:hidden"
+      aria-label={
+        porEngagement ? "Medios por engagement" : "Medios por alcance"
+      }
+    >
+      {ranking.filas.map((fila, indice) => (
+        <li
+          key={fila.clave}
+          className="flex items-start gap-3 py-2.5 first:pt-0"
+        >
+          <span
+            aria-hidden
+            className="grid size-6 shrink-0 place-items-center rounded-md bg-muted text-[0.6875rem] font-semibold cifras text-muted-foreground"
+          >
+            {indice + 1}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="truncate text-[0.8125rem] font-medium">
+                {fila.nombre}
+              </span>
+              <span className="shrink-0 text-[0.8125rem] font-semibold cifras text-primary">
+                {porEngagement
+                  ? formatearPorcentaje(fila.engagement, 1)
+                  : formatearCompacto(fila.alcance)}
+              </span>
+            </span>
+            <span className="truncate text-[0.6875rem] cifras text-muted-foreground">
+              {[
+                porEngagement
+                  ? `${formatearCompacto(fila.alcance)} personas`
+                  : `${formatearPorcentaje(fila.engagement, 1)} engagement`,
+                `${formatearCompacto(fila.interacciones)} interacciones`,
+                formatearCOPCompacto(fila.gmv),
+                `n = ${formatearNumero(fila.n)}`,
+              ].join(" · ")}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** Desde 42 rem de celda: tabla con todas las columnas. */
+function TablaMedios({ ranking }: { ranking: RankingMedios }) {
+  const porEngagement = ranking.criterio === "engagement"
+  return (
+    <div className="overflow-x-auto @max-2xl/bloque:hidden">
+      <table className="w-full min-w-[34rem] text-left text-[0.8125rem]">
+        <caption className="sr-only">
+          {porEngagement ? "Medios por engagement" : "Medios por alcance"}
+        </caption>
+        <thead className="text-xs text-muted-foreground">
+          <tr className="border-b">
+            <th scope="col" className="w-8 pb-2 font-medium">
+              <span className="sr-only">Puesto</span>
+            </th>
+            <th scope="col" className="pb-2 font-medium">
+              Medio
+            </th>
+            <th scope="col" className="pb-2 text-right font-medium">
+              Alcance
+            </th>
+            <th scope="col" className="pb-2 text-right font-medium">
+              Interacciones
+            </th>
+            <th scope="col" className="pb-2 text-right font-medium">
+              Engagement
+            </th>
+            <th scope="col" className="pb-2 text-right font-medium">
+              Inversión
+            </th>
+          </tr>
+        </thead>
+        <tbody className="cifras">
+          {ranking.filas.map((fila, indice) => (
+            <tr
+              key={fila.clave}
+              className="border-b border-border/60 last:border-0"
+            >
+              <td className="py-2.5 text-xs font-semibold text-muted-foreground">
+                {indice + 1}
+              </td>
+              <th scope="row" className="max-w-56 truncate py-2.5 font-medium">
+                {fila.nombre}
+                <span className="ml-1.5 text-[0.6875rem] font-normal text-muted-foreground">
+                  n = {formatearNumero(fila.n)}
+                </span>
+              </th>
+              <td className="py-2.5 text-right">
+                {formatearCompacto(fila.alcance)}
+              </td>
+              <td className="py-2.5 text-right">
+                {formatearCompacto(fila.interacciones)}
+              </td>
+              <td
+                className={cn(
+                  "py-2.5 text-right",
+                  porEngagement && "font-semibold text-primary"
+                )}
+              >
+                {formatearPorcentaje(fila.engagement, 1)}
+              </td>
+              <td className="py-2.5 text-right">
+                {formatearCOPCompacto(fila.gmv)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -262,7 +345,9 @@ export function CarteraAnunciante({
                   <span
                     className={cn(
                       "text-[0.6875rem]",
-                      factura.vencida ? "font-medium text-destructive" : "text-muted-foreground"
+                      factura.vencida
+                        ? "font-medium text-destructive"
+                        : "text-muted-foreground"
                     )}
                   >
                     {factura.fechaVencimiento

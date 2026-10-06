@@ -6,9 +6,8 @@ import {
   UserRoundPlus,
 } from "lucide-react"
 import type { Metadata } from "next"
-import Link from "next/link"
 
-import { Button } from "@/components/ui/button"
+import { EnlaceBoton } from "@/components/layout/enlace-boton"
 import { ConfirmacionEnlace } from "@/features/auth/components/confirmacion-enlace"
 import { EncabezadoAuth } from "@/features/auth/components/encabezado-auth"
 import { enmascararEmail } from "@/features/auth/components/enmascarar-email"
@@ -84,23 +83,17 @@ function EnlaceIncompleto() {
         descripcion="Abre el enlace completo desde el correo o pide uno nuevo. Si te invitaron, un administrador puede generar otro."
       />
       <div className="flex flex-col gap-3">
-        <Button
-          size="lg"
-          className="h-11"
-          nativeButton={false}
-          render={<Link href="/recuperar" />}
-        >
+        <EnlaceBoton size="lg" className="h-11" href="/recuperar">
           Pedir un enlace nuevo
-        </Button>
-        <Button
+        </EnlaceBoton>
+        <EnlaceBoton
           variant="ghost"
           size="lg"
           className="h-11"
-          nativeButton={false}
-          render={<Link href="/ingresar" />}
+          href="/ingresar"
         >
           Ir a ingresar
-        </Button>
+        </EnlaceBoton>
       </div>
     </div>
   )

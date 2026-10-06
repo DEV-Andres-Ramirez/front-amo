@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./utilidades/prueba"
 
 test.describe("humo", () => {
   test("la página de ingreso responde en español", async ({ page }) => {

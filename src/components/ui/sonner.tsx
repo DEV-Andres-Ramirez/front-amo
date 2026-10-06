@@ -36,10 +36,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
+      // Corrección de idioma: sonner nombra en inglés su región ("Notifications")
+      // y el botón de cierre ("Close toast").
+      containerAriaLabel="Avisos"
       toastOptions={{
         classNames: {
           toast: "cn-toast",
         },
+        closeButtonAriaLabel: "Cerrar aviso",
       }}
       {...props}
     />

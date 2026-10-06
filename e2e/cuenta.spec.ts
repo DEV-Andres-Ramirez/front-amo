@@ -1,12 +1,4 @@
 import AxeBuilder from "@axe-core/playwright"
-import {
-  type Browser,
-  expect,
-  type Locator,
-  type Page,
-  test,
-} from "@playwright/test"
-import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { generarContrasena } from "../scripts/bootstrap/contrasena"
 import {
@@ -22,6 +14,14 @@ import {
   segundosRestantesTotp,
 } from "../scripts/bootstrap/totp"
 import { type Credenciales, entorno, ingresar } from "./utilidades/cuentas"
+import {
+  type AbrirContexto,
+  expect,
+  type Locator,
+  type Page,
+  test,
+} from "./utilidades/prueba"
+import { PROYECTO_CON_CUENTAS } from "./utilidades/proyectos"
 
 /**
  * «Mi cuenta» y la bandeja de notificaciones contra `pnpm build && pnpm start`
@@ -42,8 +42,6 @@ const CUENTA: CuentaE2E = {
   debeCambiarPassword: false,
   conTotp: false,
 }
-
-const PROYECTO_CON_CUENTAS = "escritorio"
 
 let ultimoPasoTotp = -1
 
@@ -77,6 +75,18 @@ async function borrarFactores(
   }
 }
 
+async function borrarNotificaciones(
+  servicio: ClienteSupabase,
+  usuarioId: string
+): Promise<void> {
+  const { error } = await servicio
+    .from("notificaciones")
+    .delete()
+    .eq("usuario_id", usuarioId)
+  if (error)
+    throw new Error(`No se pudieron borrar notificaciones: ${error.message}`)
+}
+
 async function ingresarALaCuenta(
   page: Page,
   credenciales: Credenciales
@@ -85,11 +95,12 @@ async function ingresarALaCuenta(
   await expect(page).toHaveURL(/\/inicio$/)
 }
 
+/** Otra sesión de la misma cuenta en un navegador aparte (también vigilado). */
 async function nuevaSesion(
-  browser: Browser,
+  abrirContexto: AbrirContexto,
   credenciales: Credenciales
 ): Promise<Page> {
-  const contexto = await browser.newContext()
+  const contexto = await abrirContexto()
   const pagina = await contexto.newPage()
   await ingresarALaCuenta(pagina, credenciales)
   return pagina
@@ -130,6 +141,11 @@ test.describe("mi cuenta", () => {
     if (error) throw new Error(`No se pudo limpiar el perfil: ${error.message}`)
   })
 
+  test.afterAll(async ({}, info) => {
+    if (info.project.name !== PROYECTO_CON_CUENTAS || !servicio) return
+    await borrarNotificaciones(servicio, usuarioId)
+  })
+
   test("perfil: valida el celular colombiano y guarda los datos", async ({
     page,
   }) => {
@@ -167,7 +183,7 @@ test.describe("mi cuenta", () => {
 
   test("preferencias: se aplican al instante y se guardan en la cuenta", async ({
     page,
-    browser,
+    abrirContexto,
   }) => {
     await ingresarALaCuenta(page, cuenta)
     await page.goto("/cuenta/preferencias")
@@ -185,7 +201,7 @@ test.describe("mi cuenta", () => {
     await expect(estado).toHaveText(/Guardado en tu cuenta/)
 
     // Otro navegador (sin tema local) recibe lo guardado en la cuenta.
-    const otra = await nuevaSesion(browser, cuenta)
+    const otra = await nuevaSesion(abrirContexto, cuenta)
     await otra.goto("/cuenta/preferencias")
     await expect(
       otra.getByRole("switch", { name: "Reducir el movimiento" })
@@ -205,7 +221,7 @@ test.describe("mi cuenta", () => {
 
   test("seguridad: exige la contraseña actual y la cambia", async ({
     page,
-    browser,
+    abrirContexto,
   }) => {
     await ingresarALaCuenta(page, cuenta)
     await page.goto("/cuenta/seguridad")
@@ -231,7 +247,7 @@ test.describe("mi cuenta", () => {
     cuenta.password = nueva
 
     // La contraseña nueva sirve para ingresar desde otro navegador.
-    const otra = await nuevaSesion(browser, cuenta)
+    const otra = await nuevaSesion(abrirContexto, cuenta)
     await otra.context().close()
   })
 
@@ -280,9 +296,9 @@ test.describe("mi cuenta", () => {
 
   test("sesiones: cierra las demás y conserva la actual", async ({
     page,
-    browser,
+    abrirContexto,
   }) => {
-    const otra = await nuevaSesion(browser, cuenta)
+    const otra = await nuevaSesion(abrirContexto, cuenta)
     await ingresarALaCuenta(page, cuenta)
     await page.goto("/cuenta/seguridad")
 
@@ -311,9 +327,9 @@ test.describe("mi cuenta", () => {
   })
 
   test("notificaciones: filtra y marca como leídas", async ({ page }) => {
-    // TEMPORAL (migración 8): sin la tabla, la bandeja lo indica y no hay filtros.
-    const sinTipos = servicio as unknown as SupabaseClient
-    const { error } = await sinTipos.from("notificaciones").insert([
+    await borrarNotificaciones(servicio, usuarioId)
+    // Inserción en bloque: PostgREST deja en NULL lo que una fila omite.
+    const { error } = await servicio.from("notificaciones").insert([
       {
         usuario_id: usuarioId,
         tipo: "oferta.nueva_elegible",
@@ -321,17 +337,19 @@ test.describe("mi cuenta", () => {
         mensaje: "Hay una oferta nueva para revisar.",
         url: "/cuenta/perfil",
         prioridad: 1,
+        leida: false,
       },
       {
         usuario_id: usuarioId,
         tipo: "liquidacion.pagada",
         titulo: "Pago E2E leído",
         mensaje: "Pagamos tu liquidación.",
+        url: null,
+        prioridad: 0,
         leida: true,
       },
     ])
-    const disponible = !error
-    if (error && !["PGRST205", "42P01"].includes(error.code))
+    if (error)
       throw new Error(`No se pudieron crear notificaciones: ${error.message}`)
 
     await ingresarALaCuenta(page, cuenta)
@@ -339,15 +357,9 @@ test.describe("mi cuenta", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Notificaciones" })
     ).toBeVisible()
-
-    if (!disponible) {
-      await expect(
-        page.getByText("Tu bandeja estará lista muy pronto")
-      ).toBeVisible()
-      return
-    }
-
     await expect(page.getByText("Oferta E2E sin leer")).toBeVisible()
+    await expect(page.getByText("Pago E2E leído")).toBeVisible()
+
     await page
       .getByRole("button", { name: "No leídas", exact: false })
       .first()
@@ -365,11 +377,11 @@ test.describe("mi cuenta", () => {
         name: "Marcar como no leída: Oferta E2E sin leer",
       })
     ).toBeVisible()
-
-    await sinTipos.from("notificaciones").delete().eq("usuario_id", usuarioId)
   })
 
   test("accesibilidad de las pantallas en ambos temas", async ({ page }) => {
+    // Sin animaciones de entrada: un texto a medio aparecer da un contraste falso.
+    await page.emulateMedia({ reducedMotion: "reduce" })
     await ingresarALaCuenta(page, cuenta)
     for (const tema of ["dark", "light"] as const) {
       // next-themes lee el tema elegido de localStorage antes de pintar.

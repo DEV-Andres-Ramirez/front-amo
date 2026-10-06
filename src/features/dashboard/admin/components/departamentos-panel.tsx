@@ -1,40 +1,38 @@
 "use client"
 
 import { ChevronRight, MapPinned } from "lucide-react"
-import type { Route } from "next"
 import Link from "next/link"
 import { useState } from "react"
 
 import { EstadoVacio } from "@/components/feedback/estado-vacio"
 import { MiniMapaColombia } from "@/components/maps/mini-mapa-colombia"
-import { construirHref, RUTAS_INSIGHTS } from "@/features/dashboard/insights/rutas"
-import { DEPARTAMENTOS_SIN_DESCENSO } from "@/features/geo/niveles"
+import { type PeriodoEnlace, rutaExplorador } from "@/features/geo/rutas"
 import {
   formatearCOPCompacto,
   formatearDelta,
   formatearPorcentaje,
+  type Tendencia,
+  tendenciaDelta,
 } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
+import {
+  MAPA_EN_REJILLA,
+  REJILLA_MAPA_RANKING,
+} from "../../components/esqueletos-panel"
 import { TarjetaPanel } from "../../components/tarjeta-panel"
 import type { ZonaPanel } from "../datos"
 
 const VISIBLES = 6
 
-function hrefDepartamento(
-  codigo: string | null,
-  periodo: { desde: string; hasta: string }
-): Route {
-  const desciende = codigo !== null && !DEPARTAMENTOS_SIN_DESCENSO.has(codigo)
-  return construirHref(
-    RUTAS_INSIGHTS.mapa,
-    {
-      metrica: "gmv",
-      nivel: desciende ? "departamental" : undefined,
-      depto: desciende ? codigo : undefined,
-    },
-    periodo
-  )
+/** El explorador en ese departamento (o en Colombia), con el GMV del periodo. */
+const hrefDepartamento = (codigo: string | null, periodo: PeriodoEnlace) =>
+  rutaExplorador({ metrica: "gmv", departamento: codigo, periodo })
+
+const TONO_TENDENCIA: Readonly<Record<Tendencia, string>> = {
+  sube: "text-success",
+  baja: "text-destructive",
+  estable: "text-muted-foreground",
 }
 
 function Variacion({ zona }: { zona: ZonaPanel }) {
@@ -43,17 +41,32 @@ function Variacion({ zona }: { zona: ZonaPanel }) {
       <span className="text-[0.6875rem] font-medium text-info">Nuevo</span>
     ) : null
   }
-  const sube = zona.variacion > 0
   return (
     <span
       className={cn(
-        "text-[0.6875rem] font-medium whitespace-nowrap cifras",
-        sube ? "text-success" : "text-destructive"
+        "text-[0.6875rem] font-medium cifras whitespace-nowrap",
+        // Tras redondear: un «→ 0%» no es ni subida ni caída.
+        TONO_TENDENCIA[tendenciaDelta(zona.variacion, 0)]
       )}
     >
       {formatearDelta(zona.variacion, 0)}
     </span>
   )
+}
+
+/** "Bogotá: $56,1 M, 24% del total, +18% frente al periodo anterior". */
+function resumenZona(zona: ZonaPanel): string {
+  const partes = [`${zona.nombre}: ${formatearCOPCompacto(zona.valor)}`]
+  if (zona.participacion !== null) {
+    partes.push(`${formatearPorcentaje(zona.participacion, 0)} del total`)
+  }
+  if (zona.variacion !== null) {
+    const cambio = formatearDelta(zona.variacion, 0).replace(/^\S+\s/, "")
+    partes.push(`${cambio} frente al periodo anterior`)
+  } else if (zona.valorAnterior === 0 && zona.valor > 0) {
+    partes.push("sin negocios en el periodo anterior")
+  }
+  return partes.join(", ")
 }
 
 /**
@@ -70,7 +83,7 @@ export function DepartamentosPanel({
 }: {
   zonas: readonly ZonaPanel[]
   valores: Readonly<Record<string, number | null>>
-  periodo: { desde: string; hasta: string }
+  periodo: PeriodoEnlace
   /** Con `analitica.mapa`: filas y mapa llevan al explorador. */
   conEnlaces: boolean
   className?: string
@@ -87,7 +100,10 @@ export function DepartamentosPanel({
       className={className}
       enlace={
         conEnlaces
-          ? { href: hrefDepartamento(null, periodo), texto: "Abrir el explorador" }
+          ? {
+              href: hrefDepartamento(null, periodo),
+              texto: "Abrir el explorador",
+            }
           : undefined
       }
       pie={
@@ -105,16 +121,20 @@ export function DepartamentosPanel({
           className="h-full py-6"
         />
       ) : (
-        <div className="grid flex-1 items-center gap-5 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className={REJILLA_MAPA_RANKING}>
           <MiniMapaColombia
             valores={valores}
             metrica="gmv"
             etiqueta="GMV comprometido por departamento"
             destacado={destacado}
             enlazar={conEnlaces}
-            className="mx-auto w-full max-w-64 sm:max-w-none"
+            periodo={periodo}
+            className={MAPA_EN_REJILLA}
           />
-          <ol className="flex min-w-0 flex-col gap-1" aria-label="Departamentos con más GMV">
+          <ol
+            className="flex min-w-0 flex-col gap-1"
+            aria-label="Departamentos con más GMV"
+          >
             {top.map((zona, indice) => {
               const contenido = (
                 <>
@@ -169,8 +189,11 @@ export function DepartamentosPanel({
                       href={hrefDepartamento(zona.codigo, periodo)}
                       onFocus={() => setDestacado(zona.codigo)}
                       onBlur={() => setDestacado(null)}
-                      aria-label={`${zona.nombre}: ${formatearCOPCompacto(zona.valor)}. Abrir en el explorador`}
-                      className={cn(clases, "hover:bg-muted/60 focus-visible:anillo-foco")}
+                      aria-label={`${resumenZona(zona)}. Abrir en el explorador`}
+                      className={cn(
+                        clases,
+                        "hover:bg-muted/60 focus-visible:anillo-foco"
+                      )}
                     >
                       {contenido}
                     </Link>

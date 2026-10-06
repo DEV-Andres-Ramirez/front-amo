@@ -7,6 +7,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app"
 import type { ReactNode } from "react"
 
 import { IndicadorConexion } from "@/components/feedback/indicador-conexion"
+import { GuardiaTransiciones } from "@/components/motion/guardia-transiciones"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
@@ -44,6 +45,7 @@ export function Proveedores({ children, nonce }: ProveedoresProps) {
                 {children}
                 <Toaster position="top-right" richColors closeButton />
                 <IndicadorConexion />
+                <GuardiaTransiciones />
               </TooltipProvider>
             </LazyMotion>
           </MotionConfig>

@@ -143,27 +143,31 @@ export function BarraLateral() {
       variant="inset"
       style={{ viewTransitionName: "amo-barra-lateral" }}
     >
-      <SidebarHeader className="h-14 justify-center px-3 group-data-[collapsible=icon]:px-2">
-        <Link
-          href={RUTA_INICIO}
-          aria-label="AMO, ir al inicio"
-          className="flex items-center rounded-md group-data-[collapsible=icon]:justify-center focus-visible:anillo-foco"
-        >
-          <Logotipo
-            alto={26}
-            aria-hidden
-            className="group-data-[collapsible=icon]:hidden"
-          />
-          <Isotipo
-            size={24}
-            decorativo
-            className="hidden group-data-[collapsible=icon]:block"
-          />
-        </Link>
-      </SidebarHeader>
+      {/*
+       * Un solo landmark de navegación para toda la barra: el logo (ir al
+       * inicio) y la tarjeta de la cuenta quedaban fuera de toda región.
+       */}
+      <nav aria-label="Principal" className="flex min-h-0 flex-1 flex-col">
+        <SidebarHeader className="h-14 justify-center px-3 group-data-[collapsible=icon]:px-2">
+          <Link
+            href={RUTA_INICIO}
+            aria-label="AMO, ir al inicio"
+            className="flex items-center rounded-md group-data-[collapsible=icon]:justify-center focus-visible:anillo-foco"
+          >
+            <Logotipo
+              alto={26}
+              aria-hidden
+              className="group-data-[collapsible=icon]:hidden"
+            />
+            <Isotipo
+              size={24}
+              decorativo
+              className="hidden group-data-[collapsible=icon]:block"
+            />
+          </Link>
+        </SidebarHeader>
 
-      <SidebarContent>
-        <nav aria-label="Principal">
+        <SidebarContent>
           {grupos.map((grupo) => (
             <SidebarGroup key={grupo.id}>
               <SidebarGroupLabel className="text-[0.6875rem] font-semibold tracking-[0.08em] uppercase">
@@ -180,12 +184,12 @@ export function BarraLateral() {
               </SidebarMenu>
             </SidebarGroup>
           ))}
-        </nav>
-      </SidebarContent>
+        </SidebarContent>
 
-      <SidebarFooter>
-        <TarjetaUsuario />
-      </SidebarFooter>
+        <SidebarFooter>
+          <TarjetaUsuario />
+        </SidebarFooter>
+      </nav>
       <SidebarRail
         aria-label="Mostrar u ocultar el menú lateral"
         title="Mostrar u ocultar el menú lateral"

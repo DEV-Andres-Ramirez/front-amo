@@ -1,7 +1,12 @@
 "use client"
 
 import type { FeatureCollection, Geometry } from "geojson"
-import { type CSSProperties, type KeyboardEvent, useMemo, useState } from "react"
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  useMemo,
+  useState,
+} from "react"
 
 import {
   COLOR_SIN_DATOS,
@@ -11,7 +16,11 @@ import {
 import type { Posicion } from "@/lib/geo/tipos"
 import { cn } from "@/lib/utils"
 
-import { proyectarEnMundo, trazarPaises, VIEWBOX_MUNDO } from "./proyeccion-mundo"
+import {
+  proyectarEnMundo,
+  trazarPaises,
+  VIEWBOX_MUNDO,
+} from "./proyeccion-mundo"
 
 export interface ZonaMundo {
   /** ISO 3166-1 alfa-2. */
@@ -24,7 +33,10 @@ export interface ZonaMundo {
 
 export interface MapaMundiProps {
   /** `public/data/geo/paises.json` (el mismo que usa el explorador). */
-  readonly coleccion: FeatureCollection<Geometry, { codigo: string; nombre: string }>
+  readonly coleccion: FeatureCollection<
+    Geometry,
+    { codigo: string; nombre: string }
+  >
   readonly zonas: readonly ZonaMundo[]
   /** Nombre accesible del mapa. */
   readonly etiqueta: string
@@ -88,14 +100,20 @@ export function MapaMundi({
       oscuro: crearEscalaCuantiles(valores, { tema: "oscuro" }),
     }
   }, [zonas])
-  const conPoligono = useMemo(() => new Set(paises.map((p) => p.codigo)), [paises])
-  const circulos = zonas.filter((zona) => zona.centro && !conPoligono.has(zona.codigo))
+  const conPoligono = useMemo(
+    () => new Set(paises.map((p) => p.codigo)),
+    [paises]
+  )
+  const circulos = zonas.filter(
+    (zona) => zona.centro && !conPoligono.has(zona.codigo)
+  )
   const zonaActiva = activo ? porCodigo.get(activo) : undefined
 
   const propsInteractivas = (zona: ZonaMundo) => ({
     tabIndex: 0,
     role: onElegir ? "button" : "img",
-    "aria-label": describirAccion?.(zona) ?? `${zona.nombre}: ${formatear(zona.valor)}`,
+    "aria-label":
+      describirAccion?.(zona) ?? `${zona.nombre}: ${formatear(zona.valor)}`,
     onPointerEnter: () => setActivo(zona.codigo),
     onPointerLeave: () => setActivo(null),
     onFocus: () => setActivo(zona.codigo),
@@ -113,14 +131,21 @@ export function MapaMundi({
 
   const claseZona = (codigo: string) =>
     cn(
-      "fill-(--relleno-claro) stroke-background outline-none transition-[opacity,stroke-width] duration-200 dark:fill-(--relleno-oscuro)",
-      activo === codigo ? "stroke-foreground [stroke-width:1.6]" : "[stroke-width:0.5]",
+      "fill-(--relleno-claro) stroke-background transition-[opacity,stroke-width] duration-200 outline-none dark:fill-(--relleno-oscuro)",
+      activo === codigo
+        ? "stroke-foreground [stroke-width:1.6]"
+        : "[stroke-width:0.5]",
       activo && activo !== codigo && "opacity-70"
     )
 
   return (
     <div className={cn("relative", className)}>
-      <svg viewBox={VIEWBOX_MUNDO} role="group" aria-label={etiqueta} className="h-auto w-full">
+      <svg
+        viewBox={VIEWBOX_MUNDO}
+        role="group"
+        aria-label={etiqueta}
+        className="h-auto w-full"
+      >
         {paises.map((pais) => {
           const zona = porCodigo.get(pais.codigo)
           if (!zona) {
@@ -139,7 +164,10 @@ export function MapaMundi({
               key={pais.codigo}
               d={pais.trazo}
               style={estiloDe(zona.valor, escalas)}
-              className={cn(claseZona(pais.codigo), onElegir && "cursor-pointer")}
+              className={cn(
+                claseZona(pais.codigo),
+                onElegir && "cursor-pointer"
+              )}
               {...propsInteractivas(zona)}
             >
               <title>{`${zona.nombre}: ${formatear(zona.valor)}`}</title>
@@ -155,7 +183,11 @@ export function MapaMundi({
               cy={y}
               r={RADIO_CIRCULO}
               style={estiloDe(zona.valor, escalas)}
-              className={cn(claseZona(zona.codigo), "[stroke-width:1.2]", onElegir && "cursor-pointer")}
+              className={cn(
+                claseZona(zona.codigo),
+                "[stroke-width:1.2]",
+                onElegir && "cursor-pointer"
+              )}
               {...propsInteractivas(zona)}
             >
               <title>{`${zona.nombre}: ${formatear(zona.valor)}`}</title>
@@ -168,14 +200,16 @@ export function MapaMundi({
       <div
         aria-hidden
         className={cn(
-          "vidrio pointer-events-none absolute bottom-2 left-2 rounded-lg px-2.5 py-1.5 text-xs shadow-sm transition-opacity duration-200",
+          "pointer-events-none absolute bottom-2 left-2 rounded-lg vidrio px-2.5 py-1.5 text-xs shadow-sm transition-opacity duration-200",
           zonaActiva ? "opacity-100" : "opacity-0"
         )}
       >
         {zonaActiva ? (
           <>
             <span className="font-medium">{zonaActiva.nombre}</span>{" "}
-            <span className="cifras text-muted-foreground">{formatear(zonaActiva.valor)}</span>
+            <span className="cifras text-muted-foreground">
+              {formatear(zonaActiva.valor)}
+            </span>
           </>
         ) : null}
       </div>

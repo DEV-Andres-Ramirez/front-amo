@@ -9,12 +9,15 @@
 import "server-only"
 
 import { mensajeErrorBd } from "@/features/usuarios/errores"
+import { contextoDelActor } from "@/lib/auth/contexto-actor"
 import { requerirPermiso, tieneAlgunPermiso } from "@/lib/auth/dal"
 import type { ClavePermiso } from "@/lib/auth/permisos"
+import { registrarEvento } from "@/lib/auth/registro"
 import { desdeErrorZod, exito, fallo, type ResultadoAccion } from "@/lib/result"
 import { crearClienteServidor } from "@/lib/supabase/server"
 
 import { type DatoRevelado, grupoPrivado, presentarRevelados } from "./privados"
+import { configuracionOperacion } from "./queries/comun"
 import {
   type EntidadExportable,
   type EntradaEvidencias,
@@ -24,7 +27,7 @@ import {
   esquemaExportacion,
   esquemaRevelar,
 } from "./schemas"
-import { contextoDelActor, informar, registrarEvento } from "./servidor"
+import { informar } from "./servidor"
 
 const MENSAJE_INESPERADO =
   "No pudimos completar la operación. Intenta de nuevo en unos minutos."
@@ -37,9 +40,38 @@ export interface DatosRevelados {
 }
 
 /**
+ * ¿El USUARIO puede leer esa ficha? Se consulta con su JWT: la RLS decide. La
+ * función `revelar_privado_srv` valida el permiso, no el alcance de la fila.
+ */
+async function fichaVisible(
+  entidad: EntradaRevelar["entidad"],
+  id: string
+): Promise<boolean> {
+  const supabase = await crearClienteServidor()
+  const { data, error } =
+    entidad === "medio"
+      ? await supabase
+          .from("medios")
+          .select("id")
+          .eq("id", id)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : await supabase
+          .from("anunciantes")
+          .select("id")
+          .eq("id", id)
+          .is("deleted_at", null)
+          .maybeSingle()
+  if (error) throw error
+  return data !== null
+}
+
+/**
  * Revela un grupo de datos `_privado` de un medio o anunciante. Exige
- * `datos_sensibles.ver` y poder ver la ficha; `revelar_privado_srv` vuelve a
- * validarlo y deja `REVELAR_DATO` en la bitácora con los campos pedidos.
+ * `datos_sensibles.ver`, el permiso de la ficha y que la fila sea visible
+ * para quien consulta (RLS); `revelar_privado_srv` vuelve a validar actor,
+ * sesión y permiso, y deja `REVELAR_DATO` en la bitácora con los campos
+ * pedidos. Un id inexistente o ajeno no llega a la bitácora.
  */
 export async function revelarDatosPrivados(
   entrada: EntradaRevelar
@@ -56,6 +88,9 @@ export async function revelarDatosPrivados(
   if (!definicion) return fallo("Ese grupo de datos no existe.")
 
   try {
+    if (!(await fichaVisible(entidad, id))) {
+      return fallo("No encontramos esa ficha o no tienes acceso a ella.")
+    }
     const contexto = await contextoDelActor(actor)
     const { data, error } = await contexto.admin.rpc("revelar_privado_srv", {
       p_tabla: definicion.tabla,
@@ -65,7 +100,8 @@ export async function revelarDatosPrivados(
       p_campos: definicion.campos.map((campo) => campo.campo),
     })
     if (error) {
-      if (!error.message?.startsWith("AMO_")) informar("revelarDatosPrivados", error)
+      if (!error.message?.startsWith("AMO_"))
+        informar("revelarDatosPrivados", error)
       return fallo(mensajeErrorBd(error))
     }
     return exito({
@@ -80,8 +116,6 @@ export async function revelarDatosPrivados(
 
 // ── Evidencias (URL firmadas de corta duración) ──────────────────────────────
 
-/** `archivos.vigencia_url_firmada_segundos` (§8). */
-const VIGENCIA_URL_SEGUNDOS = 300
 const BUCKET_EVIDENCIAS = "evidencias"
 /** Capturas compartidas de los datos demo: solo se firman con la secret key (§10). */
 const PREFIJO_MUESTRAS = "muestras/"
@@ -95,6 +129,8 @@ export interface ImagenEvidencia {
 export interface ImagenesEvidencia {
   publicaciones: Record<string, ImagenEvidencia>
   metricas: Record<string, ImagenEvidencia>
+  /** Segundos que viven estas URL (`archivos.vigencia_url_firmada_segundos`, §8). */
+  vigenciaSegundos: number
 }
 
 interface FilaImagen {
@@ -108,13 +144,14 @@ type Firmador = (rutas: string[]) => Promise<Map<string, string>>
 function firmadorCon(
   almacen: ReturnType<
     Awaited<ReturnType<typeof crearClienteServidor>>["storage"]["from"]
-  >
+  >,
+  vigenciaSegundos: number
 ): Firmador {
   return async (rutas) => {
     if (rutas.length === 0) return new Map()
     const { data, error } = await almacen.createSignedUrls(
       rutas,
-      VIGENCIA_URL_SEGUNDOS
+      vigenciaSegundos
     )
     if (error) throw error
     return new Map(
@@ -129,7 +166,9 @@ function firmadorCon(
 
 function rutasDe(filas: readonly FilaImagen[]): string[] {
   return filas.flatMap((fila) =>
-    fila.miniatura_path ? [fila.captura_path, fila.miniatura_path] : [fila.captura_path]
+    fila.miniatura_path
+      ? [fila.captura_path, fila.miniatura_path]
+      : [fila.captura_path]
   )
 }
 
@@ -149,7 +188,8 @@ function imagenesPorFila(
 }
 
 /**
- * Firma las capturas de evidencia y métricas de una asignación (300 s). Las
+ * Firma las capturas de evidencia y métricas de una asignación por el tiempo
+ * configurado (`archivos.vigencia_url_firmada_segundos`, 300 s por defecto). Las
  * rutas salen de las filas que el USUARIO puede leer (RLS), nunca del cliente:
  * - `asignacion/<id>/…`: se firman con el cliente del usuario (regla 1, §8).
  * - `muestras/…` (datos demo): con la secret key tras leer la fila, dejando
@@ -165,7 +205,7 @@ export async function firmarEvidencias(
 
   try {
     const supabase = await crearClienteServidor()
-    const [publicaciones, metricas] = await Promise.all([
+    const [publicaciones, metricas, configuracion] = await Promise.all([
       supabase
         .from("publicaciones")
         .select("id, captura_path, miniatura_path")
@@ -174,9 +214,11 @@ export async function firmarEvidencias(
         .from("metricas")
         .select("id, captura_path, miniatura_path")
         .eq("asignacion_id", asignacionId),
+      configuracionOperacion(),
     ])
     if (publicaciones.error) throw publicaciones.error
     if (metricas.error) throw metricas.error
+    const vigenciaSegundos = configuracion.vigenciaUrlFirmadaSegundos
 
     const rutas = [
       ...new Set([...rutasDe(publicaciones.data), ...rutasDe(metricas.data)]),
@@ -185,24 +227,28 @@ export async function firmarEvidencias(
     const propias = rutas.filter((ruta) => ruta.startsWith(prefijoPropio))
     const muestras = rutas.filter((ruta) => ruta.startsWith(PREFIJO_MUESTRAS))
 
-    const firmadas = await firmadorCon(supabase.storage.from(BUCKET_EVIDENCIAS))(
-      propias
-    )
+    const firmadas = await firmadorCon(
+      supabase.storage.from(BUCKET_EVIDENCIAS),
+      vigenciaSegundos
+    )(propias)
     if (muestras.length > 0) {
       const contexto = await contextoDelActor(actor)
-      const registrado = await registrarEvento(contexto, {
+      const registrado = await registrarEvento({
+        actorId: contexto.actorId,
+        admin: contexto.admin,
         accion: "URL_FIRMADA",
         entidad: "asignaciones",
         entidadId: asignacionId,
         metadatos: {
           bucket: BUCKET_EVIDENCIAS,
           rutas: muestras,
-          expira_s: VIGENCIA_URL_SEGUNDOS,
+          expira_s: vigenciaSegundos,
         },
       })
       if (registrado) {
         const deMuestras = await firmadorCon(
-          contexto.admin.storage.from(BUCKET_EVIDENCIAS)
+          contexto.admin.storage.from(BUCKET_EVIDENCIAS),
+          vigenciaSegundos
         )(muestras)
         for (const [ruta, url] of deMuestras) firmadas.set(ruta, url)
       }
@@ -211,6 +257,7 @@ export async function firmarEvidencias(
     return exito({
       publicaciones: imagenesPorFila(publicaciones.data, firmadas),
       metricas: imagenesPorFila(metricas.data, firmadas),
+      vigenciaSegundos,
     })
   } catch (error) {
     informar("firmarEvidencias", error)
@@ -241,7 +288,9 @@ export async function registrarExportacionOperacion(
 
   try {
     const contexto = await contextoDelActor(actor)
-    const registrado = await registrarEvento(contexto, {
+    const registrado = await registrarEvento({
+      actorId: contexto.actorId,
+      admin: contexto.admin,
       accion: "EXPORTAR",
       entidad,
       entidadId: null,

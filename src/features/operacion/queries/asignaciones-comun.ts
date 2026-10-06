@@ -57,7 +57,9 @@ export async function asignacionesResumen(
 
 export type DuenoActividad = "medio" | "anunciante" | "campana"
 
-const COLUMNA_DUENO: Readonly<Record<DuenoActividad, "medio_id" | "anunciante_id" | "campana_id">> = {
+const COLUMNA_DUENO: Readonly<
+  Record<DuenoActividad, "medio_id" | "anunciante_id" | "campana_id">
+> = {
   medio: "medio_id",
   anunciante: "anunciante_id",
   campana: "campana_id",

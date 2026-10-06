@@ -221,7 +221,11 @@ export function VistaPreviaRol({
         style={{ backgroundColor: color }}
         className="absolute inset-y-0 left-0 w-1"
       />
-      <IconoRol rol={{ clave, tipo, color }} tamano="md" className="self-start" />
+      <IconoRol
+        rol={{ clave, tipo, color }}
+        tamano="md"
+        className="self-start"
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex min-w-0 flex-col">
           <p className="truncate text-sm font-semibold">

@@ -3,6 +3,7 @@
 import {
   CalendarCheck,
   ChartColumn,
+  Clock,
   Download,
   PencilLine,
   Send,
@@ -76,36 +77,56 @@ const URGENCIAS: Readonly<
   },
 }
 
+/**
+ * Tres líneas apiladas (acción, oferta, plazo): en la columna angosta de
+ * escritorio y a 390 px, el plazo a la derecha partía la acción en dos líneas
+ * y recortaba la oferta a unas pocas letras.
+ */
 function Accion({ accion, ahora }: { accion: AccionPendiente; ahora: Date }) {
   const cuenta = cuentaRegresiva(accion.venceAt, ahora)
   const estilo = URGENCIAS[cuenta.urgencia]
   return (
-    <li className="relative flex items-center gap-3 overflow-hidden rounded-lg border bg-background/40 p-3 pl-3.5">
+    <li className="relative flex items-start gap-3 overflow-hidden rounded-lg border bg-background/40 p-3 pl-3.5">
       <span
         aria-hidden
-        className={cn("absolute inset-y-2 left-0 w-0.5 rounded-full", estilo.barra)}
+        className={cn(
+          "absolute inset-y-2 left-0 w-0.5 rounded-full",
+          estilo.barra
+        )}
       />
       <span
         aria-hidden
-        className={cn("grid size-9 shrink-0 place-items-center rounded-lg", estilo.chip)}
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-lg",
+          estilo.chip
+        )}
       >
         <IconoAccion accion={accion.accion} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[0.8125rem] font-semibold">
+        <span className="text-[0.8125rem] leading-snug font-semibold">
           {etiquetaAccion(accion.accion)}
         </span>
-        <span className="truncate text-xs text-muted-foreground">
+        <span
+          className="truncate text-xs text-muted-foreground"
+          title={accion.ofertaTitulo}
+        >
           {accion.ofertaTitulo}
         </span>
+        <time
+          dateTime={accion.venceAt ?? undefined}
+          title={
+            accion.venceAt ? formatearFechaHora(accion.venceAt) : undefined
+          }
+          className={cn(
+            "mt-1 inline-flex items-center gap-1 text-xs cifras",
+            estilo.texto
+          )}
+        >
+          <Clock aria-hidden className="size-3 shrink-0" />
+          {cuenta.texto}
+        </time>
       </span>
-      <time
-        dateTime={accion.venceAt ?? undefined}
-        title={accion.venceAt ? formatearFechaHora(accion.venceAt) : undefined}
-        className={cn("shrink-0 text-right text-xs cifras", estilo.texto)}
-      >
-        {cuenta.texto}
-      </time>
     </li>
   )
 }
