@@ -71,6 +71,7 @@ pnpm brand:build            # regenera logos e iconos
 pnpm db:types               # regenera src/types/database.types.ts (requiere `supabase login`)
 pnpm db:permisos            # genera supabase/seed/permisos.sql desde src/lib/auth/permisos.ts
 pnpm bootstrap:superadmin   # crea/recupera el superadministrador (imprime un enlace de un solo uso)
+pnpm bootstrap:restablecer-mfa   # emergencia: borra los factores MFA de una cuenta y da un enlace nuevo
 pnpm bootstrap:e2e          # cuentas de prueba E2E (variables E2E_* en .env.local)
 pnpm demo:generar | pnpm demo:purgar   # datos demo (ver supabase/seed/demo/README.md)
 ```

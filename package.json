@@ -18,6 +18,7 @@
     "db:types": "tsx scripts/db/generar-tipos.ts",
     "db:permisos": "tsx scripts/db/permisos-seed.ts",
     "bootstrap:superadmin": "tsx scripts/bootstrap/superadmin.ts",
+    "bootstrap:restablecer-mfa": "tsx scripts/bootstrap/restablecer-mfa.ts",
     "bootstrap:e2e": "tsx scripts/bootstrap/usuarios-e2e.ts",
     "demo:generar": "tsx scripts/demo/generar.ts",
     "demo:purgar": "tsx scripts/demo/purgar.ts"

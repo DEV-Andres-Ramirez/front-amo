@@ -83,6 +83,19 @@ pnpm bootstrap:superadmin
 Imprime un enlace de un solo uso (vigente 24 h). Al abrirlo defines tu contraseña y configuras la
 verificación en dos pasos con una app autenticadora.
 
+### Si alguien pierde su autenticador
+
+Un superadministrador puede restablecer la verificación en dos pasos de cualquier persona desde
+_Administración → Usuarios_. Si quien la perdió es el único superadministrador, quien administra el
+servidor ejecuta:
+
+```bash
+pnpm bootstrap:restablecer-mfa            # usa SUPERADMIN_EMAIL; admite otro correo como argumento
+```
+
+Borra los factores de esa cuenta, lo registra en la bitácora e imprime un enlace de un solo uso para
+definir una contraseña nueva y configurar el nuevo dispositivo.
+
 ### Datos de demostración
 
 La base incluye 15 meses de operación simulada (40 anunciantes, 300 medios, 5.396 asignaciones,
