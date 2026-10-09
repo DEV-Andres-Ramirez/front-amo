@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css"
 
 import type { Feature, FeatureCollection, Geometry, Point } from "geojson"
 import type { MapSourceDataEvent, Map as MapaMapbox } from "mapbox-gl"
-import { useReducedMotion } from "motion/react"
+import { useReducedMotionConfig } from "motion/react"
 import {
   type Ref,
   useCallback,
@@ -29,6 +29,7 @@ import type { Posicion } from "@/lib/geo/tipos"
 
 import { animarColores } from "./animacion-colores"
 import { encuadreDeZona } from "./area-libre"
+import { estaALaVista } from "./cara-visible"
 import { esErrorFatalMapa, mensajeErrorMapa } from "./error-mapa"
 import {
   COLORES_MAPA,
@@ -50,6 +51,7 @@ import type {
   MargenMapa,
   PuntoPeso,
 } from "./tipos"
+import { useGiroGlobo } from "./use-giro-globo"
 
 export interface MapaCoropleticoProps {
   readonly token: string
@@ -81,6 +83,11 @@ export interface MapaCoropleticoProps {
   /** Foco de la leyenda: zonas destacadas o las zonas sin dato. */
   readonly foco: FocoMapa
   readonly destacados?: ReadonlySet<string>
+  /**
+   * Giro automático del globo sobre su eje (vista mundial). Se detiene solo
+   * mientras la persona usa el mapa, apunta a una zona o tiene una elegida.
+   */
+  readonly giro?: boolean
   /** Nombre accesible del lienzo. */
   readonly etiqueta: string
   readonly onZonaHover: (codigo: string | null) => void
@@ -310,6 +317,7 @@ export default function MapaCoropletico({
   resaltado,
   foco,
   destacados,
+  giro = false,
   etiqueta,
   onZonaHover,
   onPuntero,
@@ -320,10 +328,13 @@ export default function MapaCoropletico({
   refApi,
 }: MapaCoropleticoProps) {
   const refMapa = useRef<MapRef>(null)
-  const reducido = useReducedMotion() ?? false
+  // Movimiento reducido del sistema o de la cuenta (MotionConfig).
+  const reducido = useReducedMotionConfig() ?? false
   const [listo, setListo] = useState(false)
   const [capaCargada, setCapaCargada] = useState<string | null>(null)
   const [sobreZona, setSobreZona] = useState(false)
+  // Solo el ratón "apunta": tras un toque no hay `mouseleave` que lo suelte.
+  const [ratonSobreZona, setRatonSobreZona] = useState(false)
   const punteroRef = useRef<TipoPuntero>("mouse")
   const hoverRef = useRef<string | null>(null)
   const coloresActuales = useRef(new Map<string, string>())
@@ -545,6 +556,18 @@ export default function MapaCoropletico({
   const traerALaVista = useEffectEvent(() => {
     const mapa = refMapa.current?.getMap()
     if (!mapa || !enfoque) return
+    // En el borde o en la cara oculta del globo no hay nada que "correr" (la
+    // zona se proyecta a través del planeta): se trae al centro.
+    const centro = mapa.getCenter()
+    if (!estaALaVista([centro.lng, centro.lat], enfoque)) {
+      mapa.easeTo({
+        center: [enfoque[0], enfoque[1]],
+        padding: margen,
+        duration: reducido ? 0 : DURACION_CAMARA_MS,
+        essential: true,
+      })
+      return
+    }
     const { clientWidth: ancho, clientHeight: alto } = mapa.getContainer()
     // Los márgenes aún en pantalla: el efecto anterior apenas empezó a
     // deslizarlos (abrir el detalle) y esta animación reemplaza a esa.
@@ -613,6 +636,7 @@ export default function MapaCoropletico({
       if (codigo !== hoverRef.current) {
         hoverRef.current = codigo
         setSobreZona(codigo !== null)
+        setRatonSobreZona(codigo !== null && punteroRef.current === "mouse")
         onZonaHover(codigo)
       }
     },
@@ -622,8 +646,21 @@ export default function MapaCoropletico({
   const alSalir = useCallback(() => {
     hoverRef.current = null
     setSobreZona(false)
+    setRatonSobreZona(false)
     onZonaHover(null)
   }, [onZonaHover])
+
+  // ── Giro del globo ───────────────────────────────────────────────────────
+  // Una zona bajo el puntero o elegida no debe escaparse mientras se lee.
+  useGiroGlobo(refMapa, {
+    listo,
+    activo:
+      giro &&
+      !reducido &&
+      capaLista &&
+      !ratonSobreZona &&
+      seleccionado === null,
+  })
 
   const alClic = useCallback(
     (evento: MapMouseEvent) =>

@@ -1,7 +1,9 @@
 "use client"
 
+import { MotionConfigContext } from "motion/react"
 import {
   type RefObject,
+  use,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -60,6 +62,30 @@ export function usePunteroFino(): boolean {
     () => window.matchMedia(CONSULTA_PUNTERO_FINO).matches,
     () => true
   )
+}
+
+const CONSULTA_MOVIMIENTO_REDUCIDO = "(prefers-reduced-motion: reduce)"
+
+function suscribirMovimiento(notificar: () => void): () => void {
+  const consulta = window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO)
+  consulta.addEventListener("change", notificar)
+  return () => consulta.removeEventListener("change", notificar)
+}
+
+/**
+ * ¿Movimiento reducido, pedido por el sistema o por la cuenta? A diferencia
+ * de `useReducedMotionConfig`, sirve para decidir qué se dibuja: la
+ * preferencia del sistema se lee tras hidratar (el servidor no la conoce).
+ */
+export function useMovimientoReducido(): boolean {
+  const { reducedMotion } = use(MotionConfigContext)
+  const sistema = useSyncExternalStore(
+    suscribirMovimiento,
+    () => window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO).matches,
+    () => false
+  )
+  if (reducedMotion === "always") return true
+  return reducedMotion !== "never" && sistema
 }
 
 /**

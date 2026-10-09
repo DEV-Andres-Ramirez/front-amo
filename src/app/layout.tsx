@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google"
+import localFont from "next/font/local"
 import { headers } from "next/headers"
 
 import { SaltoAlContenido } from "@/components/feedback/salto-contenido"
@@ -9,23 +9,35 @@ import { cn } from "@/lib/utils"
 
 import "./globals.css"
 
-const geistSans = Geist({
+/*
+ * Fuentes servidas desde el repositorio (./fuentes, ver su README): compilar
+ * o arrancar la app no depende de alcanzar Google Fonts. Son variables: un
+ * archivo por familia cubre todos los pesos.
+ */
+const geistSans = localFont({
+  src: "./fuentes/geist-latin-wght-normal.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  fallback: ["system-ui", "Arial", "sans-serif"],
 })
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fuentes/geist-mono-latin-wght-normal.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+  // El ajuste automático usa las métricas de Arial: no sirve para monoespaciada.
+  adjustFontFallback: false,
 })
 
-const jakarta = Plus_Jakarta_Sans({
+const jakarta = localFont({
+  src: "./fuentes/plus-jakarta-sans-latin-wght-normal.woff2",
   variable: "--font-jakarta",
-  subsets: ["latin"],
-  // Fuente variable: un solo archivo cubre los pesos 500–800 que usa la marca.
+  weight: "200 800",
   display: "swap",
+  fallback: ["system-ui", "Arial", "sans-serif"],
 })
 
 export const metadata: Metadata = {

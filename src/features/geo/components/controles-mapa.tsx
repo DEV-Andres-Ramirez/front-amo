@@ -8,7 +8,9 @@ import {
   Maximize,
   Minimize,
   Minus,
+  Pause,
   Percent,
+  Play,
   Plus,
 } from "lucide-react"
 import type { ReactNode } from "react"
@@ -236,16 +238,36 @@ function BotonZoom({
   )
 }
 
-/** Acercar, alejar y volver al encuadre del nivel. */
+/** Estado del giro automático del globo y cómo pausarlo o reanudarlo. */
+export interface ControlGiro {
+  readonly girando: boolean
+  readonly onAlternar: () => void
+}
+
+export function etiquetaGiro(girando: boolean): string {
+  return girando ? "Pausar el giro del planeta" : "Reanudar el giro del planeta"
+}
+
+/** Icono del botón de giro: la acción disponible, no el estado. */
+export function IconoGiro({ girando }: { girando: boolean }) {
+  return girando ? <Pause aria-hidden /> : <Play aria-hidden />
+}
+
+/**
+ * Acercar, alejar y volver al encuadre del nivel; en la vista mundial, además,
+ * pausar o reanudar el giro del globo.
+ */
 export function ControlesZoom({
   onAcercar,
   onAlejar,
   onRecentrar,
+  giro,
   className,
 }: {
   onAcercar: () => void
   onAlejar: () => void
   onRecentrar: () => void
+  giro?: ControlGiro | null
   className?: string
 }) {
   return (
@@ -268,6 +290,14 @@ export function ControlesZoom({
       <BotonZoom etiqueta="Volver al encuadre" onClick={onRecentrar}>
         <LocateFixed aria-hidden />
       </BotonZoom>
+      {giro ? (
+        <BotonZoom
+          etiqueta={etiquetaGiro(giro.girando)}
+          onClick={giro.onAlternar}
+        >
+          <IconoGiro girando={giro.girando} />
+        </BotonZoom>
+      ) : null}
     </div>
   )
 }

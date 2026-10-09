@@ -13,6 +13,7 @@ import {
   useMetricasMapa,
   usePuntosMapa,
 } from "../consultas-cliente"
+import { centroDelMayorPoligono } from "../centro-zona"
 import { departamentoPorCodigo } from "../departamentos"
 import { urlGeometria } from "../encuadre"
 import { DEFINICIONES_METRICAS, type MetricaGeo } from "../metricas"
@@ -125,10 +126,13 @@ export function useDatosExplorador(
     if (estado.nivel === "nacional") {
       return departamentoPorCodigo(codigo)?.centroide ?? null
     }
-    // Los países no se recentran: su envolvente (Alaska, ultramar) engaña.
-    if (estado.nivel !== "departamental") return null
     const zona = coleccion?.features.find((f) => f.properties.codigo === codigo)
     if (!zona) return null
+    // La envolvente de un país engaña (Alaska, ultramar): se usa la de su
+    // territorio principal.
+    if (estado.nivel === "internacional") {
+      return centroDelMayorPoligono(zona.geometry)
+    }
     const [oeste, sur, este, norte] = bbox(zona)
     return [(oeste + este) / 2, (sur + norte) / 2]
   }

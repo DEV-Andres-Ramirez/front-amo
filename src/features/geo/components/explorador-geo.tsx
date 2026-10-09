@@ -70,7 +70,13 @@ import {
 import { BarraCompacta, EncabezadoMapa, HerramientasMapa } from "./barra-mapa"
 import { CoachmarkMapa } from "./coachmark-mapa"
 import { ContenidoTooltip } from "./contenido-tooltip"
-import { ControlesZoom, type OpcionesVista } from "./controles-mapa"
+import {
+  type ControlGiro,
+  ControlesZoom,
+  etiquetaGiro,
+  IconoGiro,
+  type OpcionesVista,
+} from "./controles-mapa"
 import type { DatosDetalle } from "./detalle-zona"
 import {
   type CalorLeyenda,
@@ -84,9 +90,11 @@ import {
   type CalorExplorador,
   useDatosExplorador,
 } from "./use-datos-explorador"
+import { useGiroPreferido } from "./use-giro-preferido"
 import {
   disposicionPara,
   useFocoTrasCambioDeNivel,
+  useMovimientoReducido,
   usePantallaCompleta,
   usePunteroFino,
   useTamanoElemento,
@@ -248,6 +256,14 @@ export function ExploradorGeo({
   const [errorMapa, setErrorMapa] = useState<string | null>(null)
   const [intentoMapa, setIntentoMapa] = useState(0)
   const [exportando, setExportando] = useState(false)
+  // El globo gira solo en la vista mundial; la persona puede pausarlo. Con
+  // movimiento reducido (sistema o cuenta) no gira y el control no aparece.
+  const [girar, alternarGiro] = useGiroPreferido()
+  const sinMovimiento = useMovimientoReducido()
+  const controlGiro: ControlGiro | null =
+    estado.nivel === "internacional" && !sinMovimiento
+      ? { girando: girar, onAlternar: alternarGiro }
+      : null
 
   const seleccionado = enAmbito(seleccion, ambito)
   const hoverActual = enAmbito(hover, ambito)
@@ -611,6 +627,7 @@ export function ExploradorGeo({
               onAcercar={() => apiMapa.current?.acercar()}
               onAlejar={() => apiMapa.current?.alejar()}
               onRecentrar={() => apiMapa.current?.recentrar()}
+              giro={controlGiro}
               className={cn(
                 "absolute bottom-11 transition-[right] duration-300 ease-out",
                 datosDetalle ? "right-[24.5rem]" : "right-4"
@@ -638,6 +655,20 @@ export function ExploradorGeo({
             <div className="pointer-events-auto mb-1 min-w-0">{leyenda}</div>
             {/* Por encima del logotipo y la atribución de Mapbox (obligatorios). */}
             <div className="pointer-events-auto mb-[4.25rem] flex shrink-0 flex-col items-end gap-2">
+              {mapaUsable && controlGiro ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={controlGiro.onAlternar}
+                  aria-label={etiquetaGiro(controlGiro.girando)}
+                  className={cn(
+                    CLASE_PANEL,
+                    "size-10 rounded-xl text-muted-foreground"
+                  )}
+                >
+                  <IconoGiro girando={controlGiro.girando} />
+                </Button>
+              ) : null}
               {mapaUsable ? (
                 <Button
                   variant="ghost"
@@ -709,6 +740,7 @@ export function ExploradorGeo({
           resaltado={resaltado}
           foco={focoDelMapa(foco)}
           destacados={destacados}
+          giro={controlGiro?.girando ?? false}
           etiqueta={`Mapa de ${nombreDelAmbito(estado)} por ${tipoZona.plural}: ${DEFINICIONES_METRICAS[metricaVista].titulo}. El ranking contiene los mismos datos.`}
           onZonaHover={(codigo) =>
             setHover(

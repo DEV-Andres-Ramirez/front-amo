@@ -131,6 +131,32 @@ test.describe("explorador geográfico", () => {
     await expect(page.locator(".mapboxgl-canvas")).toBeVisible()
   })
 
+  test("el giro del planeta solo existe en la vista mundial, se pausa, se recuerda y respeta el movimiento reducido", async ({
+    page,
+  }, info) => {
+    const proyecto = info.project.name
+    const giro = page.getByRole("button", { name: /giro del planeta$/ })
+
+    await abrirExplorador(page)
+    await expect(nivelActual(page)).toHaveText("Colombia")
+    await expect(giro).toHaveCount(0)
+
+    await abrirExplorador(page, `${RUTA}?nivel=internacional`)
+    await expect(giro).toHaveAccessibleName("Pausar el giro del planeta")
+    await pulsar(giro, proyecto)
+    await expect(giro).toHaveAccessibleName("Reanudar el giro del planeta")
+
+    // La elección se recuerda en el navegador.
+    await page.reload()
+    await expect(giro).toHaveAccessibleName("Reanudar el giro del planeta")
+    await pulsar(giro, proyecto)
+    await expect(giro).toHaveAccessibleName("Pausar el giro del planeta")
+
+    // Sin movimiento no hay giro que pausar.
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await expect(giro).toHaveCount(0)
+  })
+
   test("un enlace directo abre el nivel, la métrica y el periodo pedidos", async ({
     page,
   }, info) => {

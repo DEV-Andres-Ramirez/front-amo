@@ -145,6 +145,8 @@ Las constantes en código viven en `src/components/brand/colores.ts` (`LILA`, `N
 | **Geist**             | Interfaz: texto, formularios, tablas     | 400–600 | `--font-sans`                       |
 | **Geist Mono**        | Códigos, identificadores, datos técnicos | 400–500 | `--font-mono`                       |
 
+Las tres familias se sirven desde el repositorio (`src/app/fuentes/`, variables, subconjunto `latin`) con `next/font/local`: ni el desarrollo ni la compilación dependen de alcanzar Google Fonts. Origen, licencia y cómo actualizarlas, en el `README.md` de esa carpeta.
+
 Jerarquía de referencia (escritorio; en móvil un paso menos):
 
 | Nivel       | Tamaño / interlínea          | Familia y peso | Tracking  |
@@ -210,6 +212,7 @@ Hablamos **español de Colombia, cercano y profesional**, y tratamos de **tú** 
 - Las salidas son más cortas que las entradas (unos 2/3).
 - Los escalonados usan 40–60 ms entre elementos y un máximo de 6 elementos animados.
 - **`LogoAnimado`** dibuja el contorno del pin en 900 ms, rellena el pin con la Λ calada en 400 ms y hace pulsar los arcos en onda (1,6 s, desfase 220 ms). Se usa en ingreso y splash, nunca dentro de la app.
+- **Giro del globo** (explorador geográfico, solo en la vista mundial): el planeta gira sobre su eje hacia el este, una vuelta cada 3 min, con arranque y frenado suaves. Es ambiental y nunca compite con la lectura: se detiene al arrastrar, acercar, apuntar a un país o tener uno elegido, y reanuda solo; hay un botón para pausarlo (la elección se recuerda) y no existe con movimiento reducido. Modelo y constantes en `src/components/maps/giro-globo.ts`.
 - **Movimiento reducido:** con `prefers-reduced-motion` se desactivan los desplazamientos y los bucles. `LogoAnimado` muestra el isotipo estático (resuelto en CSS, sin desajustes de hidratación) y `MotionConfig reducedMotion="user"` aplica la regla al resto.
 
 ## 11. Accesibilidad de color
